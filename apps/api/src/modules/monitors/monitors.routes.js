@@ -2,6 +2,7 @@ import { MONITOR_STATUS, ROLES } from '@pulseboard/shared/constants';
 import { paginationSchema } from '@pulseboard/shared/schemas';
 import { Router } from 'express';
 import { z } from 'zod';
+import { createTestCheckLimiter } from '../../middleware/rateLimits.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import { createMonitorService, toMonitorDto } from './monitors.service.js';
@@ -30,6 +31,25 @@ export function monitorsRouter({ env, scheduler, schemas }) {
       res.status(201).json({ data: dto(req, monitor) });
     },
   );
+
+  // "Test now": one shared limiter, so both endpoints count towards the same 5/min.
+  const testLimiter = createTestCheckLimiter();
+
+  // Test an unsaved configuration (the create/edit form).
+  router.post(
+    '/test',
+    requireRole(ROLES.MEMBER),
+    testLimiter,
+    validate({ body: schemas.create }),
+    async (req, res) => {
+      res.json({ data: await monitors.testConfig(req.valid.body) });
+    },
+  );
+
+  // Test a saved monitor as it is configured now.
+  router.post('/:mid/test', requireRole(ROLES.MEMBER), testLimiter, async (req, res) => {
+    res.json({ data: await monitors.testExisting(req.params.wid, req.params.mid) });
+  });
 
   router.get('/:mid', requireRole(ROLES.VIEWER), async (req, res) => {
     const monitor = await monitors.findInWorkspace(req.params.wid, req.params.mid);

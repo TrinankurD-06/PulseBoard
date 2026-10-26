@@ -35,6 +35,7 @@ export default function EditMonitor() {
       <PageHeader title="Edit monitor" description={monitor?.name} />
       {meta && monitor ? (
         <MonitorForm
+          wid={wid}
           monitor={monitor}
           minIntervalSec={meta.minIntervalSec}
           submitLabel="Save changes"

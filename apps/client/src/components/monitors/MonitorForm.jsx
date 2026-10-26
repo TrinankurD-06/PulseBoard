@@ -1,14 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HTTP_METHODS } from '@pulseboard/shared/constants';
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
-import { Plus, X } from 'lucide-react';
-import { useMemo } from 'react';
+import { FlaskConical, Plus, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import { z } from 'zod';
+import { errorMessage } from '../../api/http.js';
+import { useTestMonitorConfig } from '../../api/monitors.js';
 import { formatDuration } from '../../lib/format.js';
 import Button from '../ui/Button.jsx';
 import Card, { CardHeader } from '../ui/Card.jsx';
 import Field, { inputClasses } from '../ui/Field.jsx';
+import TestResult from './TestResult.jsx';
 
 const INTERVAL_PRESETS = [10, 30, 60, 120, 300, 600, 1800, 3600];
 
@@ -43,8 +47,17 @@ function toFormValues(monitor) {
  * applied to the converted payload, so client and server rules can't drift.
  * `onSubmit(payload)` may throw an axios error; API field errors (e.g. the
  * SSRF check on `url`) are shown on the matching field.
+ * "Test now" validates the form the same way, then runs a one-off check of
+ * the current (unsaved) settings via the API.
  */
-export default function MonitorForm({ monitor, minIntervalSec, submitLabel, onSubmit, onCancel }) {
+export default function MonitorForm({
+  wid,
+  monitor,
+  minIntervalSec,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}) {
   const schema = useMemo(() => {
     const { create } = buildMonitorSchemas({ demoMode: minIntervalSec < 30 });
     return z.preprocess(toPayload, create);
@@ -58,16 +71,32 @@ export default function MonitorForm({ monitor, minIntervalSec, submitLabel, onSu
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema), defaultValues: toFormValues(monitor) });
   const headerRows = useFieldArray({ control, name: 'headers' });
+  const testCheck = useTestMonitorConfig(wid);
+  const [testResult, setTestResult] = useState(null);
+
+  function showFieldErrors(error) {
+    const details = error?.response?.data?.error?.details;
+    if (Array.isArray(details)) {
+      for (const { path, message } of details) setError(path || 'root', { message });
+    }
+  }
 
   const submit = handleSubmit(async (payload) => {
     try {
       await onSubmit(payload);
     } catch (error) {
       // The page already showed a toast; here we only attach field-level messages.
-      const details = error?.response?.data?.error?.details;
-      if (Array.isArray(details)) {
-        for (const { path, message } of details) setError(path || 'root', { message });
-      }
+      showFieldErrors(error);
+    }
+  });
+
+  const runTest = handleSubmit(async (payload) => {
+    setTestResult(null);
+    try {
+      setTestResult(await testCheck.mutateAsync(payload));
+    } catch (error) {
+      toast.error(errorMessage(error));
+      showFieldErrors(error);
     }
   });
 
@@ -205,7 +234,17 @@ export default function MonitorForm({ monitor, minIntervalSec, submitLabel, onSu
 
       {errors.root?.message && <p className="text-sm text-red-600">{errors.root.message}</p>}
 
-      <div className="flex justify-end gap-2">
+      {testResult && <TestResult result={testResult} />}
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          variant="secondary"
+          className="mr-auto"
+          loading={testCheck.isPending}
+          onClick={runTest}
+        >
+          {!testCheck.isPending && <FlaskConical className="h-4 w-4" />} Test now
+        </Button>
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

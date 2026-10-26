@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from './http.js';
 
+// Until live updates arrive (Socket.io, phase 6), monitor data is polled.
+const POLL_MS = 15_000;
+
 export const monitorKeys = {
   all: (wid) => ['workspaces', wid, 'monitors'],
   detail: (wid, mid) => ['workspaces', wid, 'monitors', mid],
@@ -11,6 +14,7 @@ export function useMonitors(wid) {
   return useQuery({
     queryKey: monitorKeys.all(wid),
     queryFn: () => http.get(`/workspaces/${wid}/monitors?limit=100`).then((res) => res.data.data),
+    refetchInterval: POLL_MS,
   });
 }
 
@@ -18,6 +22,7 @@ export function useMonitor(wid, mid) {
   return useQuery({
     queryKey: monitorKeys.detail(wid, mid),
     queryFn: () => http.get(`/workspaces/${wid}/monitors/${mid}`).then((res) => res.data.data),
+    refetchInterval: POLL_MS,
   });
 }
 
@@ -52,6 +57,18 @@ export const useResumeMonitor = (wid, mid) =>
   useMonitorMutation(wid, () =>
     http.post(`/workspaces/${wid}/monitors/${mid}/resume`).then(unwrap),
   );
+
+/** "Test now" for an unsaved configuration (the form). Result isn't stored. */
+export const useTestMonitorConfig = (wid) =>
+  useMutation({
+    mutationFn: (values) => http.post(`/workspaces/${wid}/monitors/test`, values).then(unwrap),
+  });
+
+/** "Test now" for a saved monitor. */
+export const useTestSavedMonitor = (wid, mid) =>
+  useMutation({
+    mutationFn: () => http.post(`/workspaces/${wid}/monitors/${mid}/test`).then(unwrap),
+  });
 
 export function useDeleteMonitor(wid, mid) {
   const queryClient = useQueryClient();

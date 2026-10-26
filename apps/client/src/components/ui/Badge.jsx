@@ -8,9 +8,10 @@ const TONES = {
   blue: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
 };
 
-export default function Badge({ tone = 'neutral', className, children }) {
+export default function Badge({ tone = 'neutral', className, children, ...props }) {
   return (
     <span
+      {...props}
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
         TONES[tone],

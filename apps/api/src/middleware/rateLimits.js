@@ -5,12 +5,13 @@ const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 // Counters live in process memory. That's correct for a single API instance;
 // several instances would each count separately (see DECISIONS.md).
-function limiter({ windowMs, limit, message }) {
+function limiter({ windowMs, limit, message, keyGenerator }) {
   return rateLimit({
     windowMs,
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    ...(keyGenerator && { keyGenerator }),
     handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', message)),
   });
 }
@@ -21,6 +22,19 @@ export function createAuthLimiter(max) {
     windowMs: FIFTEEN_MINUTES,
     limit: max,
     message: 'Too many attempts. Please try again in a few minutes.',
+  });
+}
+
+/**
+ * "Test now" makes our server send a real HTTP request, so it's limited per
+ * *user* (not IP): 5 per minute. Must run after authenticate().
+ */
+export function createTestCheckLimiter() {
+  return limiter({
+    windowMs: 60 * 1000,
+    limit: 5,
+    message: 'You can run 5 test checks per minute. Please wait a moment.',
+    keyGenerator: (req) => `user:${req.userId}`,
   });
 }
 

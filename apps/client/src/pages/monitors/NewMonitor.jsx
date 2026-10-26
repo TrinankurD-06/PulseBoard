@@ -30,6 +30,7 @@ export default function NewMonitor() {
       <PageHeader title="New monitor" description="PulseBoard will check this URL on a schedule." />
       {meta ? (
         <MonitorForm
+          wid={wid}
           minIntervalSec={meta.minIntervalSec}
           submitLabel="Create monitor"
           onSubmit={onSubmit}

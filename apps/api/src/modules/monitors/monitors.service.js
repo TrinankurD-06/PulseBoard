@@ -1,4 +1,4 @@
-import { assertSafeUrl, UnsafeTargetError } from '@pulseboard/shared/check';
+import { assertSafeUrl, runHttpCheck, UnsafeTargetError } from '@pulseboard/shared/check';
 import { MONITOR_STATUS, ROLES } from '@pulseboard/shared/constants';
 import { CheckResult, DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
@@ -118,6 +118,21 @@ export function createMonitorService({ env, scheduler, schemas }) {
       await monitor.save();
       await scheduler.scheduleMonitor(monitor);
       return monitor;
+    },
+
+    /**
+     * "Test now": runs one check directly in the API process (not via Agenda) so
+     * the user sees the result immediately. The result is NOT stored, so it
+     * can't affect uptime statistics or incidents.
+     */
+    async testConfig(config) {
+      await assertTargetAllowed(config.url);
+      return runHttpCheck(config, { allowPrivate: env.ALLOW_PRIVATE_TARGETS });
+    },
+
+    async testExisting(workspaceId, monitorId) {
+      const monitor = await findInWorkspace(workspaceId, monitorId);
+      return runHttpCheck(monitor, { allowPrivate: env.ALLOW_PRIVATE_TARGETS });
     },
 
     /** Cancels the job first, so no check runs against a half-deleted monitor. */

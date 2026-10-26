@@ -1,5 +1,6 @@
 import { ROLES } from '@pulseboard/shared/constants';
-import { ArrowLeft, ExternalLink, Pause, Pencil, Play, Trash2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, FlaskConical, Pause, Pencil, Play, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
@@ -8,8 +9,12 @@ import {
   useMonitor,
   usePauseMonitor,
   useResumeMonitor,
+  useTestSavedMonitor,
 } from '../../api/monitors.js';
+import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
+import TestResult from '../../components/monitors/TestResult.jsx';
+import TimingBar from '../../components/monitors/TimingBar.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -27,8 +32,9 @@ function Detail({ label, children }) {
   );
 }
 
-function Actions({ monitor, wid }) {
+function Actions({ monitor, wid, onTestResult }) {
   const navigate = useNavigate();
+  const testNow = useTestSavedMonitor(wid, monitor.id);
   const pause = usePauseMonitor(wid, monitor.id);
   const resume = useResumeMonitor(wid, monitor.id);
   const remove = useDeleteMonitor(wid, monitor.id);
@@ -41,6 +47,15 @@ function Actions({ monitor, wid }) {
       toast.error(errorMessage(error));
     }
   };
+
+  async function onTest() {
+    onTestResult(null);
+    try {
+      onTestResult(await testNow.mutateAsync());
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  }
 
   async function onDelete() {
     if (!window.confirm(`Delete "${monitor.name}" and all of its check history?`)) return;
@@ -55,6 +70,9 @@ function Actions({ monitor, wid }) {
 
   return (
     <div className="flex flex-wrap gap-2">
+      <Button variant="secondary" loading={testNow.isPending} onClick={onTest}>
+        {!testNow.isPending && <FlaskConical className="h-4 w-4" />} Test now
+      </Button>
       {monitor.isPaused ? (
         <Button
           variant="secondary"
@@ -90,6 +108,7 @@ export default function MonitorDetail() {
   const { mid } = useParams();
   const { data: monitor, isPending, error } = useMonitor(wid, mid);
   const now = useNow();
+  const [testResult, setTestResult] = useState(null);
 
   if (error?.response?.status === 404) return <NotFound message="This monitor doesn't exist." />;
   if (error) return <p className="text-sm text-red-600">Couldn&apos;t load this monitor.</p>;
@@ -118,6 +137,7 @@ export default function MonitorDetail() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
             <StatusBadge status={monitor.status} />
+            <SslBadge expiresAt={monitor.sslExpiresAt} now={now} />
           </div>
           <a
             href={monitor.url}
@@ -128,8 +148,10 @@ export default function MonitorDetail() {
             {monitor.method} {monitor.url} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
           </a>
         </div>
-        {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} />}
+        {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} onTestResult={setTestResult} />}
       </div>
+
+      {testResult && <TestResult result={testResult} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -141,6 +163,11 @@ export default function MonitorDetail() {
               <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
               <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
               {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
+              {monitor.lastTimings && (
+                <div className="col-span-2">
+                  <TimingBar timings={monitor.lastTimings} />
+                </div>
+              )}
             </dl>
           ) : (
             <p className="p-5 text-sm text-slate-500">

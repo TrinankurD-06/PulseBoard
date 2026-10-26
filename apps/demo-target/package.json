@@ -6,6 +6,10 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
   }
 }

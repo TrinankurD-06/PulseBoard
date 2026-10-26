@@ -307,3 +307,109 @@ totalPages } }`. Errors: `{ error: {...} }`. The client always reads `res.data.d
   status pages.
 - **Delete workspace:** cancels every monitor job before deleting any data.
 - **Timeout must not exceed the interval**, so checks of one monitor never overlap.
+
+---
+
+## Phase 4: Worker & checks
+
+### D31. Agenda v6 with `@agendajs/mongo-backend`
+
+- Agenda v6 (actively maintained, 2026 releases) moved storage into pluggable backends; the
+  MongoDB backend keeps jobs in the `agendaJobs` collection, so **MongoDB is the job queue**.
+  (The older `agenda@5` line and the `@hokify/agenda` fork were the alternatives.)
+- Agenda gets its **own connection** (`address: MONGODB_URI`) instead of reusing Mongoose's.
+  Mongoose 9 bundles a different patch version of the `mongodb` driver than the one the
+  backend resolves, and passing driver objects across versions is fragile. The cost is one
+  extra small connection pool per process.
+- **The API creates jobs but never calls `agenda.start()`**, so it never runs a check. The
+  worker defines the handlers and calls `start()`. They share nothing but the database.
+
+### D32. Exactly one `run-check` job per monitor
+
+- Scheduling uses `create('run-check', { monitorId }).repeatEvery('N seconds')
+.unique({ 'data.monitorId': id }).save()`, an **upsert**. Saving again (interval
+  change, resume) updates the existing job instead of adding a second one.
+- A **partial unique index** on `agendaJobs { data.monitorId }` (only for `name: 'run-check'`)
+  makes the database itself reject a duplicate, even if two processes upsert at the same moment.
+- **Reconcile on worker boot:** create missing jobs, fix wrong intervals, delete orphans
+  (deleted or paused monitors) and duplicates. Safe to run repeatedly (a test runs it twice).
+- **Self-healing orphans:** if a job runs for a monitor that no longer exists, the handler
+  cancels its own job. Agenda's post-run save is an update by `_id` without upsert, so a job
+  deleted while it was running stays deleted (checked in Agenda's source).
+
+### D33. Locking: why two workers never double-run a check
+
+- When a worker picks a due job it atomically sets `lockedAt` (find-and-modify). Other
+  workers only take jobs that are unlocked or whose lock has expired.
+- **Verified end to end:** two worker processes, two monitors at a 10 s interval → 4 checks
+  per monitor in ~32 s (one worker alone would also do 4). Double runs would have shown 8.
+- `defaultLockLifetime` = 60 s, twice the 30 s maximum check timeout. If it were shorter than
+  a slow check, Agenda would assume the worker died and hand the job to another worker → a
+  duplicate check.
+- On SIGTERM the worker calls `agenda.stop()`, which **unlocks** its jobs so another worker
+  can take them immediately instead of waiting up to 60 s for the lock to expire.
+- `processEvery: '5 seconds'` means a new job can wait up to 5 s before the first check. The
+  backend also offers change-stream notifications to remove that delay; polling is simpler
+  and plenty fast for uptime checks.
+- Worker `/health` reports `overdueJobs` (due but unlocked). A number that keeps growing
+  means the workers can't keep up, which is the signal to add another worker.
+
+### D34. The check runner (Node's `http`/`https`, no HTTP library)
+
+- `agent: false` = a fresh TCP (and TLS) connection on every check. With keep-alive, later
+  checks would reuse the connection and DNS/TCP/TLS would show as 0 ms.
+- Timings come from `process.hrtime.bigint()` (monotonic, nanosecond resolution) at socket
+  events:
+
+  | Phase    | From → to                                        |
+  | -------- | ------------------------------------------------ |
+  | DNS      | request start → `lookup` (0 for IP-literal URLs) |
+  | TCP      | after DNS → `connect`                            |
+  | TLS      | `connect` → `secureConnect` (0 for plain HTTP)   |
+  | TTFB     | connection ready → `response` (headers received) |
+  | Download | `response` → `end`                               |
+
+- **Timeout** is one deadline for the whole check, shared across redirects.
+- **Redirects:** up to 3, resolved relative to the current URL, http(s) only; 303 (and
+  301/302 after POST) continue as GET, like browsers. `totalMs` covers all hops; the
+  timing breakdown is for the final response.
+- **Body:** read only when a keyword is set, capped at **1 MB**, after which the download is
+  aborted. A keyword beyond the first 1 MB counts as missing (tested).
+- **TLS certificate:** `valid_to` of the peer certificate is stored as `sslExpiresAt` (UI
+  badge: amber within 14 days, red when expired). Invalid certificates fail the check.
+- **Never throws:** every outcome (timeout, refused, DNS failure, bad status) comes back as
+  data with a plain-language `error`, because a failed check is a normal result, not a bug.
+- `evaluateCheck()` (status range, then keyword) is a separate pure function with its own
+  unit tests.
+
+### D35. SSRF checked again when the check runs
+
+- Node skips DNS lookup for IP-literal URLs, so the safe `lookup` can't see them; those are
+  checked explicitly before connecting. Every redirect hop goes through the same guards,
+  so a public URL that redirects to `http://169.254.169.254/` is blocked.
+
+### D36. "Test now" runs in the API, not through Agenda
+
+- The user is waiting for an answer, so a queue round-trip (up to 5 s of polling) makes no
+  sense. The result is **not stored**, so test clicks can't skew uptime or open incidents.
+- Two endpoints: `POST /monitors/test` (unsaved form settings) and `POST /monitors/:mid/test`
+  (a saved monitor). The spec named only the second; the form needs the first. They share one
+  limiter: **5 per minute per user** (keyed by user id, not IP, since it's an authenticated
+  action). Member role required, because it makes our server send requests.
+
+### D37. Temporary rules until phases 5 and 6
+
+- Until the incident state machine (phase 5) lands, a monitor's status is simply the last
+  check's result. Phase 5 replaces this with "3 failures → down, 2 successes → up".
+- Until Socket.io (phase 6), the dashboard and monitor page poll every 15 s.
+
+### D38. Demo target
+
+- Modes: `up` (200 + "healthy"), `down` (connection dropped, like a crashed server), `slow`
+  (~3 s, still up, so response time spikes), `error500`, `missing-keyword` (200 but
+  degraded body). Verified end to end: each mode produced the expected status and error.
+- Default port **4011** instead of the spec's 4001: on this machine VS Code already holds
+  4001, and requests went to VS Code instead (found during end-to-end testing). Configurable
+  via `DEMO_TARGET_PORT`; it now exits with a clear message if its port is taken.
+- `/admin` has no authentication, on purpose: it's a demo prop, not a product feature.
+  Nothing real is behind it.

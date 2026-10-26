@@ -13,6 +13,7 @@
     "./logger": "./src/logger.js",
     "./roles": "./src/roles.js",
     "./check": "./src/check/index.js",
+    "./scheduling": "./src/scheduling/agenda.js",
     "./testing": "./src/testing/memoryDb.js"
   },
   "scripts": {
@@ -20,6 +21,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@agendajs/mongo-backend": "^4.0.3",
+    "agenda": "^6.2.6",
     "dotenv": "^18.0.9",
     "mongoose": "^9.11.4",
     "pino": "^10.4.0",

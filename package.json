@@ -10,7 +10,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "concurrently -k -n api,worker,client -c blue,magenta,green \"npm:dev -w @pulseboard/api\" \"npm:dev -w @pulseboard/worker\" \"npm:dev -w @pulseboard/client\"",
+    "dev": "concurrently -k -n api,worker,client,demo -c blue,magenta,green,yellow \"npm:dev -w @pulseboard/api\" \"npm:dev -w @pulseboard/worker\" \"npm:dev -w @pulseboard/client\" \"npm:dev -w @pulseboard/demo-target\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
