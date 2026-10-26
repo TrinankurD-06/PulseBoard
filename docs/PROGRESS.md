@@ -21,7 +21,7 @@ Legend: `[x]` done and committed · `[~]` done, not yet committed · `[ ]` to do
       rollups via `$merge`, uptime/checks/daily endpoints, all monitor charts.
 - [x] **7. Status pages**: `146b603`. CRUD, whitelist-only public endpoint with 30s cache,
       polished public page, lazy session restore.
-- [x] **8. Polish & ship**: part 1 `94d4362`, part 2 (docs + final pass) committed after it.
+- [x] **8. Polish & ship**: part 1 `94d4362`, part 2 (docs + final pass) `d350ff0`.
       Seed script, Landing page, code splitting, deploy configs, README / ARCHITECTURE / API docs.
 
 ## Phase 8 checklist
