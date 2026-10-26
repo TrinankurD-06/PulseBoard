@@ -4,4 +4,5 @@ export * from './alertChannel.js';
 export * from './auth.js';
 export * from './common.js';
 export * from './monitor.js';
+export * from './statusPage.js';
 export * from './workspace.js';

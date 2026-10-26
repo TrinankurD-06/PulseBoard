@@ -1,15 +1,21 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { http, refreshAccessToken, setSessionExpiredHandler } from '../api/http.js';
 import { setAccessToken } from '../api/tokenStore.js';
 import { AuthContext, ME_QUERY_KEY } from './AuthContext.js';
 
 export default function AuthProvider({ children }) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState('loading');
+  // 'idle' until a page that cares about the session asks for it (ensureSession),
+  // so public pages like /status/:slug never call /auth/refresh.
+  const [status, setStatus] = useState('idle');
 
-  // On first load there is no access token in memory: try the refresh cookie.
-  useEffect(() => {
+  // No access token in memory after a page load: try the refresh cookie once.
+  const sessionRequested = useRef(false);
+  const ensureSession = useCallback(() => {
+    if (sessionRequested.current) return;
+    sessionRequested.current = true;
+    setStatus('loading');
     refreshAccessToken()
       .then(() => setStatus('authenticated'))
       .catch(() => setStatus('anonymous'));
@@ -66,8 +72,9 @@ export default function AuthProvider({ children }) {
       login,
       register,
       logout,
+      ensureSession,
     }),
-    [status, meQuery.isPending, meQuery.data, login, register, logout],
+    [status, meQuery.isPending, meQuery.data, login, register, logout, ensureSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

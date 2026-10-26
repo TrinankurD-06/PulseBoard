@@ -612,3 +612,51 @@ ALERT_DELIVERY_FAILED` with the provider's reason when delivery fails.
 - The range filter (1h / 24h / 7d) sits in one row above the chart it scopes.
 - Status dots are decorative (`aria-hidden`) because a visible status label is always
   next to them; otherwise screen readers would announce the status twice.
+
+---
+
+## Phase 7: Status pages
+
+### D54. The public endpoint is a whitelist
+
+- `GET /api/v1/public/status/:slug` (no login) builds its response field by field: title,
+  description, overall status, and per monitor only **name, status, 90-day uptime and
+  daily bars**; incidents only as **monitor name, start, end, duration**.
+- Deliberately **not** exposed: monitor URLs (often internal hosts), any ids, workspace id,
+  headers, and incident causes / error messages (e.g. "Connection refused to
+  10.0.3.7:5432" would reveal infrastructure). A test greps the whole response for each of
+  these values.
+- A private page and a non-existent page both return the same 404, so slugs of private
+  pages can't be discovered.
+- Overall banner (`overallStatus`, pure, shared with the client): no active monitors →
+  no data; none down → operational; some down → partial outage; all down → major outage.
+  Paused monitors are left out (nobody is checking them).
+
+### D55. 30-second caching, invalidated on change
+
+- Two layers: an **in-process TTL cache** (one set of database queries per page per 30 s,
+  however many visitors) and `Cache-Control: public, max-age=30` for browsers/CDNs. Even
+  "not found" is cached, so random slugs can't be used to hammer the aggregation; the public
+  router also has its own rate limit (120/min/IP).
+- Creating, editing or deleting a page deletes its cache entries (old and new slug), so
+  "make private" takes effect **immediately** (tested). Status changes of monitors are
+  allowed to lag by up to 30 s; that's the accepted cost of caching and matches the spec.
+  The page refetches every 30 s to match.
+- Trade-off: deleting a whole workspace doesn't clear its pages' cache entries, so they can
+  linger for up to 30 s. Also, each API instance would have its own cache (fine for 30 s data).
+
+### D56. Status page management
+
+- Slugs: lowercase letters, digits and single dashes, 3-60 chars; filled in from the title
+  until the user edits it. A taken slug is a 409 shown on the slug field.
+- Monitors on a page must belong to the same workspace (checked server-side); their order
+  is kept. Deleting a monitor already removes it from pages (phase 3).
+- PATCH re-validates the merged page (same pattern as monitors and channels).
+
+### D57. Public pages don't touch the session
+
+- Session restore (`/auth/refresh`) is now **lazy**: `AuthProvider` starts `idle` and only
+  pages behind the login/guest guards call `ensureSession()`. A visitor of a public status
+  page triggers no auth request at all (no 401 in their console, no cookie needed).
+- Verified in a logged-out browser: the only API call is the public status request; no
+  console errors; no horizontal scrolling at 390px width.

@@ -8,6 +8,7 @@ import { alertSenderConfig } from '@pulseboard/shared/env';
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
 import { pinoHttp } from 'pino-http';
 import { createTokenService } from './lib/tokens.js';
+import { createTtlCache } from './lib/ttlCache.js';
 import { authenticate } from './middleware/authenticate.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
@@ -19,6 +20,8 @@ import { membersRouter } from './modules/members/members.routes.js';
 import { metaRouter } from './modules/meta/meta.routes.js';
 import { monitorAnalyticsRouter } from './modules/monitors/analytics.routes.js';
 import { monitorsRouter } from './modules/monitors/monitors.routes.js';
+import { PUBLIC_CACHE_SECONDS, publicRouter } from './modules/public/public.routes.js';
+import { statusPagesRouter } from './modules/statusPages/statusPages.routes.js';
 import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
 import { noopScheduler } from './scheduling/scheduler.js';
 
@@ -68,10 +71,13 @@ export function createApp({
   const requireAuth = authenticate(tokens);
 
   const monitorSchemas = buildMonitorSchemas({ demoMode: env.DEMO_MODE });
+  // Shared by the public endpoint (reads) and status page CRUD (invalidates).
+  const publicCache = createTtlCache({ ttlMs: PUBLIC_CACHE_SECONDS * 1000 });
 
   const api = express.Router();
   api.use('/meta', metaRouter({ env, schemas: monitorSchemas }));
   api.use('/auth', authRouter({ env, tokens, logger }));
+  api.use('/public', publicRouter({ publicCache }));
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.
@@ -87,6 +93,7 @@ export function createApp({
     requireAuth,
     alertChannelsRouter({ senders: alertSenders, env }),
   );
+  api.use('/workspaces/:wid/status-pages', requireAuth, statusPagesRouter({ publicCache }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

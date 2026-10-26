@@ -5,7 +5,6 @@ import AlertChannels from './pages/AlertChannels.jsx';
 import AppIndex from './pages/AppIndex.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
-import ComingSoon from './pages/ComingSoon.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Incidents from './pages/Incidents.jsx';
 import Landing from './pages/Landing.jsx';
@@ -15,6 +14,7 @@ import NewMonitor from './pages/monitors/NewMonitor.jsx';
 import NotFound from './pages/NotFound.jsx';
 import PublicStatus from './pages/PublicStatus.jsx';
 import Settings from './pages/Settings.jsx';
+import StatusPages from './pages/StatusPages.jsx';
 import Team from './pages/Team.jsx';
 
 export default function App() {
@@ -37,7 +37,7 @@ export default function App() {
           <Route path="monitors/:mid/edit" element={<EditMonitor />} />
           <Route path="incidents" element={<Incidents />} />
           <Route path="alerts" element={<AlertChannels />} />
-          <Route path="status-pages" element={<ComingSoon title="Status pages" />} />
+          <Route path="status-pages" element={<StatusPages />} />
           <Route path="team" element={<Team />} />
           <Route path="settings" element={<Settings />} />
         </Route>

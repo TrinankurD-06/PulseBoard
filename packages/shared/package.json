@@ -12,6 +12,7 @@
     "./env": "./src/env.js",
     "./logger": "./src/logger.js",
     "./roles": "./src/roles.js",
+    "./statusPage": "./src/statusPage.js",
     "./check": "./src/check/index.js",
     "./scheduling": "./src/scheduling/agenda.js",
     "./alerts": "./src/alerts/index.js",
