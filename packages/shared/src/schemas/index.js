@@ -2,4 +2,5 @@
 // Must stay browser-safe: no mongoose or Node imports here.
 export * from './auth.js';
 export * from './common.js';
+export * from './monitor.js';
 export * from './workspace.js';

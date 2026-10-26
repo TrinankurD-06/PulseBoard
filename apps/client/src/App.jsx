@@ -7,6 +7,9 @@ import Register from './pages/auth/Register.jsx';
 import ComingSoon from './pages/ComingSoon.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Landing from './pages/Landing.jsx';
+import EditMonitor from './pages/monitors/EditMonitor.jsx';
+import MonitorDetail from './pages/monitors/MonitorDetail.jsx';
+import NewMonitor from './pages/monitors/NewMonitor.jsx';
 import NotFound from './pages/NotFound.jsx';
 import PublicStatus from './pages/PublicStatus.jsx';
 import Settings from './pages/Settings.jsx';
@@ -27,6 +30,9 @@ export default function App() {
         <Route index element={<AppIndex />} />
         <Route path=":wid" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="monitors/new" element={<NewMonitor />} />
+          <Route path="monitors/:mid" element={<MonitorDetail />} />
+          <Route path="monitors/:mid/edit" element={<EditMonitor />} />
           <Route path="incidents" element={<ComingSoon title="Incidents" />} />
           <Route path="alerts" element={<ComingSoon title="Alert channels" />} />
           <Route path="status-pages" element={<ComingSoon title="Status pages" />} />

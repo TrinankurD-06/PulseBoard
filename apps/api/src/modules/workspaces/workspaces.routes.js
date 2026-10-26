@@ -17,7 +17,7 @@ import {
 } from './workspaces.service.js';
 
 /** Mounted under /workspaces, after authenticate. */
-export function workspacesRouter() {
+export function workspacesRouter({ scheduler }) {
   const router = Router();
 
   router.get('/', validate({ query: paginationSchema }), async (req, res) => {
@@ -45,7 +45,7 @@ export function workspacesRouter() {
   );
 
   router.delete('/:wid', requireRole(ROLES.OWNER), async (req, res) => {
-    await deleteWorkspace(req.params.wid);
+    await deleteWorkspace(req.params.wid, scheduler);
     res.status(204).end();
   });
 

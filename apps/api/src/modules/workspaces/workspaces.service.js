@@ -78,8 +78,12 @@ export async function renameWorkspace(workspaceId, name) {
  * document last, so if a step fails the workspace still exists and the delete can
  * simply be retried. (Time-series collections can't be written inside a
  * transaction, so a single transaction isn't an option here.)
+ * Check jobs are cancelled first, so the worker stops touching these monitors.
  */
-export async function deleteWorkspace(workspaceId) {
+export async function deleteWorkspace(workspaceId, scheduler) {
+  const monitorIds = await Monitor.find({ workspaceId }).distinct('_id');
+  await Promise.all(monitorIds.map((id) => scheduler.cancelMonitor(id)));
+
   await Promise.all([
     Monitor.deleteMany({ workspaceId }),
     CheckResult.deleteMany({ 'meta.workspaceId': workspaceId }),

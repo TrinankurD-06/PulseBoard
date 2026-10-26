@@ -242,3 +242,68 @@ Newest phase at the bottom.
 
 - Single resources: `{ data: {...} }`. Lists: `{ data: [...], pagination: { page, limit, total,
 totalPages } }`. Errors: `{ error: {...} }`. The client always reads `res.data.data`.
+
+---
+
+## Phase 3: Monitors CRUD
+
+### D26. Services depend on a scheduler _interface_, not on Agenda
+
+- Monitor and workspace services only call `scheduler.scheduleMonitor(monitor)` and
+  `scheduler.cancelMonitor(id)`. `createApp({ scheduler })` receives the implementation.
+- **Why:** the monitor code doesn't change when Agenda arrives (phase 4); tests pass a fake
+  that records calls, so "job created on create / cancelled on pause and delete" is checked
+  quickly and without timing; and the scheduler could be swapped later without touching
+  business logic (dependency injection).
+
+### D27. SSRF protection in two layers
+
+1. **When a monitor is saved** (`assertSafeUrl`): only `http(s)`, no `user:pass@` in the URL,
+   and _every_ address the hostname resolves to must be public. One private record among
+   several is enough to reject it, since the client could connect to any of them.
+2. **When the check connects** (`createSafeLookup`, used by the check runner in phase 4): a
+   custom DNS `lookup` passed to `http.request` rejects private addresses at the moment the
+   socket connects. This defeats **DNS rebinding**, where a name resolves to a public IP
+   at validation time and to `127.0.0.1` later. The address we check is exactly the one used.
+
+- Blocked: `0/8, 10/8, 100.64/10, 127/8, 169.254/16` (cloud metadata), `172.16/12,
+192.168/16`, multicast/reserved, and IPv6 `::, ::1, fc00::/7, fe80::/10, ff00::/8`.
+  IPv4-mapped IPv6 (`::ffff:127.0.0.1`, `::ffff:7f00:1`) is unwrapped first; that's a
+  classic bypass.
+- Uses Node's built-in `net.BlockList` for CIDR matching instead of hand-written bit maths.
+- Anything that isn't a valid IP counts as private ("fail closed").
+- `ALLOW_PRIVATE_TARGETS=true` turns it off for the local demo-target only.
+
+### D28. One Zod schema for client and API, built by a factory
+
+- `buildMonitorSchemas({ demoMode })` returns `create`/`update` schemas, since the minimum
+  interval depends on `DEMO_MODE` (10 s vs 30 s). The client form uses the same `create`
+  schema (via `z.preprocess` to turn its header rows into an object), so client and server
+  rules can't drift. `GET /api/v1/meta` tells the client which mode the server is in.
+- **PATCH = merge, then validate the whole thing.** The update schema accepts any subset of
+  fields; the service merges it with the stored monitor and re-parses the result with
+  `create`. Cross-field rules (timeout ≤ interval) therefore hold even when only one of the
+  two fields changes.
+- **Zod 4 gotcha (caught by a test):** `.default()` values are applied even inside
+  `.partial()`, so a PATCH of `{ name }` would have silently reset `method`, `timeoutMs` and
+  `expectedStatus`. The base fields have no defaults; only `create` adds them.
+- The URL check uses `abort: true` so a malformed URL reports one error, not two.
+
+### D29. Workspace scoping and secret headers
+
+- Every monitor lookup filters by `{ _id, workspaceId }`, never `_id` alone, so a monitor id
+  from another workspace is simply "not found", even for a valid member of _some_ workspace.
+- Custom headers often carry API keys. Viewers see header _names_ but values are masked
+  (`••••••`); members and owners see real values because they need them to edit.
+
+### D30. Lifecycle rules
+
+- **Create:** status `pending` until the first check.
+- **Pause:** `status = paused` and the job is cancelled; nothing runs while paused.
+- **Resume:** counters reset, `status = pending`, job scheduled again. Starting fresh avoids
+  a stale "2 of 3 failures" from before the pause tipping the monitor into an incident.
+- **Delete:** the job is cancelled _first_, so no check runs against a half-deleted monitor;
+  then check results, rollups and incidents are removed and the monitor is pulled from
+  status pages.
+- **Delete workspace:** cancels every monitor job before deleting any data.
+- **Timeout must not exceed the interval**, so checks of one monitor never overlap.

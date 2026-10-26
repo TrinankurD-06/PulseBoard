@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
 import { pinoHttp } from 'pino-http';
 import { createTokenService } from './lib/tokens.js';
 import { authenticate } from './middleware/authenticate.js';
@@ -11,13 +12,16 @@ import { sanitizeBody } from './middleware/sanitize.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
+import { metaRouter } from './modules/meta/meta.routes.js';
+import { monitorsRouter } from './modules/monitors/monitors.routes.js';
 import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
+import { noopScheduler } from './scheduling/scheduler.js';
 
 /**
  * Builds the Express app without listening, so tests can drive it with Supertest.
  * Process-level concerns (DB connection, sockets, shutdown) live in server.js.
  */
-export function createApp({ env, logger, getRealtimeStatus }) {
+export function createApp({ env, logger, scheduler = noopScheduler, getRealtimeStatus }) {
   const app = express();
 
   if (env.TRUST_PROXY) app.set('trust proxy', 1);
@@ -52,10 +56,18 @@ export function createApp({ env, logger, getRealtimeStatus }) {
   const tokens = createTokenService(env);
   const requireAuth = authenticate(tokens);
 
+  const monitorSchemas = buildMonitorSchemas({ demoMode: env.DEMO_MODE });
+
   const api = express.Router();
+  api.use('/meta', metaRouter({ env, schemas: monitorSchemas }));
   api.use('/auth', authRouter({ env, tokens, logger }));
-  api.use('/workspaces', requireAuth, workspacesRouter());
+  api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
+  api.use(
+    '/workspaces/:wid/monitors',
+    requireAuth,
+    monitorsRouter({ env, scheduler, schemas: monitorSchemas }),
+  );
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

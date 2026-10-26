@@ -17,7 +17,8 @@ export default [
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      eqeqeq: ['error', 'always'],
+      // `x == null` (null or undefined) is the one idiomatic loose comparison.
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },

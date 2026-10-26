@@ -12,6 +12,7 @@
     "./env": "./src/env.js",
     "./logger": "./src/logger.js",
     "./roles": "./src/roles.js",
+    "./check": "./src/check/index.js",
     "./testing": "./src/testing/memoryDb.js"
   },
   "scripts": {

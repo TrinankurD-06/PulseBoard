@@ -1,0 +1,169 @@
+import { ROLES } from '@pulseboard/shared/constants';
+import { ArrowLeft, ExternalLink, Pause, Pencil, Play, Trash2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { errorMessage } from '../../api/http.js';
+import {
+  useDeleteMonitor,
+  useMonitor,
+  usePauseMonitor,
+  useResumeMonitor,
+} from '../../api/monitors.js';
+import StatusBadge from '../../components/monitors/StatusBadge.jsx';
+import Button from '../../components/ui/Button.jsx';
+import Card, { CardHeader } from '../../components/ui/Card.jsx';
+import Skeleton from '../../components/ui/Skeleton.jsx';
+import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
+import { useNow } from '../../hooks/useNow.js';
+import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
+import NotFound from '../NotFound.jsx';
+
+function Detail({ label, children }) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
+    </div>
+  );
+}
+
+function Actions({ monitor, wid }) {
+  const navigate = useNavigate();
+  const pause = usePauseMonitor(wid, monitor.id);
+  const resume = useResumeMonitor(wid, monitor.id);
+  const remove = useDeleteMonitor(wid, monitor.id);
+
+  const run = (mutation, message) => async () => {
+    try {
+      await mutation.mutateAsync();
+      toast.success(message);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
+
+  async function onDelete() {
+    if (!window.confirm(`Delete "${monitor.name}" and all of its check history?`)) return;
+    try {
+      await remove.mutateAsync();
+      toast.success('Monitor deleted');
+      navigate(`/app/${wid}`, { replace: true });
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {monitor.isPaused ? (
+        <Button
+          variant="secondary"
+          loading={resume.isPending}
+          onClick={run(resume, 'Monitoring resumed')}
+        >
+          <Play className="h-4 w-4" /> Resume
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          loading={pause.isPending}
+          onClick={run(pause, 'Monitor paused')}
+        >
+          <Pause className="h-4 w-4" /> Pause
+        </Button>
+      )}
+      <Link
+        to={`/app/${wid}/monitors/${monitor.id}/edit`}
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+      >
+        <Pencil className="h-4 w-4" /> Edit
+      </Link>
+      <Button variant="danger" loading={remove.isPending} onClick={onDelete}>
+        <Trash2 className="h-4 w-4" /> Delete
+      </Button>
+    </div>
+  );
+}
+
+export default function MonitorDetail() {
+  const { wid, can } = useCurrentWorkspace();
+  const { mid } = useParams();
+  const { data: monitor, isPending, error } = useMonitor(wid, mid);
+  const now = useNow();
+
+  if (error?.response?.status === 404) return <NotFound message="This monitor doesn't exist." />;
+  if (error) return <p className="text-sm text-red-600">Couldn&apos;t load this monitor.</p>;
+  if (isPending) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-16" />
+        <Skeleton className="h-48 rounded-xl" />
+      </div>
+    );
+  }
+
+  const headerNames = Object.keys(monitor.headers ?? {});
+
+  return (
+    <div className="space-y-6">
+      <Link
+        to={`/app/${wid}`}
+        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+      >
+        <ArrowLeft className="h-4 w-4" /> All monitors
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
+            <StatusBadge status={monitor.status} />
+          </div>
+          <a
+            href={monitor.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-flex max-w-full items-center gap-1 text-sm break-all text-slate-500 hover:text-emerald-600"
+          >
+            {monitor.method} {monitor.url} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+          </a>
+        </div>
+        {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} />}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Latest check" />
+          {monitor.lastCheckedAt ? (
+            <dl className="grid grid-cols-2 gap-4 p-5">
+              <Detail label="Checked">{timeAgo(monitor.lastCheckedAt, now)}</Detail>
+              <Detail label="Result">{monitor.lastOk ? 'Passed' : 'Failed'}</Detail>
+              <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
+              <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
+              {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
+            </dl>
+          ) : (
+            <p className="p-5 text-sm text-slate-500">
+              {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
+            </p>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader title="Configuration" />
+          <dl className="grid grid-cols-2 gap-4 p-5">
+            <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
+            <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
+            <Detail label="Expected status">
+              {monitor.expectedStatus.min}–{monitor.expectedStatus.max}
+            </Detail>
+            <Detail label="Keyword">{monitor.keyword ? `"${monitor.keyword}"` : 'None'}</Detail>
+            <Detail label="Custom headers">
+              {headerNames.length ? headerNames.join(', ') : 'None'}
+            </Detail>
+          </dl>
+        </Card>
+      </div>
+    </div>
+  );
+}
