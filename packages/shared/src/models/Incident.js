@@ -1,0 +1,37 @@
+import mongoose from 'mongoose';
+import { INCIDENT_EVENT } from '../constants.js';
+import { baseOptions } from './_options.js';
+
+const timelineEntrySchema = new mongoose.Schema(
+  {
+    at: { type: Date, default: Date.now },
+    type: { type: String, enum: Object.values(INCIDENT_EVENT), required: true },
+    message: { type: String, maxlength: 500 },
+  },
+  { _id: false },
+);
+
+const incidentSchema = new mongoose.Schema(
+  {
+    monitorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Monitor', required: true },
+    workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
+    startedAt: { type: Date, required: true },
+    resolvedAt: { type: Date, default: null },
+    cause: { type: String, maxlength: 500 },
+    durationSec: { type: Number, default: null },
+    timeline: { type: [timelineEntrySchema], default: [] },
+  },
+  baseOptions,
+);
+
+// Incidents page: open/resolved per workspace, newest first.
+incidentSchema.index({ workspaceId: 1, resolvedAt: 1, startedAt: -1 });
+// Monitor detail page + status page "recent incidents".
+incidentSchema.index({ monitorId: 1, startedAt: -1 });
+// Safety net: at most ONE open incident per monitor, enforced by the database.
+incidentSchema.index(
+  { monitorId: 1 },
+  { unique: true, partialFilterExpression: { resolvedAt: { $type: 'null' } } },
+);
+
+export const Incident = mongoose.models.Incident || mongoose.model('Incident', incidentSchema);

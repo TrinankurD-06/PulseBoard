@@ -1,0 +1,24 @@
+# Local MongoDB only. Runs as a single-node replica set (rs0) because
+# change streams require a replica set. Nothing else lives here by design.
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: pulseboard-mongo
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    # The healthcheck doubles as the replica-set initializer: the first run
+    # calls rs.initiate(), later runs just confirm the node is PRIMARY-ready.
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) {
+        rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      start_period: 10s
+      retries: 20
+
+volumes:
+  mongo-data:
