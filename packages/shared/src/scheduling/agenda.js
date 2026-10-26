@@ -3,6 +3,7 @@
 // MongoDB is the job queue: no Redis or other broker.
 import { MongoBackend } from '@agendajs/mongo-backend';
 import { Agenda } from 'agenda';
+import mongoose from 'mongoose';
 import { JOB_NAMES } from '../constants.js';
 
 export const AGENDA_COLLECTION = 'agendaJobs';
@@ -68,18 +69,62 @@ export function countOverdueJobs(db) {
   });
 }
 
+/** Seconds between checks the job should use: the current interval, else the base one. */
+export const repeatSecondsOf = (monitor) => monitor.currentIntervalSec ?? monitor.intervalSec;
+
+/**
+ * Changes the interval of a run-check job FROM INSIDE its own run (adaptive
+ * intervals, budget slow-down).
+ *
+ * Agenda computes nextRunAt when a run starts and, when the run ends, saves
+ * nextRunAt from the in-memory job (overwriting anything written to the
+ * database meanwhile) but not repeatInterval. So both are set in memory, so the
+ * post-run save keeps them, and repeatInterval is also written to the database,
+ * so future runs (loaded from the database) use it.
+ */
+export async function applyIntervalToRunningJob(job, db, seconds) {
+  const repeatInterval = `${seconds} seconds`;
+  const from = job.attrs.lastRunAt ? new Date(job.attrs.lastRunAt).getTime() : Date.now();
+  const nextRunAt = new Date(from + seconds * 1000);
+  job.attrs.repeatInterval = repeatInterval;
+  job.attrs.nextRunAt = nextRunAt;
+
+  const result = await db
+    .collection(AGENDA_COLLECTION)
+    .updateOne(storedJobFilter(job), { $set: { repeatInterval, nextRunAt } });
+  // false = the stored job is gone (e.g. deleted mid-run); the caller decides whether to log.
+  return result.matchedCount === 1;
+}
+
+/**
+ * Filter that finds a job's stored document. Agenda hands handlers job
+ * objects whose `_id` is a hex STRING (not an ObjectId), so it must be
+ * converted; run-check jobs can also be found by their unique monitorId.
+ */
+function storedJobFilter(job) {
+  const id = job.attrs._id != null ? String(job.attrs._id) : null;
+  if (id && /^[a-f\d]{24}$/i.test(id)) {
+    return { _id: new mongoose.Types.ObjectId(id) };
+  }
+  return { name: job.attrs.name, 'data.monitorId': job.attrs.data?.monitorId };
+}
+
 /**
  * The scheduler interface used by the API and the worker's reconcile step.
  * One repeating `run-check` job per monitor, identified by data.monitorId.
  */
 export function createAgendaScheduler(agenda) {
   return {
-    /** Creates the job, or updates its interval if it exists (upsert on data.monitorId). */
+    /**
+     * Creates the job, or updates its interval if it exists (upsert on
+     * data.monitorId). Uses the CURRENT interval (adaptive / budget-slowed),
+     * falling back to the base interval, so rescheduling never undoes adaptation.
+     */
     async scheduleMonitor(monitor) {
       const monitorId = String(monitor._id);
       await agenda
         .create(JOB_NAMES.RUN_CHECK, { monitorId })
-        .repeatEvery(`${monitor.intervalSec} seconds`)
+        .repeatEvery(`${repeatSecondsOf(monitor)} seconds`)
         .unique({ 'data.monitorId': monitorId })
         .save();
     },

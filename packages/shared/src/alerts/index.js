@@ -5,6 +5,7 @@ import { sendDiscord, sendSlack } from './webhooks.js';
 
 export * from './email.js';
 export * from './message.js';
+export * from './notice.js';
 export * from './webhooks.js';
 
 /**

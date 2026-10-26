@@ -1,7 +1,7 @@
 import { ALERT_KIND } from '../constants.js';
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
-const COLORS = { down: 0xef4444, up: 0x22c55e, test: 0x38bdf8 };
+const COLORS = { down: 0xef4444, up: 0x22c55e, test: 0x38bdf8, notice: 0xf59e0b };
 
 /**
  * POSTs JSON and throws on anything but 2xx. `redirect: 'error'` means a

@@ -13,6 +13,7 @@ import {
   useTestSavedMonitor,
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
+import BudgetBanner from '../../components/monitors/BudgetBanner.jsx';
 import MonitorAnalytics from '../../components/monitors/MonitorAnalytics.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
@@ -25,7 +26,8 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
-import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
+import { intervalDescription, isPausedByBudget } from '../../lib/budget.js';
+import { formatMs, timeAgo } from '../../lib/format.js';
 import NotFound from '../NotFound.jsx';
 
 function Detail({ label, children }) {
@@ -116,7 +118,20 @@ function Actions({ monitor, wid, onTestResult }) {
       <Button variant="secondary" loading={testNow.isPending} onClick={onTest}>
         {!testNow.isPending && <FlaskConical className="h-4 w-4" />} Test now
       </Button>
-      {monitor.isPaused ? (
+      {monitor.isPaused && isPausedByBudget(monitor) ? (
+        // The API refuses (409 BUDGET_EXCEEDED) until the budget is raised.
+        <Button
+          variant="secondary"
+          disabled
+          title="Paused by the monthly request budget: raise the budget to resume"
+          aria-describedby="resume-budget-note"
+        >
+          <Play className="h-4 w-4" /> Resume
+          <span id="resume-budget-note" className="sr-only">
+            Paused by the monthly request budget: raise the budget to resume
+          </span>
+        </Button>
+      ) : monitor.isPaused ? (
         <Button
           variant="secondary"
           loading={resume.isPending}
@@ -195,6 +210,8 @@ export default function MonitorDetail() {
         {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} onTestResult={setTestResult} />}
       </div>
 
+      <BudgetBanner wid={wid} monitor={monitor} canEdit={can(ROLES.MEMBER)} />
+
       {testResult && <TestResult result={testResult} />}
 
       <MonitorAnalytics
@@ -234,7 +251,7 @@ export default function MonitorDetail() {
                 ? "GET (server doesn't support HEAD)"
                 : monitor.method}
             </Detail>
-            <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
+            <Detail label="Interval">{intervalDescription(monitor, now)}</Detail>
             <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
             <Detail label="Expected status">
               {monitor.expectedStatus.min}–{monitor.expectedStatus.max}

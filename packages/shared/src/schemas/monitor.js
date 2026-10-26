@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC,
+  BUDGET_ACTIONS,
   CURRENCIES,
   DEFAULT_CURRENCY,
   DEFAULT_EXPECTED_STATUS,
@@ -69,6 +71,19 @@ const costSchema = z.preprocess(
   z.coerce.number().min(0, 'Price cannot be negative').max(1_000_000).nullable(),
 );
 
+/** Monthly request budget. Empty input means "no budget". */
+const budgetSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? null : value),
+  z.coerce.number().int().min(1, 'Budget must be at least 1 request').max(1_000_000_000).nullable(),
+);
+
+const intervalField = (minimum, label) =>
+  z.coerce
+    .number()
+    .int()
+    .min(minimum, `${label} must be at least ${minimum} seconds`)
+    .max(MAX_INTERVAL_SEC);
+
 /**
  * Monitor schemas depend on whether DEMO_MODE is on (10s minimum interval
  * instead of 30s), so they are built by a factory.
@@ -93,6 +108,11 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
     headers: headersSchema.optional(),
     costPer1kRequests: costSchema,
     currency: z.enum(CURRENCIES),
+    adaptive: z.boolean(),
+    minIntervalSec: intervalField(minIntervalSec, 'Fastest interval'),
+    maxIntervalSec: intervalField(minIntervalSec, 'Slowest interval'),
+    monthlyRequestBudget: budgetSchema,
+    budgetAction: z.enum(BUDGET_ACTIONS),
   });
 
   const withDefaults = fields.extend({
@@ -102,16 +122,52 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
     currency: fields.shape.currency.default(DEFAULT_CURRENCY),
     timeoutMs: fields.shape.timeoutMs.default(DEFAULT_TIMEOUT_MS),
     expectedStatus: fields.shape.expectedStatus.default({ ...DEFAULT_EXPECTED_STATUS }),
+    // New monitors adapt by default; min/max default from the base interval (below).
+    adaptive: fields.shape.adaptive.default(true),
+    minIntervalSec: fields.shape.minIntervalSec.optional(),
+    maxIntervalSec: fields.shape.maxIntervalSec.optional(),
+    monthlyRequestBudget: fields.shape.monthlyRequestBudget.optional(),
+    budgetAction: fields.shape.budgetAction.default('slow'),
   });
 
   const crossFieldRules = (monitor, ctx) => {
-    // A check must finish before the next one is due.
-    if (monitor.timeoutMs > monitor.intervalSec * 1000) {
+    // A check must finish before the next one is due. With adaptive intervals
+    // checks can run as often as minIntervalSec, so the timeout must fit that too.
+    // (minIntervalSec may still be unset here: it defaults below to the mode minimum.)
+    const fastest = monitor.adaptive
+      ? Math.min(
+          monitor.intervalSec,
+          monitor.minIntervalSec ?? Math.min(minIntervalSec, monitor.intervalSec),
+        )
+      : monitor.intervalSec;
+    if (monitor.timeoutMs > fastest * 1000) {
       ctx.addIssue({
         code: 'custom',
         path: ['timeoutMs'],
-        message: 'Timeout must not be longer than the check interval',
+        message:
+          fastest < monitor.intervalSec
+            ? 'Timeout must not be longer than the fastest adaptive interval'
+            : 'Timeout must not be longer than the check interval',
       });
+    }
+    // The base interval must sit between the adaptive bounds. Only checked when
+    // adaptive is on: the bounds are irrelevant otherwise (and older monitors
+    // may carry default bounds that don't fit their interval).
+    if (monitor.adaptive) {
+      if (monitor.minIntervalSec != null && monitor.minIntervalSec > monitor.intervalSec) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['minIntervalSec'],
+          message: 'Fastest interval must not be slower than the base interval',
+        });
+      }
+      if (monitor.maxIntervalSec != null && monitor.maxIntervalSec < monitor.intervalSec) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['maxIntervalSec'],
+          message: 'Slowest interval must not be faster than the base interval',
+        });
+      }
     }
     // HEAD responses have no body, so a keyword could never be found.
     if (monitor.method === 'HEAD' && monitor.keyword) {
@@ -125,10 +181,16 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
 
   // Cheapest request that can still do the job: HEAD (headers only) unless a
   // keyword has to be found in the body.
+  // Adaptive bounds default to the mode's minimum and 10 minutes, widened so
+  // the base interval always fits between them.
   const defaultMethod = (monitor) => ({
     ...monitor,
     method: monitor.method ?? (monitor.keyword ? 'GET' : 'HEAD'),
     costPer1kRequests: monitor.costPer1kRequests ?? null,
+    minIntervalSec: monitor.minIntervalSec ?? Math.min(minIntervalSec, monitor.intervalSec),
+    maxIntervalSec:
+      monitor.maxIntervalSec ?? Math.max(ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC, monitor.intervalSec),
+    monthlyRequestBudget: monitor.monthlyRequestBudget ?? null,
   });
 
   return {

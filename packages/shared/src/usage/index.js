@@ -10,11 +10,34 @@ import { MonitorUsage } from '../models/MonitorUsage.js';
  * as an update by itself.
  */
 export async function recordUsage(monitor, count, at = new Date()) {
-  if (!count) return;
-  await MonitorUsage.updateOne(
+  if (!count) return requestsThisMonth(monitor._id, at);
+  const usage = await MonitorUsage.findOneAndUpdate(
     { monitorId: monitor._id, month: monthKey(at) },
     { $inc: { requests: count }, $setOnInsert: { workspaceId: monitor.workspaceId } },
-    { upsert: true },
+    { upsert: true, returnDocument: 'after', projection: { requests: 1 } },
+  ).lean();
+  // The new monthly total, so the caller can check the budget without another read.
+  return usage.requests;
+}
+
+/**
+ * Sets a "sent once this month" marker (warnedAt / exceededAt) only if it is
+ * still unset. Returns true for exactly one caller, even under concurrency.
+ */
+export async function claimUsageMarker(monitorId, month, marker, at = new Date()) {
+  const claimed = await MonitorUsage.findOneAndUpdate(
+    { monitorId, month, [marker]: null },
+    { $set: { [marker]: at } },
+    { projection: { _id: 1 } },
+  ).lean();
+  return Boolean(claimed);
+}
+
+/** Clears budget markers (e.g. after the budget was raised). */
+export async function clearUsageMarkers(monitorId, month, markers) {
+  await MonitorUsage.updateOne(
+    { monitorId, month },
+    { $set: Object.fromEntries(markers.map((marker) => [marker, null])) },
   );
 }
 

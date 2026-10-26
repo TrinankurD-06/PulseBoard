@@ -10,6 +10,9 @@ const monitorUsageSchema = new mongoose.Schema(
     workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
     month: { type: String, required: true }, // "YYYY-MM"
     requests: { type: Number, default: 0 },
+    // "Sent once per month" markers for budget notices, set atomically (only if null).
+    warnedAt: { type: Date, default: null },
+    exceededAt: { type: Date, default: null },
   },
   baseOptions,
 );

@@ -1,6 +1,9 @@
 import { runHttpCheck } from '@pulseboard/shared/check';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
 import { recordUsage } from '@pulseboard/shared/usage';
+import { applyAdaptiveInterval } from '../adaptive.js';
+
+const noopEnforceBudget = async () => 'none';
 
 /**
  * Handler for the repeating `run-check` job:
@@ -8,11 +11,21 @@ import { recordUsage } from '@pulseboard/shared/usage';
  *   2. store the raw result in the time-series collection
  *   3. hand it to the incident engine, which updates the monitor's live
  *      fields and counters and opens/resolves incidents
+ *   4. adaptive interval: decide the next interval and apply it to this job
+ *   5. budget: warn at 80 %, pause or slow down at 100 %
  *
  * Check failures are normal data, not job failures, so this only throws when
  * the database itself fails.
  */
-export function createRunCheckJob({ allowPrivate, appUrl, scheduler, processCheckResult, logger }) {
+export function createRunCheckJob({
+  allowPrivate,
+  appUrl,
+  db,
+  scheduler,
+  processCheckResult,
+  enforceBudget = noopEnforceBudget,
+  logger,
+}) {
   return async function runCheckJob(job) {
     const { monitorId } = job.attrs.data;
     const monitor = await Monitor.findById(monitorId).lean();
@@ -31,7 +44,7 @@ export function createRunCheckJob({ allowPrivate, appUrl, scheduler, processChec
     // Count what was actually sent to the customer (redirects and a HEAD->GET
     // fallback included), and remember a server that rejects HEAD so later
     // checks go straight to GET instead of paying for two requests.
-    await recordUsage(monitor, result.requestsSent, checkedAt);
+    const requests = await recordUsage(monitor, result.requestsSent, checkedAt);
     if (result.headUnsupported && !monitor.headUnsupported) {
       await Monitor.updateOne({ _id: monitor._id }, { headUnsupported: true });
     }
@@ -45,7 +58,14 @@ export function createRunCheckJob({ allowPrivate, appUrl, scheduler, processChec
       totalMs: result.totalMs,
       timings: result.timings,
     });
-    await processCheckResult(monitor._id, result, checkedAt);
+    const { monitor: counted } = await processCheckResult(monitor._id, result, checkedAt);
+
+    // Adaptive first, budget second: a budget slow-down must win over the
+    // interval adaptation of the same run.
+    if (counted && db) {
+      await applyAdaptiveInterval({ job, db, monitor: counted, result, checkedAt, logger });
+    }
+    await enforceBudget({ job, monitor, requests, at: checkedAt });
 
     logger.debug(
       { monitorId, ok: result.ok, statusCode: result.statusCode, ms: result.totalMs },

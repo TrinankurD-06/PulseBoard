@@ -1,3 +1,4 @@
+import { budgetState, effectiveIntervalSec, isBudgetSlowed } from '@pulseboard/shared/adaptive';
 import { DEFAULT_CURRENCY } from '@pulseboard/shared/constants';
 import {
   costOf,
@@ -47,6 +48,23 @@ export async function getUsage(monitorId, now = new Date()) {
     estimatedMonthlyCost: estimateMonthlyCost(monitor),
     method: monitor.method,
     headUnsupported: Boolean(monitor.headUnsupported),
+    budget: {
+      monthlyRequestBudget: monitor.monthlyRequestBudget ?? null,
+      budgetAction: monitor.budgetAction ?? 'slow',
+      usedRatio: monitor.monthlyRequestBudget
+        ? Math.round((requests / monitor.monthlyRequestBudget) * 1000) / 1000
+        : null,
+      state: budgetState(requests, monitor.monthlyRequestBudget),
+      exceededThisMonth: monitor.budgetExceededMonth === monthKey(now),
+    },
+    interval: {
+      adaptive: Boolean(monitor.adaptive),
+      intervalSec: monitor.intervalSec,
+      currentIntervalSec: effectiveIntervalSec(monitor),
+      minIntervalSec: monitor.minIntervalSec ?? null,
+      maxIntervalSec: monitor.maxIntervalSec ?? null,
+      slowedByBudget: isBudgetSlowed(monitor, now),
+    },
   };
 }
 

@@ -13,9 +13,14 @@ const LIVE_MONITOR_FIELDS = [
   'lastError',
   'lastTimings',
   'sslExpiresAt',
+  // U2: adaptive interval and budget state, so the UI label/banner update live.
+  'adaptive',
+  'currentIntervalSec',
+  'pausedReason',
+  'budgetExceededMonth',
 ];
 
-/** Change-stream filter for monitors: only check results and status changes. */
+/** Change-stream filter for monitors: check results, status, interval and budget changes. */
 export const MONITOR_PIPELINE = [
   {
     $match: {
@@ -26,6 +31,8 @@ export const MONITOR_PIPELINE = [
           $or: [
             { 'updateDescription.updatedFields.lastCheckedAt': { $exists: true } },
             { 'updateDescription.updatedFields.status': { $exists: true } },
+            { 'updateDescription.updatedFields.currentIntervalSec': { $exists: true } },
+            { 'updateDescription.updatedFields.budgetExceededMonth': { $exists: true } },
           ],
         },
       ],

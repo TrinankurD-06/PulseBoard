@@ -42,6 +42,10 @@ export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
     };
   }
 
+  if (kind === ALERT_KIND.NOTICE) {
+    throw new Error('Use buildNotice() for notices');
+  }
+
   return {
     ...base,
     title: `✅ ${monitor.name} is back UP`,

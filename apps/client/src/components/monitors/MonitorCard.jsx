@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { formatDuration, formatMs, hostOf, timeAgoShort } from '../../lib/format.js';
+import { intervalLabel } from '../../lib/budget.js';
+import { formatMs, hostOf, timeAgoShort } from '../../lib/format.js';
 import { statusStyle } from '../../lib/status.js';
 import Sparkline from '../charts/Sparkline.jsx';
 import StatusDot from './StatusDot.jsx';
@@ -31,7 +32,7 @@ export default function MonitorCard({ monitor, wid, now, sparkline }) {
         </div>
         <div>
           <dt className="text-xs text-slate-500">Interval</dt>
-          <dd className="font-medium">{formatDuration(monitor.intervalSec)}</dd>
+          <dd className="truncate font-medium">{intervalLabel(monitor, now)}</dd>
         </div>
         <div>
           <dt className="text-xs text-slate-500">Checked</dt>

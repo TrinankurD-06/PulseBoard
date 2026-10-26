@@ -55,11 +55,30 @@ export const JOB_NAMES = Object.freeze({
   SEND_ALERT: 'send-alert',
   ROLLUP: 'rollup',
   FINALIZE_ROLLUP: 'finalize-rollup',
+  SEND_NOTICE: 'send-notice',
+  BUDGET_RESET: 'budget-reset',
+});
+
+// Adaptive intervals (U2): each run of this many consecutive successes while up
+// doubles the interval, up to maxIntervalSec.
+export const ADAPTIVE_SUCCESS_RUN = 10;
+export const ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC = 600;
+
+// Monthly request budgets (U2).
+export const BUDGET_ACTIONS = Object.freeze(['slow', 'pause']);
+export const BUDGET_WARNING_RATIO = 0.8;
+export const BUDGET_SLOW_INTERVAL_SEC = 900;
+export const PAUSED_REASONS = Object.freeze({ USER: 'user', BUDGET: 'budget_exceeded' });
+
+// Alerts that aren't about an incident (sent by the send-notice job).
+export const NOTICE_KIND = Object.freeze({
+  BUDGET_WARNING: 'budget_warning',
+  BUDGET_EXCEEDED: 'budget_exceeded',
 });
 
 // send-alert retries after a failed delivery: 30s, then 2m, then 8m, then give up.
 export const ALERT_RETRY_DELAYS_SEC = Object.freeze([30, 120, 480]);
 
-export const ALERT_KIND = Object.freeze({ DOWN: 'down', UP: 'up', TEST: 'test' });
+export const ALERT_KIND = Object.freeze({ DOWN: 'down', UP: 'up', TEST: 'test', NOTICE: 'notice' });
 
 export const PAGINATION = Object.freeze({ DEFAULT_LIMIT: 20, MAX_LIMIT: 100 });

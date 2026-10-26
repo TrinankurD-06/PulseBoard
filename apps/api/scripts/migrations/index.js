@@ -1,7 +1,8 @@
 import * as monitorTypesAndCost from './001-monitor-types-and-cost.js';
+import * as adaptiveAndBudget from './002-adaptive-and-budget.js';
 
 // All migrations, in the order they must run. Add new ones at the end.
-export const migrations = [monitorTypesAndCost];
+export const migrations = [monitorTypesAndCost, adaptiveAndBudget];
 
 const APPLIED = 'migrations';
 

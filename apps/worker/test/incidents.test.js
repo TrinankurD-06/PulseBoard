@@ -44,7 +44,8 @@ const at = (seconds) => new Date(Date.UTC(2026, 0, 1, 10, 0, seconds));
 async function feed(monitor, results, startSecond = 0) {
   const transitions = [];
   for (const [i, result] of results.entries()) {
-    transitions.push(await processCheckResult(monitor._id, result, at(startSecond + i * 10)));
+    const { transition } = await processCheckResult(monitor._id, result, at(startSecond + i * 10));
+    transitions.push(transition);
   }
   return transitions.filter(Boolean);
 }
@@ -129,7 +130,9 @@ describe('incident engine', () => {
     // Eight checks of the same monitor finishing "at the same time", e.g. on
     // several workers. Counters must all be applied and only one transition win.
     const results = await Promise.all(
-      Array.from({ length: 8 }, (_, i) => processCheckResult(monitor._id, failure, at(i))),
+      Array.from({ length: 8 }, (_, i) =>
+        processCheckResult(monitor._id, failure, at(i)).then((r) => r.transition),
+      ),
     );
     expect(results.filter((t) => t === 'open_incident')).toHaveLength(1);
     expect(await Incident.countDocuments()).toBe(1);

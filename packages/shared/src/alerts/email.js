@@ -6,7 +6,7 @@ const escapeHtml = (value) =>
     (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
   );
 
-const ACCENT = { down: '#ef4444', up: '#22c55e', test: '#38bdf8' };
+const ACCENT = { down: '#ef4444', up: '#22c55e', test: '#38bdf8', notice: '#f59e0b' };
 
 /** Simple, inline-styled HTML (email clients ignore <style> blocks and most CSS). */
 export function renderEmail(alert) {

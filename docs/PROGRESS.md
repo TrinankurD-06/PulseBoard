@@ -74,15 +74,18 @@ currency INR.
       remembered), no body without keyword, bot headers + `/bot` page, live cost estimate,
       `MonitorUsage` counting, usage card, idempotent `npm run migrate`. Built by
       backend + frontend tracks in parallel against `docs/upgrade/U1-contract.md`.
-- [ ] **U2. Budgets + adaptive intervals**
+- [x] **U2. Budgets + adaptive intervals**: pure `nextInterval` + EWMA, interval applied to the
+      running Agenda job and persisted, budget warning at 80 % / slow or pause at 100 % (exactly
+      once), notices, monthly reset with boot catch-up, raise-budget, 409 on resume over budget,
+      migration 002, UI (adaptive label, budget banner, raise-budget modal, budget bar).
 - [ ] **U3. Heartbeat monitors**
 - [ ] **U4. `pulseboard-agent` + probe-on-silence**
 - [ ] **U5. Cost & Usage page, cross-type tests, demo, docs**
 
 ## Resume note (upgrade)
 
-U1 committed. Validation: Prettier clean, ESLint 0, 315/315 tests (shared 163, api 116,
-client 7, demo-target 5, worker 24), client build OK; real run (seed, migrate twice, dev,
-browser): HEAD default, live "≈ 43,200 requests/month · ≈ ₹432/month", HEAD+keyword error,
-usage card with real counts, `/bot` page, no console errors. Next: U2 (budgets + adaptive
-intervals), starting with `docs/upgrade/U2-contract.md`.
+U1 `9fc020d`, U2 committed. U2 validation found and fixed a real bug unit tests missed
+(Agenda job ids are hex strings, D75): verified on real processes that the adaptive job now
+runs every 20 s and a budget-slowed job every 900 s. Gate: 381/381 tests (shared 195, api
+128, client 17, demo-target 5, worker 36), lint and Prettier clean, build OK.
+Next: U3 (heartbeat monitors), starting with `docs/upgrade/U3-contract.md`.

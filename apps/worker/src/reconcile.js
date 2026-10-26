@@ -1,10 +1,11 @@
 import { JOB_NAMES } from '@pulseboard/shared/constants';
 import { Monitor } from '@pulseboard/shared/models';
-import { AGENDA_COLLECTION } from '@pulseboard/shared/scheduling';
+import { AGENDA_COLLECTION, repeatSecondsOf } from '@pulseboard/shared/scheduling';
 
 /**
  * Makes the job table match the monitors table, run once on worker boot:
- *   - every active monitor has exactly one run-check job with its interval
+ *   - every active monitor has exactly one run-check job with its CURRENT
+ *     interval (adaptive/budget-slowed intervals are kept, not reset to the base)
  *   - jobs for deleted/paused monitors (orphans) and duplicates are removed
  *
  * Normally the API keeps both in sync, but a crash between "save monitor" and
@@ -13,7 +14,10 @@ import { AGENDA_COLLECTION } from '@pulseboard/shared/scheduling';
  */
 export async function reconcileJobs({ db, scheduler, logger }) {
   const jobs = db.collection(AGENDA_COLLECTION);
-  const activeMonitors = await Monitor.find({ isPaused: false }, { intervalSec: 1 }).lean();
+  const activeMonitors = await Monitor.find(
+    { isPaused: false },
+    { intervalSec: 1, currentIntervalSec: 1 },
+  ).lean();
   const activeById = new Map(activeMonitors.map((monitor) => [String(monitor._id), monitor]));
 
   const existingJobs = await jobs
@@ -32,7 +36,7 @@ export async function reconcileJobs({ db, scheduler, logger }) {
       continue;
     }
     covered.add(monitorId);
-    if (job.repeatInterval !== `${monitor.intervalSec} seconds`) {
+    if (job.repeatInterval !== `${repeatSecondsOf(monitor)} seconds`) {
       await scheduler.scheduleMonitor(monitor);
       counts.updated += 1;
     }

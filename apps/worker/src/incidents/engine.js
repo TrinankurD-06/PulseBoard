@@ -115,27 +115,32 @@ export function createIncidentEngine({ agenda, logger }) {
     );
   }
 
-  /** Records one check result; returns the transition applied, if any (for tests/logs). */
+  /**
+   * Records one check result. Returns { transition, monitor }: the transition
+   * applied (if any) and the monitor document as counted, so the caller can
+   * compute the next adaptive interval without reading it again.
+   */
   return async function processCheckResult(monitorId, result, checkedAt) {
     const counted = await Monitor.collection.findOneAndUpdate(
       { _id: monitorId, isPaused: false },
       buildCheckUpdate(result, checkedAt),
       { returnDocument: 'after' },
     );
-    if (!counted) return null; // paused or deleted meanwhile
+    if (!counted) return { transition: null, monitor: null }; // paused or deleted meanwhile
 
     const transition = decideTransition(counted);
-    if (!transition) return null;
+    if (!transition) return { transition: null, monitor: counted };
 
     const moved = await Monitor.collection.findOneAndUpdate(
       { _id: monitorId, ...TRANSITION_GUARDS[transition] },
       { $set: { status: TRANSITION_TARGET[transition] } },
       { returnDocument: 'after' },
     );
-    if (!moved) return null; // another worker applied it first
+    // Another worker applied it first: report no transition, but the counted state.
+    if (!moved) return { transition: null, monitor: counted };
 
     if (transition === TRANSITIONS.OPEN_INCIDENT) await onIncidentOpened(moved, checkedAt);
     if (transition === TRANSITIONS.RESOLVE_INCIDENT) await onIncidentResolved(moved, checkedAt);
-    return transition;
+    return { transition, monitor: moved };
   };
 }

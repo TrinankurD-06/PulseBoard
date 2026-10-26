@@ -17,11 +17,14 @@ import {
   ensureAgendaIndexes,
 } from '@pulseboard/shared/scheduling';
 import { env } from './config/env.js';
+import { createBudgetEnforcer } from './budget.js';
 import { startHealthServer } from './healthServer.js';
 import { createIncidentEngine } from './incidents/engine.js';
+import { createBudgetResetJob } from './jobs/budgetReset.js';
 import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
 import { createRunCheckJob } from './jobs/runCheck.js';
 import { createSendAlertJob } from './jobs/sendAlert.js';
+import { createSendNoticeJob } from './jobs/sendNotice.js';
 import { reconcileJobs } from './reconcile.js';
 
 const logger = createLogger({ name: 'worker' });
@@ -44,38 +47,48 @@ async function main() {
   await ensureAgendaIndexes(mongoose.connection.db);
   const scheduler = createAgendaScheduler(agenda);
 
+  const db = mongoose.connection.db;
   const processCheckResult = createIncidentEngine({ agenda, logger });
+  const enforceBudget = createBudgetEnforcer({ agenda, db, scheduler, logger });
+  const senders = createAlertSenders({ ...alertSenderConfig(env), logger });
   agenda.define(
     JOB_NAMES.RUN_CHECK,
     createRunCheckJob({
       allowPrivate: env.ALLOW_PRIVATE_TARGETS,
       appUrl: appUrlOf(env),
+      db,
       scheduler,
       processCheckResult,
+      enforceBudget,
       logger,
     }),
     { concurrency: env.AGENDA_MAX_CONCURRENCY },
   );
   agenda.define(
     JOB_NAMES.SEND_ALERT,
-    createSendAlertJob({
-      agenda,
-      senders: createAlertSenders({ ...alertSenderConfig(env), logger }),
-      dashboardUrl: env.DASHBOARD_URL,
-      logger,
-    }),
+    createSendAlertJob({ agenda, senders, dashboardUrl: env.DASHBOARD_URL, logger }),
     { concurrency: 5 },
   );
+  agenda.define(
+    JOB_NAMES.SEND_NOTICE,
+    createSendNoticeJob({ agenda, senders, dashboardUrl: env.DASHBOARD_URL, logger }),
+    { concurrency: 5 },
+  );
+  const budgetReset = createBudgetResetJob({ scheduler, logger });
+  agenda.define(JOB_NAMES.BUDGET_RESET, () => budgetReset(new Date()));
   agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
   agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
 
-  await reconcileJobs({ db: mongoose.connection.db, scheduler, logger });
+  // Catch up on a missed monthly reset first, so reconcile sees the restored intervals.
+  await budgetReset(new Date());
+  await reconcileJobs({ db, scheduler, logger });
   await agenda.start();
   // every() creates a single job per name (upsert), so several workers booting
   // at once still end up with one rollup job and one nightly finalize job.
   await agenda.every('15 minutes', JOB_NAMES.ROLLUP);
   await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
+  await agenda.every('0 0 1 * *', JOB_NAMES.BUDGET_RESET, undefined, { timezone: 'UTC' });
   let agendaRunning = true;
   logger.info('Agenda started, processing jobs');
 

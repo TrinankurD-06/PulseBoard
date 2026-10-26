@@ -795,3 +795,94 @@ Implemented`. The checker then retries the same URL with GET **within the same c
   so the tracks never edit the same file and never wait on each other. They proceed on the
   contract and report open questions, which are resolved during integration. Commits happen
   only after lint, all tests and a real browser run pass.
+
+## U2: Budgets + adaptive intervals
+
+### D69. Adaptive intervals: back off while healthy, speed up on trouble
+
+- `nextInterval(monitor, lastResult)` is a pure, shared function, applied by the worker after
+  the incident engine has counted the check. Rules, in priority order: slowed by budget → the slow
+  interval (checked **first**, so a non-adaptive monitor over budget also stays slowed; the
+  backend work caught that the contract had these two the other way round); not adaptive →
+  base interval (old behaviour); any failure → fastest
+  interval; still down → fastest; response time over 2× its daily average → back to at most the
+  base interval; every 10th consecutive success while up → double, capped at the slowest
+  interval; otherwise unchanged.
+- A failure drops straight to the fastest interval so an outage is **confirmed quickly**:
+  the incident rules (3 failures / 2 successes) are untouched, they just run at the fast
+  pace. The trade-off: a monitor that has backed off notices an outage at its _next_
+  (slower) check. That's the cost/latency trade customers opt into; it's on by default only
+  for **new** monitors, and existing monitors keep fixed intervals.
+- A response-time spike pulls a backed-off interval back to the base (`min(current, base)`):
+  slowness is often the first sign of trouble, but it should never slow down a monitor that
+  is already checking fast.
+- Doubling uses the engine's own `consecutiveSuccesses` (every 10th success) instead of a
+  separate counter, so there's one source of truth for streaks.
+
+### D70. A moving average instead of a 24-hour query
+
+- "Response time > 2× its 24 h average" would need a raw-check aggregation on every check.
+  Instead each monitor keeps a time-weighted exponential moving average (time constant 24 h)
+  updated in O(1) per check. It weighs recent checks more, so it's an approximation of a
+  24 h mean, which is fine for spotting a 2× spike.
+
+### D71. Applying a new interval to Agenda without fighting it
+
+- Agenda computes `nextRunAt` when a run **starts** and writes it back from memory when the
+  run ends (it doesn't write `repeatInterval` then). Updating the job document during the run
+  would therefore be overwritten. The worker changes the interval on the **running job
+  object** (`repeatInterval` + `nextRunAt` in memory) and also persists `repeatInterval` in
+  `agendaJobs`, so both this run's save and all future runs use the new interval. Verified in
+  Agenda's source before designing (see the U1 plan).
+- Everything that (re)schedules (API, boot reconcile) now uses `currentIntervalSec`, otherwise
+  a worker restart would silently reset every adaptive interval to the base value.
+
+### D72. Budgets: warn at 80 %, act at 100 %, exactly once
+
+- After each check the usage counter is bumped with `$inc` and the new count compared with
+  the budget (`budgetState`, pure). Crossing 80 % and 100 % is recorded with
+  **conditional updates** on the month's `MonitorUsage` document (`warnedAt: null →
+now`), so even with several workers only one sends the warning and only one applies the
+  action.
+- Actions: `slow` (default) switches to 15 minutes (or the slowest adaptive interval if
+  that's longer) for the rest of the month; `pause` pauses the monitor with
+  `pausedReason: 'budget_exceeded'`, which a manual resume can't undo until the budget is
+  raised (409 `BUDGET_EXCEEDED`). Raising the budget lifts the restriction immediately.
+- `slow` is the default because a budget usually means "spend less", not "stop watching".
+
+### D73. Monthly reset that can't be missed
+
+- The restriction is stored as `budgetExceededMonth: "YYYY-MM"`, not a boolean. The reset
+  job (1st of the month, 00:00 UTC) restores every monitor whose month is not the current
+  one, and the same logic runs at worker boot, so a worker that was down at midnight still
+  catches up. User-paused monitors are never touched (`pausedReason: 'user'`).
+
+### D74. Notices: alerts that aren't incidents
+
+- Budget warnings (and, in U4, "agent silent but endpoint reachable") need to reach the same
+  channels as incident alerts, but have no incident. A separate `send-notice` job reuses the
+  senders and the 30 s / 2 min / 8 min retry policy; "once" is guaranteed by the markers on
+  `MonitorUsage` (or the monitor), not by the job.
+
+### D75. Validation caught what unit tests couldn't: Agenda job ids are strings
+
+- In the real run, the adaptive monitor's `currentIntervalSec` became 20 s but the worker kept
+  checking every 10 s. Cause: Agenda's MongoDB backend hands jobs to handlers with `_id`
+  converted to a **hex string**, so updating the stored job by `{ _id: job.attrs._id }`
+  matched nothing; every later run reloaded the old interval. The unit test had built its fake
+  job from the raw document (an ObjectId), so it passed.
+- Fix: match the stored job robustly (converted ObjectId / name + monitor id, checking that one
+  document matched), decide whether to re-apply based on the **job's actual**
+  `repeatInterval` (so any drift heals itself on the next run), and a regression test with a
+  job shaped exactly like Agenda's.
+- Lesson for the process (D68): every phase is validated end to end against real processes,
+  not only by unit and integration tests.
+
+### D76. Known limitations of budgets
+
+- Lowering a budget below this month's usage takes effect at the monitor's next check, not on
+  save (at most one interval later).
+- Switching `budgetAction` (slow ↔ pause) after the budget is already exhausted this month
+  applies from next month; raising the budget lifts the current restriction immediately.
+- In DEMO_MODE the default fastest adaptive interval is 10 s, so an adaptive monitor's timeout
+  must be ≤ 10 s unless the fastest interval is raised (checks may run that often).

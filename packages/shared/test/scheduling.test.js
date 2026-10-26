@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AGENDA_COLLECTION,
+  applyIntervalToRunningJob,
   countOverdueJobs,
   createAgenda,
   createAgendaScheduler,
@@ -55,6 +56,55 @@ describe('agenda scheduler', () => {
     await jobs.insertOne({ name: 'x', nextRunAt: new Date(Date.now() + 60_000), lockedAt: null });
     await jobs.insertOne({ name: 'y', nextRunAt: new Date(0), lockedAt: new Date() });
     expect(await countOverdueJobs(mongoose.connection.db)).toBe(1);
+  });
+
+  it('schedules with the current (adaptive) interval when there is one', async () => {
+    const m = { ...monitor(60), currentIntervalSec: 240 };
+    await scheduler.scheduleMonitor(m);
+    const job = await jobs.findOne({ 'data.monitorId': String(m._id) });
+    expect(job.repeatInterval).toBe('240 seconds');
+  });
+
+  it('applyIntervalToRunningJob updates the in-memory job and the stored repeatInterval', async () => {
+    const m = monitor(60);
+    await scheduler.scheduleMonitor(m);
+    const stored = await jobs.findOne({ 'data.monitorId': String(m._id) });
+    const lastRunAt = new Date('2026-10-15T12:00:00Z');
+    const job = { attrs: { ...stored, lastRunAt } };
+
+    await applyIntervalToRunningJob(job, mongoose.connection.db, 480);
+
+    // In memory: Agenda's post-run save writes nextRunAt from here.
+    expect(job.attrs.repeatInterval).toBe('480 seconds');
+    expect(job.attrs.nextRunAt).toEqual(new Date(lastRunAt.getTime() + 480_000));
+    // Stored: future runs are loaded from the database.
+    const after = await jobs.findOne({ _id: stored._id });
+    expect(after.repeatInterval).toBe('480 seconds');
+    expect(after.nextRunAt).toEqual(job.attrs.nextRunAt);
+  });
+
+  it('works with job objects as Agenda passes them (hex-string _id)', async () => {
+    const m = monitor(60);
+    await scheduler.scheduleMonitor(m);
+    const stored = await jobs.findOne({ 'data.monitorId': String(m._id) });
+    // Agenda's Mongo backend builds handler job objects with _id as a hex STRING.
+    const job = {
+      attrs: { ...stored, _id: stored._id.toHexString(), lastRunAt: new Date() },
+    };
+
+    expect(await applyIntervalToRunningJob(job, mongoose.connection.db, 300)).toBe(true);
+    const after = await jobs.findOne({ _id: stored._id });
+    expect(after.repeatInterval).toBe('300 seconds');
+    expect(after.nextRunAt).toEqual(job.attrs.nextRunAt);
+  });
+
+  it('reports false when the stored job no longer exists', async () => {
+    const m = monitor(60);
+    await scheduler.scheduleMonitor(m);
+    const stored = await jobs.findOne({ 'data.monitorId': String(m._id) });
+    await scheduler.cancelMonitor(m._id);
+    const job = { attrs: { ...stored, _id: stored._id.toHexString() } };
+    expect(await applyIntervalToRunningJob(job, mongoose.connection.db, 300)).toBe(false);
   });
 
   it('has the one-job-per-monitor unique index', async () => {

@@ -2,11 +2,15 @@ import mongoose from 'mongoose';
 import {
   DEFAULT_EXPECTED_STATUS,
   DEFAULT_TIMEOUT_MS,
+  ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC,
+  BUDGET_ACTIONS,
   CURRENCIES,
   DEFAULT_CURRENCY,
   HTTP_METHODS,
   MONITOR_STATUS,
   MONITOR_TYPES,
+  MIN_INTERVAL_SEC,
+  PAUSED_REASONS,
 } from '../constants.js';
 import { baseOptions } from './_options.js';
 
@@ -44,6 +48,24 @@ const monitorSchema = new mongoose.Schema(
     costPer1kRequests: { type: Number, default: null },
     currency: { type: String, enum: CURRENCIES, default: DEFAULT_CURRENCY },
     isPaused: { type: Boolean, default: false },
+    // Why it is paused: by a user, or automatically because the monthly budget ran out.
+    pausedReason: { type: String, enum: [...Object.values(PAUSED_REASONS), null], default: null },
+
+    // Adaptive interval (U2). intervalSec is the BASE interval; currentIntervalSec is
+    // what the check job actually uses (null = intervalSec).
+    adaptive: { type: Boolean, default: false },
+    minIntervalSec: { type: Number, default: MIN_INTERVAL_SEC },
+    maxIntervalSec: { type: Number, default: ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC },
+    currentIntervalSec: { type: Number, default: null },
+    // Time-weighted moving average of response times (~24 h), for spike detection.
+    responseEwmaMs: { type: Number, default: null },
+    responseEwmaAt: { type: Date, default: null },
+
+    // Monthly request budget (U2): null = no budget.
+    monthlyRequestBudget: { type: Number, default: null },
+    budgetAction: { type: String, enum: BUDGET_ACTIONS, default: 'slow' },
+    // "YYYY-MM" of the month whose budget ran out (restriction active), else null.
+    budgetExceededMonth: { type: String, default: null },
     status: {
       type: String,
       enum: Object.values(MONITOR_STATUS),

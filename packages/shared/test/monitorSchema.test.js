@@ -6,7 +6,7 @@ const valid = { name: 'API', url: 'https://example.com/health', intervalSec: 60 
 describe('buildMonitorSchemas', () => {
   const { create, update } = buildMonitorSchemas({ demoMode: false });
 
-  it('applies defaults: HEAD (no body needed), INR, no price', () => {
+  it('applies defaults: HEAD (no body needed), INR, no price, adaptive, no budget', () => {
     expect(create.parse(valid)).toEqual({
       ...valid,
       method: 'HEAD',
@@ -15,6 +15,11 @@ describe('buildMonitorSchemas', () => {
       keyword: null,
       costPer1kRequests: null,
       currency: 'INR',
+      adaptive: true,
+      minIntervalSec: 30,
+      maxIntervalSec: 600,
+      monthlyRequestBudget: null,
+      budgetAction: 'slow',
     });
   });
 
@@ -81,6 +86,52 @@ describe('buildMonitorSchemas', () => {
     );
     expect(create.safeParse({ ...valid, headers: { Host: 'evil.com' } }).success).toBe(false);
     expect(create.safeParse({ ...valid, headers: { 'Bad Header': 'x' } }).success).toBe(false);
+  });
+
+  describe('adaptive intervals and budget (U2)', () => {
+    it('widens the default bounds so the base interval always fits', () => {
+      expect(create.parse({ ...valid, intervalSec: 3600 })).toMatchObject({
+        minIntervalSec: 30,
+        maxIntervalSec: 3600,
+      });
+      const demo = buildMonitorSchemas({ demoMode: true });
+      expect(demo.create.parse({ ...valid, intervalSec: 60, timeoutMs: 5000 })).toMatchObject({
+        minIntervalSec: 10,
+        maxIntervalSec: 600,
+      });
+    });
+
+    it('requires min <= base <= max when adaptive', () => {
+      const tooSlowMin = create.safeParse({ ...valid, minIntervalSec: 120 });
+      expect(tooSlowMin.error.issues[0].path).toEqual(['minIntervalSec']);
+      const tooFastMax = create.safeParse({ ...valid, maxIntervalSec: 30 });
+      expect(tooFastMax.error.issues[0].path).toEqual(['maxIntervalSec']);
+      // Bounds are ignored when adaptive is off.
+      expect(create.safeParse({ ...valid, adaptive: false, maxIntervalSec: 30 }).success).toBe(
+        true,
+      );
+    });
+
+    it('requires the timeout to fit the fastest adaptive interval (including the default one)', () => {
+      const demo = buildMonitorSchemas({ demoMode: true });
+      const result = demo.create.safeParse({ ...valid, intervalSec: 60, timeoutMs: 20_000 });
+      expect(result.success).toBe(false);
+      expect(result.error.issues[0].message).toMatch(/fastest adaptive interval/);
+      expect(
+        demo.create.safeParse({ ...valid, intervalSec: 60, timeoutMs: 20_000, adaptive: false })
+          .success,
+      ).toBe(true);
+    });
+
+    it('validates the budget and its action', () => {
+      expect(create.parse({ ...valid, monthlyRequestBudget: '' }).monthlyRequestBudget).toBeNull();
+      expect(create.parse({ ...valid, monthlyRequestBudget: '20000' }).monthlyRequestBudget).toBe(
+        20000,
+      );
+      expect(create.safeParse({ ...valid, monthlyRequestBudget: 0 }).success).toBe(false);
+      expect(create.safeParse({ ...valid, budgetAction: 'explode' }).success).toBe(false);
+      expect(create.parse({ ...valid, budgetAction: 'pause' }).budgetAction).toBe('pause');
+    });
   });
 
   it('accepts partial updates without filling in defaults, but not empty ones', () => {
