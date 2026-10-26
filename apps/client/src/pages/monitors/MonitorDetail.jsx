@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
+import { useIncidents } from '../../api/incidents.js';
 import {
   useDeleteMonitor,
   useMonitor,
@@ -11,6 +12,7 @@ import {
   useResumeMonitor,
   useTestSavedMonitor,
 } from '../../api/monitors.js';
+import IncidentCard from '../../components/incidents/IncidentCard.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
 import TestResult from '../../components/monitors/TestResult.jsx';
@@ -29,6 +31,44 @@ function Detail({ label, children }) {
       <dt className="text-xs text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
     </div>
+  );
+}
+
+function MonitorIncidents({ wid, monitorId, now }) {
+  const { data } = useIncidents(wid, { monitorId, limit: 5 });
+  const incidents = data?.data;
+  return (
+    <Card>
+      <CardHeader
+        title="Incidents"
+        action={
+          data?.pagination.total > 5 && (
+            <Link
+              to={`/app/${wid}/incidents?status=all`}
+              className="text-sm text-emerald-600 hover:underline"
+            >
+              View all
+            </Link>
+          )
+        }
+      />
+      {incidents?.length === 0 && (
+        <p className="p-5 text-sm text-slate-500">No incidents recorded for this monitor.</p>
+      )}
+      {incidents?.length > 0 && (
+        <div className="space-y-3 p-5">
+          {incidents.map((incident) => (
+            <IncidentCard
+              key={incident.id}
+              incident={incident}
+              wid={wid}
+              now={now}
+              showMonitor={false}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -191,6 +231,8 @@ export default function MonitorDetail() {
           </dl>
         </Card>
       </div>
+
+      <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
     </div>
   );
 }

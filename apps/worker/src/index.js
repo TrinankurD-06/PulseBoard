@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { createAlertSenders } from '@pulseboard/shared/alerts';
 import { JOB_NAMES, MAX_TIMEOUT_MS } from '@pulseboard/shared/constants';
 import {
   connectMongo,
@@ -7,6 +8,7 @@ import {
   mongoose,
   mongoState,
 } from '@pulseboard/shared/db';
+import { alertSenderConfig } from '@pulseboard/shared/env';
 import { createLogger } from '@pulseboard/shared/logger';
 import {
   countOverdueJobs,
@@ -16,7 +18,9 @@ import {
 } from '@pulseboard/shared/scheduling';
 import { env } from './config/env.js';
 import { startHealthServer } from './healthServer.js';
+import { createIncidentEngine } from './incidents/engine.js';
 import { createRunCheckJob } from './jobs/runCheck.js';
+import { createSendAlertJob } from './jobs/sendAlert.js';
 import { reconcileJobs } from './reconcile.js';
 
 const logger = createLogger({ name: 'worker' });
@@ -32,15 +36,33 @@ async function main() {
     // Comfortably above the longest possible check, so a slow check is never
     // mistaken for a dead worker and handed to someone else.
     defaultLockLifetime: MAX_TIMEOUT_MS * 2,
+    // One-off jobs (alerts) are deleted once done, so agendaJobs doesn't grow forever.
+    removeOnComplete: true,
   });
   await agenda.ready;
   await ensureAgendaIndexes(mongoose.connection.db);
   const scheduler = createAgendaScheduler(agenda);
 
+  const processCheckResult = createIncidentEngine({ agenda, logger });
   agenda.define(
     JOB_NAMES.RUN_CHECK,
-    createRunCheckJob({ allowPrivate: env.ALLOW_PRIVATE_TARGETS, scheduler, logger }),
+    createRunCheckJob({
+      allowPrivate: env.ALLOW_PRIVATE_TARGETS,
+      scheduler,
+      processCheckResult,
+      logger,
+    }),
     { concurrency: env.AGENDA_MAX_CONCURRENCY },
+  );
+  agenda.define(
+    JOB_NAMES.SEND_ALERT,
+    createSendAlertJob({
+      agenda,
+      senders: createAlertSenders({ ...alertSenderConfig(env), logger }),
+      dashboardUrl: env.DASHBOARD_URL,
+      logger,
+    }),
+    { concurrency: 5 },
   );
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
 

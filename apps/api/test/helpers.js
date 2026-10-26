@@ -15,6 +15,7 @@ export const testEnv = {
   TRUST_PROXY: false,
   DEMO_MODE: true,
   ALLOW_PRIVATE_TARGETS: true,
+  DASHBOARD_URL: 'http://localhost:5173',
 };
 
 export function buildTestApp({ env, ...overrides } = {}) {

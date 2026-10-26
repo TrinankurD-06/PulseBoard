@@ -3,19 +3,19 @@
 // transactions behave exactly like the docker-compose and Atlas setups.
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import { ensureCollections } from '../db.js';
+import { connectMongo, disconnectMongo, ensureCollections } from '../db.js';
 
 let replSet;
 
 export async function startMemoryDb() {
   replSet = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
-  await mongoose.connect(replSet.getUri('pulseboard-test'));
+  await connectMongo(replSet.getUri('pulseboard-test'));
   await ensureCollections();
   return replSet;
 }
 
 export async function stopMemoryDb() {
-  await mongoose.disconnect();
+  await disconnectMongo();
   await replSet?.stop();
 }
 

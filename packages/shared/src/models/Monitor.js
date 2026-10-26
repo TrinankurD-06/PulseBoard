@@ -43,6 +43,12 @@ const monitorSchema = new mongoose.Schema(
     // Incident state machine counters (updated atomically by the worker).
     consecutiveFailures: { type: Number, default: 0 },
     consecutiveSuccesses: { type: Number, default: 0 },
+    // When the current failure / success streak began. Incidents use them so
+    // startedAt is the first failed check and resolvedAt the first good one,
+    // not the moment the threshold was crossed.
+    failingSince: { type: Date, default: null },
+    failingCause: { type: String, default: null },
+    recoveringSince: { type: Date, default: null },
 
     // Denormalised "latest check" fields. Time-series collections cannot be
     // watched with change streams, so the worker copies each result here and

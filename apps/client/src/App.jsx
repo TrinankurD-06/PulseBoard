@@ -1,11 +1,13 @@
 import { Route, Routes } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './auth/routes.jsx';
 import AppLayout from './components/layout/AppLayout.jsx';
+import AlertChannels from './pages/AlertChannels.jsx';
 import AppIndex from './pages/AppIndex.jsx';
 import Login from './pages/auth/Login.jsx';
 import Register from './pages/auth/Register.jsx';
 import ComingSoon from './pages/ComingSoon.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Incidents from './pages/Incidents.jsx';
 import Landing from './pages/Landing.jsx';
 import EditMonitor from './pages/monitors/EditMonitor.jsx';
 import MonitorDetail from './pages/monitors/MonitorDetail.jsx';
@@ -33,8 +35,8 @@ export default function App() {
           <Route path="monitors/new" element={<NewMonitor />} />
           <Route path="monitors/:mid" element={<MonitorDetail />} />
           <Route path="monitors/:mid/edit" element={<EditMonitor />} />
-          <Route path="incidents" element={<ComingSoon title="Incidents" />} />
-          <Route path="alerts" element={<ComingSoon title="Alert channels" />} />
+          <Route path="incidents" element={<Incidents />} />
+          <Route path="alerts" element={<AlertChannels />} />
           <Route path="status-pages" element={<ComingSoon title="Status pages" />} />
           <Route path="team" element={<Team />} />
           <Route path="settings" element={<Settings />} />

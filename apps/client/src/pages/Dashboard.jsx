@@ -1,6 +1,7 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import { Activity, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
 import MonitorCard from '../components/monitors/MonitorCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
@@ -37,6 +38,8 @@ function SummaryCard({ label, value, accent }) {
 export default function Dashboard() {
   const { wid, workspace, can } = useCurrentWorkspace();
   const { data: monitors, isPending, isError } = useMonitors(wid);
+  const { data: openIncidents } = useIncidents(wid, { status: 'open', limit: 1 });
+  const openCount = openIncidents?.pagination.total;
   const now = useNow();
   const canEdit = can(ROLES.MEMBER);
 
@@ -52,7 +55,11 @@ export default function Dashboard() {
     <>
       <PageHeader
         title={workspace.name}
-        description="All monitors at a glance"
+        description={
+          summary
+            ? `${summary.total} monitor${summary.total === 1 ? '' : 's'}`
+            : 'All monitors at a glance'
+        }
         action={newButton}
       />
 
@@ -61,7 +68,6 @@ export default function Dashboard() {
           ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[106px] rounded-xl" />)
           : summary && (
               <>
-                <SummaryCard label="Monitors" value={summary.total} />
                 <SummaryCard
                   label="Up"
                   value={summary.up}
@@ -72,6 +78,16 @@ export default function Dashboard() {
                   value={summary.down}
                   accent={summary.down > 0 ? 'text-red-600 dark:text-red-400' : undefined}
                 />
+                <Link
+                  to={`/app/${wid}/incidents`}
+                  className="rounded-xl focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                >
+                  <SummaryCard
+                    label="Open incidents"
+                    value={openCount ?? '—'}
+                    accent={openCount > 0 ? 'text-red-600 dark:text-red-400' : undefined}
+                  />
+                </Link>
                 <SummaryCard label="Avg response" value={formatMs(summary.avgResponseMs)} />
               </>
             )}

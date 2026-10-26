@@ -1,5 +1,6 @@
 import { assertSafeUrl, runHttpCheck, UnsafeTargetError } from '@pulseboard/shared/check';
 import { MONITOR_STATUS, ROLES } from '@pulseboard/shared/constants';
+import { resolveOpenIncident } from '@pulseboard/shared/incident';
 import { CheckResult, DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
 import { AppError, notFound } from '../../lib/errors.js';
@@ -103,6 +104,12 @@ export function createMonitorService({ env, scheduler, schemas }) {
       monitor.set({ isPaused: true, status: MONITOR_STATUS.PAUSED });
       await monitor.save();
       await scheduler.cancelMonitor(monitor._id);
+      // No checks run while paused, so an open incident could never recover on
+      // its own. Close it now (no recovery alert: nothing actually recovered).
+      await resolveOpenIncident(monitor._id, {
+        resolvedAt: new Date(),
+        message: 'Closed because monitoring was paused',
+      });
       return monitor;
     },
 

@@ -3,14 +3,18 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
+import { createAlertSenders } from '@pulseboard/shared/alerts';
+import { alertSenderConfig } from '@pulseboard/shared/env';
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
 import { pinoHttp } from 'pino-http';
 import { createTokenService } from './lib/tokens.js';
 import { authenticate } from './middleware/authenticate.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
+import { alertChannelsRouter } from './modules/alertChannels/alertChannels.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { incidentsRouter } from './modules/incidents/incidents.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
 import { metaRouter } from './modules/meta/meta.routes.js';
 import { monitorsRouter } from './modules/monitors/monitors.routes.js';
@@ -21,7 +25,13 @@ import { noopScheduler } from './scheduling/scheduler.js';
  * Builds the Express app without listening, so tests can drive it with Supertest.
  * Process-level concerns (DB connection, sockets, shutdown) live in server.js.
  */
-export function createApp({ env, logger, scheduler = noopScheduler, getRealtimeStatus }) {
+export function createApp({
+  env,
+  logger,
+  scheduler = noopScheduler,
+  alertSenders = createAlertSenders({ ...alertSenderConfig(env), logger }),
+  getRealtimeStatus,
+}) {
   const app = express();
 
   if (env.TRUST_PROXY) app.set('trust proxy', 1);
@@ -67,6 +77,12 @@ export function createApp({ env, logger, scheduler = noopScheduler, getRealtimeS
     '/workspaces/:wid/monitors',
     requireAuth,
     monitorsRouter({ env, scheduler, schemas: monitorSchemas }),
+  );
+  api.use('/workspaces/:wid/incidents', requireAuth, incidentsRouter());
+  api.use(
+    '/workspaces/:wid/alert-channels',
+    requireAuth,
+    alertChannelsRouter({ senders: alertSenders, env }),
   );
   app.use('/api/v1', api);
 

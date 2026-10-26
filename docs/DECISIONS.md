@@ -413,3 +413,96 @@ totalPages } }`. Errors: `{ error: {...} }`. The client always reads `res.data.d
   via `DEMO_TARGET_PORT`; it now exits with a clear message if its port is taken.
 - `/admin` has no authentication, on purpose: it's a demo prop, not a product feature.
   Nothing real is behind it.
+
+---
+
+## Phase 5: Incidents & alerts
+
+### D39. The state machine is a pure function; the database applies it with guards
+
+- `packages/shared/src/incident/stateMachine.js`: `nextMonitorState(state, ok)` and
+  `decideTransition(counters)`, with no I/O, so every rule has a unit test (13 tests, including
+  flapping, a failure mid-recovery, repeated outages and paused monitors).
+- Rules: `pending → up` on the first success; `pending/up → down` on the **3rd consecutive**
+  failure (open incident); `down → up` on the **2nd consecutive** success (resolve). Anything
+  below a threshold leaves the status alone, so one blip, or a flapping endpoint that never
+  fails 3 times in a row, never pages anyone.
+
+### D40. Concurrency: two checks of one monitor can't open two incidents
+
+Three layers, each enough on its own for its job:
+
+1. **Atomic counting.** The check result is applied in one `findOneAndUpdate` with an
+   **aggregation-pipeline update**: MongoDB computes `consecutiveFailures + 1`, resets the other
+   counter, and sets `failingSince` only if this is the first failure of a streak, all from the
+   document's current values in one write. No read-modify-write window.
+2. **Guarded transition.** The status change is a second `findOneAndUpdate` whose filter repeats
+   the precondition (`TRANSITION_GUARDS`, exported next to the state machine so the two can't
+   drift), e.g. `{ status: { $nin: ['down','paused'] }, consecutiveFailures: { $gte: 3 } }`. If
+   two workers race, only one matches; the other gets `null` and does nothing. **Only the winner
+   opens the incident and queues alerts.**
+3. **Database safety net.** A partial unique index allows only one incident with
+   `resolvedAt: null` per monitor; a duplicate insert fails with 11000 and is ignored.
+
+- **Tested:** 8 failing checks of one monitor processed concurrently → counters reach 8,
+  exactly one `open_incident`, one incident, one alert per channel.
+- User-derived values in the pipeline (error messages) are wrapped in `$literal`, so an error
+  text like `"$consecutiveFailures"` is stored as text, not evaluated as a field path (tested).
+
+### D41. Incident times reflect the real outage
+
+- `startedAt` = time of the **first failed check** of the streak (`failingSince`), not the 3rd
+  check that confirmed it. `resolvedAt` = the **first good check** (`recoveringSince`), not the
+  2nd that confirmed recovery. So `durationSec` is the true outage length (verified end to end:
+  error500 for ~40 s → `durationSec: 40`).
+- `cause` = the error of the first failed check (`failingCause`).
+
+### D42. Alerts are Agenda jobs with our own retry/backoff
+
+- On open/resolve, one `send-alert { incidentId, channelId, kind, attempt }` job per **enabled**
+  channel is queued with `agenda.now()`. Alert sending never slows down checking, and an outage
+  of Discord can't block anything else.
+- On failure the handler logs `alert_failed` in the timeline and schedules a **new** job:
+  **30 s → 2 min → 8 min**, then gives up. Reading of the spec: the initial send plus up to
+  3 retries using those three delays. Delivery errors are caught, never thrown, so Agenda's own
+  retry logic doesn't stack on top of ours.
+- **No duplicate alerts:** after a successful send the key `"channelId:kind"` is added to the
+  incident's `deliveredAlerts` and checked before sending. A re-run job (e.g. after a crash)
+  can't notify a channel twice, and the state machine guarantees one "down" per incident
+  (the spec's "cooldown").
+- `removeOnComplete: true` deletes finished one-off jobs so `agendaJobs` doesn't grow forever
+  (repeating check jobs are unaffected).
+- Every send and failure is recorded in the incident **timeline** (an extra event type,
+  `alert_failed`, alongside the spec's `opened / alert_sent / resolved`).
+
+### D43. Alert content is built once, formatted per channel
+
+- `buildAlert()` produces channel-neutral content (title, summary, fields, dashboard link);
+  `discordPayload` (embed with a red/green bar), `slackPayload` (Block Kit with an "Open
+  dashboard" button) and `renderEmail` (inline-styled HTML + plain text) only format it.
+  Each is unit-tested; email output escapes HTML from monitor names.
+- Senders live in `shared/alerts` because both the worker (incidents) and the API ("send test
+  alert") need them. They're injected (`createApp({ alertSenders })`), so tests use fakes and
+  never hit the network.
+- **Email in development:** with no `SMTP_HOST`, Nodemailer creates a free **Ethereal** test
+  inbox. Nothing reaches a real person, and each message's preview URL is written to the
+  incident timeline (shown as a clickable link in the UI). With SMTP settings, real email is sent.
+
+### D44. Alert channel safety
+
+- Webhook URLs are validated against the real hosts (`discord.com/api/webhooks/...`,
+  `hooks.slack.com/services/...`). Besides catching typos, this means "send alert" can't be
+  used to make our servers POST to arbitrary internal URLs (SSRF). Requests also use
+  `redirect: 'error'` and a 10 s timeout.
+- Webhook URLs and emails are secrets-ish: **viewers see them masked**
+  (`https://discord.com/•••`, `o•••@example.com`); members and owners see them in full.
+- PATCH re-validates the merged channel, so switching `type` to `email` while the target is
+  still a Discord URL is rejected.
+- "Send test alert" is limited to 5 per minute per user and returns `502
+ALERT_DELIVERY_FAILED` with the provider's reason when delivery fails.
+
+### D45. Pausing closes an open incident
+
+- No checks run while paused, so an open incident could never recover on its own and would
+  stay "ongoing" forever. Pausing resolves it with the timeline entry "Closed because
+  monitoring was paused" and sends **no** recovery alert (nothing actually recovered).

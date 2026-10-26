@@ -10,6 +10,7 @@ import {
 } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createIncidentEngine } from '../src/incidents/engine.js';
 import { createRunCheckJob } from '../src/jobs/runCheck.js';
 import { reconcileJobs } from '../src/reconcile.js';
 
@@ -103,7 +104,13 @@ describe('one job per monitor', () => {
 
 describe('run-check job handler', () => {
   // Built per call: `scheduler` only exists once beforeAll has run.
-  const runJob = (job) => createRunCheckJob({ allowPrivate: true, scheduler, logger })(job);
+  const runJob = (job) =>
+    createRunCheckJob({
+      allowPrivate: true,
+      scheduler,
+      processCheckResult: createIncidentEngine({ agenda, logger }),
+      logger,
+    })(job);
   const fakeJob = (monitorId) => ({ attrs: { data: { monitorId: String(monitorId) } } });
 
   it('stores a time-series result and updates the monitor live fields', async () => {

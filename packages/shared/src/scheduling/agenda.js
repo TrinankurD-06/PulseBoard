@@ -22,9 +22,17 @@ export function createAgenda({
   processEvery = '5 seconds',
   maxConcurrency = 20,
   defaultLockLifetime = 60_000,
+  removeOnComplete = false,
 }) {
   const backend = new MongoBackend({ address: mongoUri, collection: AGENDA_COLLECTION });
-  const agenda = new Agenda({ backend, name, processEvery, maxConcurrency, defaultLockLifetime });
+  const agenda = new Agenda({
+    backend,
+    name,
+    processEvery,
+    maxConcurrency,
+    defaultLockLifetime,
+    removeOnComplete,
+  });
   async function close() {
     await agenda.stop(false);
     await backend.disconnect();

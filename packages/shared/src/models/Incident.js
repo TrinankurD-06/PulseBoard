@@ -20,6 +20,9 @@ const incidentSchema = new mongoose.Schema(
     cause: { type: String, maxlength: 500 },
     durationSec: { type: Number, default: null },
     timeline: { type: [timelineEntrySchema], default: [] },
+    // "channelId:kind" keys of alerts already delivered, so a retried or
+    // duplicated send-alert job never notifies the same channel twice.
+    deliveredAlerts: { type: [String], default: [] },
   },
   baseOptions,
 );

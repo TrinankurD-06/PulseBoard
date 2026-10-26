@@ -38,6 +38,16 @@ export function createTestCheckLimiter() {
   });
 }
 
+/** "Send test alert" posts to a real webhook/inbox: 5 per minute per user. */
+export function createTestAlertLimiter() {
+  return limiter({
+    windowMs: 60 * 1000,
+    limit: 5,
+    message: 'You can send 5 test alerts per minute. Please wait a moment.',
+    keyGenerator: (req) => `user:${req.userId}`,
+  });
+}
+
 /** Refresh is called automatically by the client, so it gets a looser limit. */
 export function createRefreshLimiter(max) {
   return limiter({

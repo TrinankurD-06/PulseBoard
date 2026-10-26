@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { z } from 'zod';
 
 const ROOT_ENV_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env');
 
@@ -25,3 +26,21 @@ export function parseEnv(schema, source = process.env) {
   }
   return result.data;
 }
+
+/**
+ * Alert-delivery settings, used by both the API ("send test alert") and the
+ * worker. Empty SMTP_HOST means "use an Ethereal test inbox" (development).
+ */
+export const alertEnvFields = {
+  DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
+};
+
+export const alertSenderConfig = (env) => ({
+  smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS },
+  from: env.ALERT_FROM_EMAIL,
+});

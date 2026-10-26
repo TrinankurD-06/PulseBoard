@@ -1,4 +1,4 @@
-import { loadEnv, parseEnv } from '@pulseboard/shared/env';
+import { alertEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
 import { z } from 'zod';
 
 loadEnv();
@@ -13,10 +13,10 @@ const envSchema = z.object({
   MONGODB_URI: z.string().min(1),
   WORKER_HEALTH_PORT: z.coerce.number().int().default(4002),
   AGENDA_MAX_CONCURRENCY: z.coerce.number().int().positive().default(20),
-  DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
   DEMO_MODE: booleanString,
   ALLOW_PRIVATE_TARGETS: booleanString,
   LOG_LEVEL: z.string().default('info'),
+  ...alertEnvFields,
 });
 
 export const env = parseEnv(envSchema);

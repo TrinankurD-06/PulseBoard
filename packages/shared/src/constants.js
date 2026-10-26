@@ -45,4 +45,9 @@ export const JOB_NAMES = Object.freeze({
   FINALIZE_ROLLUP: 'finalize-rollup',
 });
 
+// send-alert retries after a failed delivery: 30s, then 2m, then 8m, then give up.
+export const ALERT_RETRY_DELAYS_SEC = Object.freeze([30, 120, 480]);
+
+export const ALERT_KIND = Object.freeze({ DOWN: 'down', UP: 'up', TEST: 'test' });
+
 export const PAGINATION = Object.freeze({ DEFAULT_LIMIT: 20, MAX_LIMIT: 100 });
