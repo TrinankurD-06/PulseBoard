@@ -4,6 +4,7 @@ import { DailyRollup } from './DailyRollup.js';
 import { Incident } from './Incident.js';
 import { Membership } from './Membership.js';
 import { Monitor } from './Monitor.js';
+import { MonitorUsage } from './MonitorUsage.js';
 import { Session } from './Session.js';
 import { StatusPage } from './StatusPage.js';
 import { User } from './User.js';
@@ -16,6 +17,7 @@ export {
   Incident,
   Membership,
   Monitor,
+  MonitorUsage,
   Session,
   StatusPage,
   User,
@@ -29,6 +31,7 @@ export const allModels = [
   Incident,
   Membership,
   Monitor,
+  MonitorUsage,
   Session,
   StatusPage,
   User,

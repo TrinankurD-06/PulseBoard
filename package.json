@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
-    "seed": "npm run seed -w @pulseboard/api"
+    "seed": "npm run seed -w @pulseboard/api",
+    "migrate": "npm run migrate -w @pulseboard/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

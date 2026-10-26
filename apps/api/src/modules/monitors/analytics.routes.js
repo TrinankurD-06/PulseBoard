@@ -11,6 +11,7 @@ import {
   getRecentChecks,
   getSparklines,
   getUptime,
+  getUsage,
 } from './analytics.service.js';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -44,6 +45,10 @@ export function monitorAnalyticsRouter() {
 
   router.get('/sparklines', viewer, validate({ query: sparklineQuery }), async (req, res) => {
     res.json({ data: await getSparklines(req.params.wid, req.valid.query.points) });
+  });
+
+  router.get('/:mid/usage', viewer, assertMonitorInWorkspace, async (req, res) => {
+    res.json({ data: await getUsage(req.params.mid) });
   });
 
   router.get('/:mid/uptime', viewer, assertMonitorInWorkspace, async (req, res) => {

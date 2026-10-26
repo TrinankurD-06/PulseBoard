@@ -52,7 +52,11 @@ describe('create', () => {
     const monitor = await createMonitor();
     expect(monitor).toMatchObject({
       name: 'Cloudflare DNS',
-      method: 'GET',
+      method: 'HEAD', // U1: new monitors default to the cheapest request
+      type: 'http',
+      currency: 'INR',
+      costPer1kRequests: null,
+      headUnsupported: false,
       timeoutMs: 10000,
       expectedStatus: { min: 200, max: 399 },
       status: 'pending',
@@ -150,7 +154,7 @@ describe('read', () => {
 
 describe('update', () => {
   it('applies a partial update without resetting other fields, and reschedules', async () => {
-    const monitor = await createMonitor({ ...validMonitor, method: 'HEAD', keyword: 'ok' });
+    const monitor = await createMonitor({ ...validMonitor, method: 'POST', keyword: 'ok' });
     scheduler.calls.length = 0;
 
     const res = await request(app)
@@ -159,7 +163,7 @@ describe('update', () => {
       .send({ intervalSec: 120 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ intervalSec: 120, method: 'HEAD', keyword: 'ok' });
+    expect(res.body.data).toMatchObject({ intervalSec: 120, method: 'POST', keyword: 'ok' });
     expect(scheduler.calls).toEqual([['schedule', monitor.id, 120]]);
   });
 

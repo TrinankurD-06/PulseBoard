@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  CURRENCIES,
+  DEFAULT_CURRENCY,
   DEFAULT_EXPECTED_STATUS,
   DEFAULT_TIMEOUT_MS,
   HTTP_METHODS,
@@ -61,6 +63,12 @@ const keywordSchema = z
   .nullish()
   .transform((value) => value || null);
 
+/** Customer's price per 1,000 requests. Empty input (forms) means "no price". */
+const costSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? null : value),
+  z.coerce.number().min(0, 'Price cannot be negative').max(1_000_000).nullable(),
+);
+
 /**
  * Monitor schemas depend on whether DEMO_MODE is on (10s minimum interval
  * instead of 30s), so they are built by a factory.
@@ -83,16 +91,21 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
     expectedStatus: expectedStatusSchema,
     keyword: keywordSchema,
     headers: headersSchema.optional(),
+    costPer1kRequests: costSchema,
+    currency: z.enum(CURRENCIES),
   });
 
   const withDefaults = fields.extend({
-    method: fields.shape.method.default('GET'),
+    // Method has no plain default: it depends on the keyword (see below).
+    method: fields.shape.method.optional(),
+    costPer1kRequests: fields.shape.costPer1kRequests.optional(),
+    currency: fields.shape.currency.default(DEFAULT_CURRENCY),
     timeoutMs: fields.shape.timeoutMs.default(DEFAULT_TIMEOUT_MS),
     expectedStatus: fields.shape.expectedStatus.default({ ...DEFAULT_EXPECTED_STATUS }),
   });
 
-  // A check must finish before the next one is due.
-  const timeoutFitsInterval = (monitor, ctx) => {
+  const crossFieldRules = (monitor, ctx) => {
+    // A check must finish before the next one is due.
     if (monitor.timeoutMs > monitor.intervalSec * 1000) {
       ctx.addIssue({
         code: 'custom',
@@ -100,11 +113,27 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
         message: 'Timeout must not be longer than the check interval',
       });
     }
+    // HEAD responses have no body, so a keyword could never be found.
+    if (monitor.method === 'HEAD' && monitor.keyword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['method'],
+        message: 'HEAD responses have no body: use GET (or POST) for keyword checks',
+      });
+    }
   };
+
+  // Cheapest request that can still do the job: HEAD (headers only) unless a
+  // keyword has to be found in the body.
+  const defaultMethod = (monitor) => ({
+    ...monitor,
+    method: monitor.method ?? (monitor.keyword ? 'GET' : 'HEAD'),
+    costPer1kRequests: monitor.costPer1kRequests ?? null,
+  });
 
   return {
     minIntervalSec,
-    create: withDefaults.superRefine(timeoutFitsInterval),
+    create: withDefaults.superRefine(crossFieldRules).transform(defaultMethod),
     // PATCH bodies are partial; the service re-validates the merged result with `create`.
     update: fields.partial().refine((patch) => Object.keys(patch).length > 0, 'Nothing to update'),
   };

@@ -15,6 +15,18 @@ export const MONITOR_STATUS = Object.freeze({
 
 export const HTTP_METHODS = Object.freeze(['GET', 'HEAD', 'POST']);
 
+// Who sends the requests: PulseBoard polls (http), or the customer pushes
+// (heartbeat pings, agent reports). Existing monitors are http.
+export const MONITOR_TYPES = Object.freeze({
+  HTTP: 'http',
+  HEARTBEAT: 'heartbeat',
+  AGENT: 'agent',
+});
+
+// Currencies offered for the cost estimator (the customer's own API price).
+export const CURRENCIES = Object.freeze(['INR', 'USD', 'EUR', 'GBP']);
+export const DEFAULT_CURRENCY = 'INR';
+
 export const ALERT_CHANNEL_TYPES = Object.freeze(['email', 'discord', 'slack']);
 
 export const INCIDENT_EVENT = Object.freeze({

@@ -1,5 +1,15 @@
+import { DEFAULT_CURRENCY } from '@pulseboard/shared/constants';
+import {
+  costOf,
+  estimateMonthlyCost,
+  estimateMonthlyRequests,
+  estimateRequestsBetween,
+  monthKey,
+  monthStart,
+} from '@pulseboard/shared/cost';
 import { mongoose } from '@pulseboard/shared/db';
-import { CheckResult, DailyRollup } from '@pulseboard/shared/models';
+import { CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
+import { requestsThisMonth } from '@pulseboard/shared/usage';
 import {
   addDays,
   bucketSizeMs,
@@ -13,6 +23,32 @@ import {
 export const MAX_CHART_POINTS = 500;
 
 const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
+
+/**
+ * Requests actually sent to the monitor's endpoint this calendar month (UTC,
+ * from MonitorUsage) next to what the estimator expected, plus costs at the
+ * customer's own price (null when no price is set).
+ * "Expected so far" starts at the later of the month start and the monitor's
+ * creation, so a monitor created mid-month isn't compared with a full month.
+ */
+export async function getUsage(monitorId, now = new Date()) {
+  const monitor = await Monitor.findById(monitorId).lean();
+  const requests = await requestsThisMonth(monitor._id, now);
+  const from = new Date(Math.max(monthStart(now).getTime(), new Date(monitor.createdAt).getTime()));
+  return {
+    month: monthKey(now),
+    requests,
+    estimatedSoFar: estimateRequestsBetween(monitor, from, now),
+    estimatedMonthly: estimateMonthlyRequests(monitor),
+    costPer1kRequests: monitor.costPer1kRequests ?? null,
+    // lean() skips schema defaults, so a not-yet-migrated monitor may lack it.
+    currency: monitor.currency ?? DEFAULT_CURRENCY,
+    actualCost: costOf(monitor, requests),
+    estimatedMonthlyCost: estimateMonthlyCost(monitor),
+    method: monitor.method,
+    headUnsupported: Boolean(monitor.headUnsupported),
+  };
+}
 
 /**
  * Uptime % for the four windows shown on the monitor page.

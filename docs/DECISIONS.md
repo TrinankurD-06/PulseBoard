@@ -709,3 +709,89 @@ ALERT_DELIVERY_FAILED` with the provider's reason when delivery fails.
 - The login page offers the demo credentials (with a "Fill in" button) only when the server
   runs in `DEMO_MODE`.
 - Browser tab titles follow the page ("Incidents · PulseBoard", the monitor's name, …).
+
+---
+
+# Upgrade: cost-aware, push-first monitoring
+
+Goal: send fewer requests to customers' endpoints, because many customers pay per call.
+Design and phase plan: [docs/upgrade/U1-contract.md](upgrade/U1-contract.md) and
+[PROGRESS.md](PROGRESS.md).
+
+## U1: Cheap checks + cost visibility
+
+### D62. HEAD by default, GET only when needed
+
+- New monitors default to `HEAD`: the server sends status + headers but no body, which is
+  usually all an uptime check needs, and is cheaper for the customer's server and network.
+- A keyword check needs the body, so the default is `keyword ? GET : HEAD`, and `HEAD` +
+  keyword is rejected (it could never match). This is computed in the shared schema, so the
+  form and the API agree.
+- Some servers don't implement HEAD and answer `405 Method Not Allowed` or `501 Not
+Implemented`. The checker then retries the same URL with GET **within the same check**
+  (so the result is still correct) and the worker stores `headUnsupported: true` on the
+  monitor; later checks go straight to GET instead of paying for two requests.
+  Only 405/501 trigger it: other errors to HEAD (403, 404, 500) are real answers.
+- **Existing monitors are untouched**: they keep the method they were created with
+  (the migration never changes `method`).
+
+### D63. Never download a body nobody reads
+
+- Without a keyword, the response is closed as soon as the headers arrive: we already have
+  the status code and the time to first byte. The trade-off: `downloadMs` is now 0 for such
+  checks (download time was rarely meaningful for health endpoints anyway). With a keyword,
+  the body is still read, capped at 1 MB (D34).
+- This applies to existing GET monitors too. Their verdict is identical (status code
+  decides), they just stop downloading pages for nothing.
+
+### D64. Checks identify themselves
+
+- Every check sends `User-Agent: PulseBoard/1.0 (+<APP_URL>/bot)` and `X-PulseBoard-Check: 1`.
+  Customers can filter on the header to keep checks out of analytics and metered billing,
+  and the public `/bot` page explains both headers.
+- The marker header is applied **after** custom headers, so a custom header can't remove it.
+- `APP_URL` defaults to `DASHBOARD_URL` (the same public web app), so no new required
+  setting.
+
+### D65. Counting requests: a tiny counter collection, not the time-series data
+
+- `MonitorUsage { monitorId, workspaceId, month: "YYYY-MM", requests }`, one document per
+  monitor per UTC month, bumped with an upsert `$inc` after each check. Counting the
+  time-series `checkresults` would scan thousands of documents and only covers 7 days.
+- The unique index `{monitorId, month}` prevents duplicate counters; when two "first of the
+  month" upserts race, MongoDB (4.2+) retries the loser as an update by itself.
+- What counts: **every request actually attempted** against the customer: redirect hops, a
+  HEAD that fell back to GET, and "Test now" on a saved monitor. "Test now" on an unsaved
+  form can't be attributed to a monitor, so it isn't counted (it's rate-limited to 5/min).
+- Months are UTC calendar months, matching the daily rollups.
+
+### D66. The cost estimator is a pure, shared function
+
+- `estimateMonthlyRequests(monitor)` = 30-day month ÷ interval (60 s → 43,200). With adaptive
+  intervals (U2) the real interval only grows from the base interval, so the base interval is
+  an **upper bound**, the safe direction for a cost estimate.
+- `estimateMonthlyCost` uses the customer's own `costPer1kRequests` (we can't know their
+  pricing) and `currency` (default INR); no price → `null`, shown as "no price set" rather
+  than "₹0".
+- Browser-safe and in `shared`, so the form shows the estimate live while typing, and the
+  monitor page compares it with the real counter ("estimated so far" vs "sent so far").
+- Push monitors (heartbeat/agent, U3–U4) send 0 requests to the customer by design.
+
+### D67. Schema changes go through versioned, idempotent migrations
+
+- `npm run migrate` runs each file in `apps/api/scripts/migrations/` once, recording it in a
+  `migrations` collection. Each migration is also idempotent on its own (it only sets fields
+  that are missing), so running it twice, or on a half-migrated database, is safe.
+- Mongoose defaults would fill missing fields when documents are _read_, but queries that
+  _filter_ on new fields (e.g. `type: 'http'` in U2+) need the values stored, so we migrate.
+
+### D68. Parallel frontend and backend tracks
+
+- From U1 on, work is split into a **backend** track (shared, API, worker), a **frontend**
+  track (client) and an **integration** step (plan, contract, docs, validation, commits),
+  running in parallel.
+- **No blocking by construction:** each phase starts with a written contract
+  (`docs/upgrade/U<n>-contract.md`) fixing endpoints and payloads; file ownership is disjoint,
+  so the tracks never edit the same file and never wait on each other. They proceed on the
+  contract and report open questions, which are resolved during integration. Commits happen
+  only after lint, all tests and a real browser run pass.

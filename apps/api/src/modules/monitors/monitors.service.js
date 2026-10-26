@@ -1,8 +1,10 @@
 import { assertSafeUrl, runHttpCheck, UnsafeTargetError } from '@pulseboard/shared/check';
+import { appUrlOf } from '@pulseboard/shared/env';
 import { MONITOR_STATUS, ROLES } from '@pulseboard/shared/constants';
 import { resolveOpenIncident } from '@pulseboard/shared/incident';
 import { CheckResult, DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
+import { recordUsage } from '@pulseboard/shared/usage';
 import { AppError, notFound } from '../../lib/errors.js';
 import { paginate } from '../../lib/pagination.js';
 
@@ -18,6 +20,8 @@ const EDITABLE_FIELDS = [
   'expectedStatus',
   'keyword',
   'headers',
+  'costPer1kRequests',
+  'currency',
 ];
 
 function editableFields(monitor) {
@@ -134,12 +138,21 @@ export function createMonitorService({ env, scheduler, schemas }) {
      */
     async testConfig(config) {
       await assertTargetAllowed(config.url);
-      return runHttpCheck(config, { allowPrivate: env.ALLOW_PRIVATE_TARGETS });
+      return runHttpCheck(config, {
+        allowPrivate: env.ALLOW_PRIVATE_TARGETS,
+        appUrl: appUrlOf(env),
+      });
     },
 
+    /** Counted in MonitorUsage: it is a real request to the customer's endpoint. */
     async testExisting(workspaceId, monitorId) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
-      return runHttpCheck(monitor, { allowPrivate: env.ALLOW_PRIVATE_TARGETS });
+      const result = await runHttpCheck(monitor, {
+        allowPrivate: env.ALLOW_PRIVATE_TARGETS,
+        appUrl: appUrlOf(env),
+      });
+      await recordUsage(monitor, result.requestsSent);
+      return result;
     },
 
     /** Cancels the job first, so no check runs against a half-deleted monitor. */

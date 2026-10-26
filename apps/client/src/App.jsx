@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound.jsx';
 const AlertChannels = lazy(() => import('./pages/AlertChannels.jsx'));
 const AppIndex = lazy(() => import('./pages/AppIndex.jsx'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout.jsx'));
+const Bot = lazy(() => import('./pages/Bot.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const EditMonitor = lazy(() => import('./pages/monitors/EditMonitor.jsx'));
 const Incidents = lazy(() => import('./pages/Incidents.jsx'));
@@ -28,6 +29,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/status/:slug" element={<PublicStatus />} />
+        <Route path="/bot" element={<Bot />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<Login />} />

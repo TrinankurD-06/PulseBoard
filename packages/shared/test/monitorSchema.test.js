@@ -6,14 +6,42 @@ const valid = { name: 'API', url: 'https://example.com/health', intervalSec: 60 
 describe('buildMonitorSchemas', () => {
   const { create, update } = buildMonitorSchemas({ demoMode: false });
 
-  it('applies defaults', () => {
+  it('applies defaults: HEAD (no body needed), INR, no price', () => {
     expect(create.parse(valid)).toEqual({
       ...valid,
-      method: 'GET',
+      method: 'HEAD',
       timeoutMs: 10_000,
       expectedStatus: { min: 200, max: 399 },
       keyword: null,
+      costPer1kRequests: null,
+      currency: 'INR',
     });
+  });
+
+  it('defaults to GET when a keyword has to be found in the body', () => {
+    expect(create.parse({ ...valid, keyword: 'ok' }).method).toBe('GET');
+  });
+
+  it('keeps an explicitly chosen method', () => {
+    expect(create.parse({ ...valid, method: 'GET' }).method).toBe('GET');
+    expect(create.parse({ ...valid, method: 'POST', keyword: 'ok' }).method).toBe('POST');
+  });
+
+  it('rejects HEAD together with a keyword (HEAD responses have no body)', () => {
+    const result = create.safeParse({ ...valid, method: 'HEAD', keyword: 'ok' });
+    expect(result.success).toBe(false);
+    expect(result.error.issues[0].path).toEqual(['method']);
+  });
+
+  it('validates the price per 1,000 requests and the currency', () => {
+    expect(create.parse({ ...valid, costPer1kRequests: '2.5', currency: 'USD' })).toMatchObject({
+      costPer1kRequests: 2.5,
+      currency: 'USD',
+    });
+    expect(create.parse({ ...valid, costPer1kRequests: '' }).costPer1kRequests).toBeNull();
+    expect(create.parse({ ...valid, costPer1kRequests: 0 }).costPer1kRequests).toBe(0);
+    expect(create.safeParse({ ...valid, costPer1kRequests: -1 }).success).toBe(false);
+    expect(create.safeParse({ ...valid, currency: 'JPY' }).success).toBe(false);
   });
 
   it('enforces a 30s minimum interval normally and 10s in demo mode', () => {

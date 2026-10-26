@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { HTTP_METHODS } from '@pulseboard/shared/constants';
+import { CURRENCIES, DEFAULT_CURRENCY, HTTP_METHODS } from '@pulseboard/shared/constants';
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
-import { FlaskConical, Plus, X } from 'lucide-react';
+import { FlaskConical, Lightbulb, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { errorMessage } from '../../api/http.js';
@@ -12,6 +13,7 @@ import { formatDuration } from '../../lib/format.js';
 import Button from '../ui/Button.jsx';
 import Card, { CardHeader } from '../ui/Card.jsx';
 import Field, { inputClasses } from '../ui/Field.jsx';
+import CostEstimate from './CostEstimate.jsx';
 import TestResult from './TestResult.jsx';
 
 const INTERVAL_PRESETS = [10, 30, 60, 120, 300, 600, 1800, 3600];
@@ -30,7 +32,9 @@ function toFormValues(monitor) {
   return {
     name: monitor?.name ?? '',
     url: monitor?.url ?? 'https://',
-    method: monitor?.method ?? 'GET',
+    // New monitors start with HEAD (headers only, cheapest for the customer);
+    // existing monitors keep the method they have.
+    method: monitor?.method ?? 'HEAD',
     intervalSec: String(monitor?.intervalSec ?? 60),
     timeoutMs: String(monitor?.timeoutMs ?? 10000),
     expectedStatus: {
@@ -39,6 +43,8 @@ function toFormValues(monitor) {
     },
     keyword: monitor?.keyword ?? '',
     headers: Object.entries(monitor?.headers ?? {}).map(([name, value]) => ({ name, value })),
+    costPer1kRequests: monitor?.costPer1kRequests == null ? '' : String(monitor.costPer1kRequests),
+    currency: monitor?.currency ?? DEFAULT_CURRENCY,
   };
 }
 
@@ -71,6 +77,11 @@ export default function MonitorForm({
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(schema), defaultValues: toFormValues(monitor) });
   const headerRows = useFieldArray({ control, name: 'headers' });
+  const [method, keyword, intervalSec, costPer1kRequests, currency] = useWatch({
+    control,
+    name: ['method', 'keyword', 'intervalSec', 'costPer1kRequests', 'currency'],
+  });
+  const headWithKeyword = method === 'HEAD' && Boolean(keyword?.trim());
   const testCheck = useTestMonitorConfig(wid);
   const [testResult, setTestResult] = useState(null);
 
@@ -107,9 +118,9 @@ export default function MonitorForm({
       <Card>
         <CardHeader title="What to check" />
         <div className="grid gap-4 p-5 sm:grid-cols-[8rem_1fr]">
-          <Field label="Method" as="select" {...register('method')}>
-            {HTTP_METHODS.map((method) => (
-              <option key={method}>{method}</option>
+          <Field label="Method" as="select" error={errors.method?.message} {...register('method')}>
+            {HTTP_METHODS.map((option) => (
+              <option key={option}>{option}</option>
             ))}
           </Field>
           <Field
@@ -126,6 +137,23 @@ export default function MonitorForm({
             error={errors.name?.message}
             {...register('name')}
           />
+          <p className="flex gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600 sm:col-span-2 dark:bg-slate-800/60 dark:text-slate-300">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+            <span>
+              <span className="font-medium text-slate-800 dark:text-slate-100">Tip:</span> point
+              PulseBoard at a lightweight <code className="text-xs">/health</code> endpoint that
+              doesn&apos;t touch your database or paid services. Every check is a real request to
+              your server;{' '}
+              <Link
+                to="/bot"
+                target="_blank"
+                className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                here&apos;s how to recognise them
+              </Link>
+              .
+            </span>
+          </p>
         </div>
       </Card>
 
@@ -153,6 +181,13 @@ export default function MonitorForm({
             error={errors.timeoutMs?.message}
             {...register('timeoutMs')}
           />
+          <div className="sm:col-span-2">
+            <CostEstimate
+              intervalSec={intervalSec}
+              costPer1kRequests={costPer1kRequests}
+              currency={currency}
+            />
+          </div>
         </div>
       </Card>
 
@@ -178,7 +213,11 @@ export default function MonitorForm({
             label="Keyword (optional)"
             className="sm:col-span-2"
             placeholder='e.g. "ok" or "healthy"'
-            hint="The response body must contain this text"
+            hint={
+              headWithKeyword
+                ? 'Keyword checks need the response body: switch Method to GET.'
+                : 'The response body must contain this text. Without a keyword no body is downloaded.'
+            }
             error={errors.keyword?.message}
             {...register('keyword')}
           />
@@ -229,6 +268,35 @@ export default function MonitorForm({
           {errors.headers?.message && (
             <p className="text-xs text-red-600 dark:text-red-400">{errors.headers.message}</p>
           )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Cost"
+          description="Optional. If your endpoint is billed per request, enter your price to see what monitoring costs you."
+        />
+        <div className="grid gap-4 p-5 sm:grid-cols-[1fr_8rem]">
+          <Field
+            label="Price per 1,000 requests"
+            type="number"
+            min={0}
+            step="any"
+            inputMode="decimal"
+            placeholder="e.g. 10"
+            error={errors.costPer1kRequests?.message}
+            {...register('costPer1kRequests')}
+          />
+          <Field
+            label="Currency"
+            as="select"
+            error={errors.currency?.message}
+            {...register('currency')}
+          >
+            {CURRENCIES.map((code) => (
+              <option key={code}>{code}</option>
+            ))}
+          </Field>
         </div>
       </Card>
 

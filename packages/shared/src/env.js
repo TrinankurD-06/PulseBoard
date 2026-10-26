@@ -33,12 +33,18 @@ export function parseEnv(schema, source = process.env) {
  */
 export const alertEnvFields = {
   DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+  // Public URL of the web app, used in the checker's User-Agent ("+APP_URL/bot").
+  // Defaults to DASHBOARD_URL (see appUrlOf).
+  APP_URL: z.preprocess((value) => value || undefined, z.string().url().optional()),
   SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
 };
+
+/** The public web app URL: APP_URL if set, else DASHBOARD_URL. */
+export const appUrlOf = (env) => env.APP_URL ?? env.DASHBOARD_URL;
 
 export const alertSenderConfig = (env) => ({
   smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS },

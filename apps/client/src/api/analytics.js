@@ -62,6 +62,18 @@ export function useDailyUptime(wid, mid, days = 90) {
   });
 }
 
+/**
+ * Requests sent to the monitor's endpoint this month, the estimate, and costs.
+ * Keyed under the analytics prefix, so live check results refresh it too.
+ */
+export function useUsage(wid, mid) {
+  return useQuery({
+    queryKey: analyticsKey(wid, mid, 'usage'),
+    queryFn: () => http.get(`/workspaces/${wid}/monitors/${mid}/usage`).then(unwrap),
+    ...shared,
+  });
+}
+
 /** { [monitorId]: [{ t, ms, ok }] } for the dashboard cards. Live updates append to it. */
 export function useSparklines(wid) {
   return useQuery({

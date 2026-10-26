@@ -1,9 +1,10 @@
 import { runHttpCheck } from '@pulseboard/shared/check';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
+import { recordUsage } from '@pulseboard/shared/usage';
 
 /**
  * Handler for the repeating `run-check` job:
- *   1. run the HTTP check
+ *   1. run the HTTP check and count the requests it sent (MonitorUsage)
  *   2. store the raw result in the time-series collection
  *   3. hand it to the incident engine, which updates the monitor's live
  *      fields and counters and opens/resolves incidents
@@ -11,7 +12,7 @@ import { CheckResult, Monitor } from '@pulseboard/shared/models';
  * Check failures are normal data, not job failures, so this only throws when
  * the database itself fails.
  */
-export function createRunCheckJob({ allowPrivate, scheduler, processCheckResult, logger }) {
+export function createRunCheckJob({ allowPrivate, appUrl, scheduler, processCheckResult, logger }) {
   return async function runCheckJob(job) {
     const { monitorId } = job.attrs.data;
     const monitor = await Monitor.findById(monitorId).lean();
@@ -24,8 +25,16 @@ export function createRunCheckJob({ allowPrivate, scheduler, processCheckResult,
       return;
     }
 
-    const result = await runHttpCheck(monitor, { allowPrivate });
+    const result = await runHttpCheck(monitor, { allowPrivate, appUrl });
     const checkedAt = new Date();
+
+    // Count what was actually sent to the customer (redirects and a HEAD->GET
+    // fallback included), and remember a server that rejects HEAD so later
+    // checks go straight to GET instead of paying for two requests.
+    await recordUsage(monitor, result.requestsSent, checkedAt);
+    if (result.headUnsupported && !monitor.headUnsupported) {
+      await Monitor.updateOne({ _id: monitor._id }, { headUnsupported: true });
+    }
 
     await CheckResult.create({
       timestamp: checkedAt,

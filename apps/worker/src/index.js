@@ -8,7 +8,7 @@ import {
   mongoose,
   mongoState,
 } from '@pulseboard/shared/db';
-import { alertSenderConfig } from '@pulseboard/shared/env';
+import { alertSenderConfig, appUrlOf } from '@pulseboard/shared/env';
 import { createLogger } from '@pulseboard/shared/logger';
 import {
   countOverdueJobs,
@@ -49,6 +49,7 @@ async function main() {
     JOB_NAMES.RUN_CHECK,
     createRunCheckJob({
       allowPrivate: env.ALLOW_PRIVATE_TARGETS,
+      appUrl: appUrlOf(env),
       scheduler,
       processCheckResult,
       logger,

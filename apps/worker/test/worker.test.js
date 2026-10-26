@@ -1,7 +1,8 @@
 import http from 'node:http';
 import { mongoose } from '@pulseboard/shared/db';
 import { createLogger } from '@pulseboard/shared/logger';
-import { CheckResult, Monitor } from '@pulseboard/shared/models';
+import { monthKey } from '@pulseboard/shared/cost';
+import { CheckResult, Monitor, MonitorUsage } from '@pulseboard/shared/models';
 import {
   AGENDA_COLLECTION,
   createAgenda,
@@ -26,8 +27,9 @@ beforeAll(async () => {
   scheduler = createAgendaScheduler(agenda);
   jobs = mongoose.connection.db.collection(AGENDA_COLLECTION);
 
-  server = http.createServer((_req, res) => {
-    res.statusCode = respondWith;
+  server = http.createServer((req, res) => {
+    // "/no-head" behaves like a server that doesn't implement HEAD.
+    res.statusCode = req.url === '/no-head' && req.method === 'HEAD' ? 405 : respondWith;
     res.end('healthy');
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -154,5 +156,27 @@ describe('run-check job handler', () => {
     await Monitor.updateOne({ _id: monitor._id }, { isPaused: true, status: 'paused' });
     await job;
     expect((await Monitor.findById(monitor._id).lean()).status).toBe('paused');
+  });
+
+  it('counts every request sent in MonitorUsage for the current month', async () => {
+    const monitor = await createMonitor();
+    await runJob(fakeJob(monitor._id));
+    await runJob(fakeJob(monitor._id));
+
+    const [usage, ...others] = await MonitorUsage.find().lean();
+    expect(others).toHaveLength(0);
+    expect(usage).toMatchObject({ month: monthKey(new Date()), requests: 2 });
+    expect(String(usage.workspaceId)).toBe(String(workspaceId));
+  });
+
+  it('remembers a server that rejects HEAD, so later checks use GET directly', async () => {
+    const monitor = await createMonitor({ url: `${targetUrl}no-head`, method: 'HEAD' });
+
+    await runJob(fakeJob(monitor._id)); // HEAD (405) + GET = 2 requests
+    expect((await Monitor.findById(monitor._id).lean()).headUnsupported).toBe(true);
+
+    await runJob(fakeJob(monitor._id)); // straight to GET = 1 request
+    expect((await MonitorUsage.findOne().lean()).requests).toBe(3);
+    expect((await Monitor.findById(monitor._id).lean()).lastOk).toBe(true);
   });
 });

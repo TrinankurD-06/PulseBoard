@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, formatMs, hostOf, timeAgo, timeAgoShort } from './format.js';
+import {
+  formatCount,
+  formatCurrency,
+  formatDuration,
+  formatMonth,
+  formatMs,
+  hostOf,
+  timeAgo,
+  timeAgoShort,
+} from './format.js';
 
 describe('format helpers', () => {
   it('formatDuration', () => {
@@ -31,6 +40,20 @@ describe('format helpers', () => {
     expect(timeAgoShort('2026-01-01T11:59:26Z', now)).toBe('34s ago');
     expect(timeAgoShort('2026-01-01T09:30:00Z', now)).toBe('2h ago');
     expect(timeAgoShort('2026-01-01T12:00:09Z', now)).toBe('just now');
+  });
+
+  it('formatCurrency', () => {
+    expect(formatCurrency(432, 'INR')).toBe('₹432');
+    expect(formatCurrency(0.62, 'INR')).toBe('₹0.62');
+    expect(formatCurrency(100000, 'INR')).toBe('₹1,00,000');
+    expect(formatCurrency(21.6, 'USD')).toBe('$21.6');
+    expect(formatCurrency(null)).toBe('—');
+  });
+
+  it('formatCount and formatMonth', () => {
+    expect(formatCount(43200)).toBe('43,200');
+    expect(formatCount(null)).toBe('—');
+    expect(formatMonth('2026-10')).toBe('October 2026');
   });
 
   it('hostOf', () => {

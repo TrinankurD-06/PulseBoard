@@ -19,7 +19,9 @@
     "./incident": "./src/incident/index.js",
     "./uptime": "./src/uptime/index.js",
     "./rollup": "./src/rollup/index.js",
-    "./testing": "./src/testing/memoryDb.js"
+    "./testing": "./src/testing/memoryDb.js",
+    "./cost": "./src/cost/index.js",
+    "./usage": "./src/usage/index.js"
   },
   "scripts": {
     "test": "vitest run",

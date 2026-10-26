@@ -62,6 +62,36 @@ export function formatMs(ms) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`;
 }
 
+/**
+ * Money in the monitor's currency: 432 INR -> "₹432", 0.62 INR -> "₹0.62".
+ * Indian grouping for INR (₹1,00,000), the default locale's otherwise.
+ */
+export function formatCurrency(amount, currency = 'INR') {
+  if (amount == null) return '—';
+  return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/** 43200 -> "43,200": request counts. */
+export function formatCount(count) {
+  if (count == null) return '—';
+  return Math.round(count).toLocaleString('en-US');
+}
+
+/** "2026-10" -> "October 2026". */
+export function formatMonth(month) {
+  const [year, index] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, index - 1, 1)).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 /** "https://api.example.com/health" -> "api.example.com". */
 export function hostOf(url) {
   try {

@@ -6,8 +6,25 @@ import { createSafeLookup, isPrivateIp, UnsafeTargetError } from './ssrf.js';
 
 const MAX_REDIRECTS = 3;
 const MAX_BODY_BYTES = 1024 * 1024; // only read for keyword checks
-const USER_AGENT = 'PulseBoard/1.0 (uptime monitor)';
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+// Servers that don't implement HEAD answer like this; we then retry with GET.
+const HEAD_UNSUPPORTED_STATUSES = new Set([405, 501]);
+
+/**
+ * Every check identifies itself, so customers can exclude PulseBoard traffic
+ * from analytics and billing (explained on the public /bot page).
+ * The marker header is set last, so custom headers can't remove it.
+ */
+export function checkHeaders({ appUrl, custom } = {}) {
+  const botPage = appUrl ? ` (+${appUrl.replace(/\/$/, '')}/bot)` : '';
+  return {
+    'user-agent': `PulseBoard/1.0${botPage}`,
+    accept: '*/*',
+    connection: 'close',
+    ...custom,
+    'x-pulseboard-check': '1',
+  };
+}
 
 class CheckTimeoutError extends Error {
   constructor(timeoutMs) {
@@ -63,7 +80,7 @@ function requestOnce(url, { method, headers, timeoutMs, readBody, allowPrivate }
       method,
       agent: false,
       lookup: createSafeLookup({ allowPrivate }),
-      headers: { 'user-agent': USER_AGENT, accept: '*/*', connection: 'close', ...headers },
+      headers,
     });
 
     const timer = setTimeout(() => req.destroy(new CheckTimeoutError(timeoutMs)), timeoutMs);
@@ -100,8 +117,15 @@ function requestOnce(url, { method, headers, timeoutMs, readBody, allowPrivate }
         });
       };
 
+      // No keyword to look for: we have the status and TTFB, so close the
+      // connection now instead of downloading a body nobody reads.
+      if (!readBody) {
+        finish();
+        res.destroy();
+        return;
+      }
+
       res.on('data', (chunk) => {
-        if (!readBody) return; // still consumed, so download time is measured
         chunks.push(chunk.subarray(0, MAX_BODY_BYTES - size));
         size += chunk.length;
         if (size >= MAX_BODY_BYTES) {
@@ -146,25 +170,36 @@ export function describeNetworkError(err) {
 /**
  * Runs one uptime check. Never throws: every outcome is returned as data.
  *
- * @param target  { url, method, timeoutMs, headers, expectedStatus, keyword }
- * @returns { ok, statusCode, error, totalMs, timings, sslExpiresAt }
+ * @param target  { url, method, timeoutMs, headers, expectedStatus, keyword, headUnsupported }
+ * @param options { allowPrivate, appUrl }
+ * @returns { ok, statusCode, error, totalMs, timings, sslExpiresAt,
+ *            requestsSent, headUnsupported }
  *
  * totalMs covers the whole check including redirects; timings describe the
- * final hop (the response that was evaluated).
+ * final hop (the response that was evaluated). requestsSent counts every
+ * request attempted (redirect hops and a HEAD->GET fallback included), for
+ * usage tracking. headUnsupported is true when this check discovered that
+ * the server rejects HEAD, so the caller can remember it.
  */
-export async function runHttpCheck(target, { allowPrivate = false } = {}) {
+export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}) {
   const started = now();
   const deadline = Date.now() + target.timeoutMs;
-  const headers =
+  const custom =
     target.headers instanceof Map ? Object.fromEntries(target.headers) : target.headers;
+  const headers = checkHeaders({ appUrl, custom });
   let url = new URL(target.url);
-  let method = target.method ?? 'GET';
+  // A server known to reject HEAD gets GET straight away (saves a request).
+  let method =
+    target.method === 'HEAD' && target.headUnsupported ? 'GET' : (target.method ?? 'GET');
+  let requestsSent = 0;
+  let headUnsupported = false;
 
   try {
-    for (let redirects = 0; ; redirects += 1) {
+    for (let redirects = 0; ;) {
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0) throw new CheckTimeoutError(target.timeoutMs);
 
+      requestsSent += 1;
       const response = await requestOnce(url, {
         method,
         headers,
@@ -173,8 +208,15 @@ export async function runHttpCheck(target, { allowPrivate = false } = {}) {
         allowPrivate,
       });
 
+      if (method === 'HEAD' && HEAD_UNSUPPORTED_STATUSES.has(response.statusCode)) {
+        method = 'GET';
+        headUnsupported = true;
+        continue; // same URL again, not a redirect
+      }
+
       if (REDIRECT_STATUSES.has(response.statusCode) && response.location) {
-        if (redirects >= MAX_REDIRECTS) {
+        redirects += 1;
+        if (redirects > MAX_REDIRECTS) {
           throw new Error(`Too many redirects (more than ${MAX_REDIRECTS})`);
         }
         url = new URL(response.location, url);
@@ -196,6 +238,8 @@ export async function runHttpCheck(target, { allowPrivate = false } = {}) {
         totalMs: round1(msBetween(started, now())),
         timings: response.timings,
         sslExpiresAt: response.sslExpiresAt,
+        requestsSent,
+        headUnsupported,
       };
     }
   } catch (err) {
@@ -206,6 +250,8 @@ export async function runHttpCheck(target, { allowPrivate = false } = {}) {
       totalMs: round1(msBetween(started, now())),
       timings: null,
       sslExpiresAt: null,
+      requestsSent,
+      headUnsupported,
     };
   }
 }

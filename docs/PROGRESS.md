@@ -60,3 +60,29 @@ All eight phases are complete. Nothing is in progress.
 - Real Discord/Slack alerts need your webhook URL in `SEED_DISCORD_WEBHOOK_URL` /
   `SEED_SLACK_WEBHOOK_URL` (or added on the Alert channels page).
 - Deployment to Render + Vercel (needs your accounts; see README → Deploy).
+
+---
+
+# Upgrade: cost-aware, push-first monitoring
+
+Spec: reduce requests sent to customers' endpoints (push-first, pull as fallback).
+Decisions start at D62 in DECISIONS.md. Agreed defaults: per-type incident thresholds
+(heartbeat 1/1, http and agent 3/2), `degraded` shows as operational on public pages,
+currency INR.
+
+- [x] **U1. Cheap checks + cost visibility**: HEAD default with GET fallback (405/501,
+      remembered), no body without keyword, bot headers + `/bot` page, live cost estimate,
+      `MonitorUsage` counting, usage card, idempotent `npm run migrate`. Built by
+      backend + frontend tracks in parallel against `docs/upgrade/U1-contract.md`.
+- [ ] **U2. Budgets + adaptive intervals**
+- [ ] **U3. Heartbeat monitors**
+- [ ] **U4. `pulseboard-agent` + probe-on-silence**
+- [ ] **U5. Cost & Usage page, cross-type tests, demo, docs**
+
+## Resume note (upgrade)
+
+U1 committed. Validation: Prettier clean, ESLint 0, 315/315 tests (shared 163, api 116,
+client 7, demo-target 5, worker 24), client build OK; real run (seed, migrate twice, dev,
+browser): HEAD default, live "≈ 43,200 requests/month · ≈ ₹432/month", HEAD+keyword error,
+usage card with real counts, `/bot` page, no console errors. Next: U2 (budgets + adaptive
+intervals), starting with `docs/upgrade/U2-contract.md`.

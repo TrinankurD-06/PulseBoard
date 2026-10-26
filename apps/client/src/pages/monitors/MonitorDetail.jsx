@@ -18,6 +18,7 @@ import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
 import TestResult from '../../components/monitors/TestResult.jsx';
 import TimingBar from '../../components/monitors/TimingBar.jsx';
+import UsageCard from '../../components/monitors/UsageCard.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -224,20 +225,28 @@ export default function MonitorDetail() {
         }
       />
 
-      <Card>
-        <CardHeader title="Configuration" />
-        <dl className="grid grid-cols-2 gap-4 p-5">
-          <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
-          <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
-          <Detail label="Expected status">
-            {monitor.expectedStatus.min}–{monitor.expectedStatus.max}
-          </Detail>
-          <Detail label="Keyword">{monitor.keyword ? `"${monitor.keyword}"` : 'None'}</Detail>
-          <Detail label="Custom headers">
-            {headerNames.length ? headerNames.join(', ') : 'None'}
-          </Detail>
-        </dl>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Configuration" />
+          <dl className="grid grid-cols-2 gap-4 p-5">
+            <Detail label="Method">
+              {monitor.method === 'HEAD' && monitor.headUnsupported
+                ? "GET (server doesn't support HEAD)"
+                : monitor.method}
+            </Detail>
+            <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
+            <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
+            <Detail label="Expected status">
+              {monitor.expectedStatus.min}–{monitor.expectedStatus.max}
+            </Detail>
+            <Detail label="Keyword">{monitor.keyword ? `"${monitor.keyword}"` : 'None'}</Detail>
+            <Detail label="Custom headers">
+              {headerNames.length ? headerNames.join(', ') : 'None'}
+            </Detail>
+          </dl>
+        </Card>
+        <UsageCard wid={wid} monitorId={monitor.id} />
+      </div>
 
       <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
     </div>

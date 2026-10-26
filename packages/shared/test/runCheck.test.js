@@ -6,11 +6,41 @@ import { runHttpCheck } from '../src/check/runCheck.js';
 // 127.0.0.1 and localhost/::1 reach it. Private targets are allowed in these tests.
 let server;
 let base;
+let lastHeaders = null; // headers of the latest request to /record
+let trickleClosedEarly = false;
 
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
     switch (path) {
+      case '/head-405':
+      case '/head-501':
+        // A server that doesn't implement HEAD.
+        res.statusCode = req.method === 'HEAD' ? Number(path.slice(-3)) : 200;
+        res.end(req.method === 'HEAD' ? '' : 'healthy');
+        return;
+      case '/record':
+        lastHeaders = req.headers;
+        res.end('ok');
+        return;
+      case '/trickle': {
+        // Headers right away, then a body that takes ~3 s to arrive.
+        trickleClosedEarly = false;
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        let sent = 0;
+        const timer = setInterval(() => {
+          sent += 1;
+          if (sent > 30) {
+            clearInterval(timer);
+            res.end('done');
+          } else res.write('x'.repeat(1024));
+        }, 100);
+        res.on('close', () => {
+          if (sent <= 30) trickleClosedEarly = true;
+          clearInterval(timer);
+        });
+        return;
+      }
       case '/ok':
         res.end('all systems healthy');
         return;
@@ -156,5 +186,70 @@ describe('runHttpCheck', () => {
     const named = await runHttpCheck({ ...target('/ok'), url: `http://localhost:${port}/ok` });
     expect(named.ok).toBe(false);
     expect(named.error).toMatch(/Blocked connection to private address/);
+  });
+});
+
+describe('runHttpCheck: cheap requests (U1)', () => {
+  it.each(['/head-405', '/head-501'])(
+    'falls back from HEAD to GET when the server rejects HEAD (%s)',
+    async (path) => {
+      const result = await run(path, { method: 'HEAD' });
+      expect(result).toMatchObject({
+        ok: true,
+        statusCode: 200,
+        requestsSent: 2,
+        headUnsupported: true,
+      });
+    },
+  );
+
+  it('goes straight to GET once the monitor is known not to support HEAD', async () => {
+    const result = await run('/head-405', { method: 'HEAD', headUnsupported: true });
+    expect(result).toMatchObject({ ok: true, requestsSent: 1, headUnsupported: false });
+  });
+
+  it('uses HEAD when the server supports it (one request, no fallback)', async () => {
+    expect(await run('/ok', { method: 'HEAD' })).toMatchObject({
+      ok: true,
+      statusCode: 200,
+      requestsSent: 1,
+      headUnsupported: false,
+    });
+  });
+
+  it('does not download the body when no keyword is set', async () => {
+    const result = await run('/trickle', { timeoutMs: 5000 });
+    expect(result).toMatchObject({ ok: true, statusCode: 200 });
+    expect(result.totalMs).toBeLessThan(1000); // the full body takes ~3 s
+    expect(result.timings.ttfbMs).toBeGreaterThanOrEqual(0); // TTFB is still measured
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(trickleClosedEarly).toBe(true); // we hung up before the body finished
+  });
+
+  it('still downloads the body when a keyword is set', async () => {
+    const result = await run('/trickle', { timeoutMs: 5000, keyword: 'done' });
+    expect(result.ok).toBe(true);
+    expect(result.totalMs).toBeGreaterThan(2500);
+  });
+
+  it('identifies itself with the bot User-Agent and the X-PulseBoard-Check header', async () => {
+    await runHttpCheck(target('/record'), {
+      allowPrivate: true,
+      appUrl: 'https://app.pulseboard.dev/',
+    });
+    expect(lastHeaders['user-agent']).toBe('PulseBoard/1.0 (+https://app.pulseboard.dev/bot)');
+    expect(lastHeaders['x-pulseboard-check']).toBe('1');
+  });
+
+  it('custom headers cannot remove the check marker', async () => {
+    await run('/record', { headers: { 'X-PulseBoard-Check': '0', 'X-Api-Key': 'k' } });
+    expect(lastHeaders['x-pulseboard-check']).toBe('1');
+    expect(lastHeaders['x-api-key']).toBe('k');
+  });
+
+  it('counts every request sent, including redirect hops', async () => {
+    expect((await run('/redirect')).requestsSent).toBe(2); // 302 + final
+    expect((await run('/loop')).requestsSent).toBe(4); // 1 + 3 redirects, then gives up
+    expect((await run('/ok')).requestsSent).toBe(1);
   });
 });

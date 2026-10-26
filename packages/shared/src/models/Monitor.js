@@ -2,8 +2,11 @@ import mongoose from 'mongoose';
 import {
   DEFAULT_EXPECTED_STATUS,
   DEFAULT_TIMEOUT_MS,
+  CURRENCIES,
+  DEFAULT_CURRENCY,
   HTTP_METHODS,
   MONITOR_STATUS,
+  MONITOR_TYPES,
 } from '../constants.js';
 import { baseOptions } from './_options.js';
 
@@ -21,6 +24,7 @@ export const timingsSchema = new mongoose.Schema(
 const monitorSchema = new mongoose.Schema(
   {
     workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
+    type: { type: String, enum: Object.values(MONITOR_TYPES), default: MONITOR_TYPES.HTTP },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     url: { type: String, required: true, trim: true },
     method: { type: String, enum: HTTP_METHODS, default: 'GET' },
@@ -33,6 +37,12 @@ const monitorSchema = new mongoose.Schema(
     },
     keyword: { type: String, default: null },
     headers: { type: Map, of: String, default: undefined },
+    // Set by the worker when the server answered HEAD with 405/501; checks then use GET.
+    headUnsupported: { type: Boolean, default: false },
+
+    // Cost estimator: the customer's own price per 1,000 requests to this endpoint.
+    costPer1kRequests: { type: Number, default: null },
+    currency: { type: String, enum: CURRENCIES, default: DEFAULT_CURRENCY },
     isPaused: { type: Boolean, default: false },
     status: {
       type: String,
