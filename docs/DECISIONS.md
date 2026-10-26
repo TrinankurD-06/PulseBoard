@@ -134,3 +134,111 @@ Newest phase at the bottom.
   production a Vercel rewrite does the same. The refresh cookie is therefore always
   first-party (`SameSite=Lax`), avoiding third-party-cookie blocking in Safari/Chrome.
   Socket.io connects to the API directly; it authenticates with the access token, not cookies.
+
+---
+
+## Phase 2: Auth & RBAC
+
+### D16. Access token in memory, refresh token in an httpOnly cookie
+
+- **Access token** (JWT, 15 min) is returned in the JSON body and kept only in a JS variable,
+  never `localStorage`. XSS can't steal a stored token, and if one leaks it dies in 15 minutes.
+- **Refresh token** (JWT, 7 days) lives in an `httpOnly` cookie that JavaScript can't read.
+  It is scoped with `Path=/api/v1/auth`, so the browser only sends it to auth endpoints, and
+  it is `Secure` in production.
+- After a page reload the access token is gone; `AuthProvider` silently calls `/auth/refresh`
+  to get a new one. That's why the app shows a spinner for a moment on load.
+- **Alternatives:** both tokens in `localStorage` (simple, but XSS-stealable); a server-side
+  session cookie only (simplest, but the spec asks for JWT and Socket.io auth is easier with a
+  bearer token).
+
+### D17. Refresh-token rotation with reuse detection (`Session` collection)
+
+- Every refresh token is single-use. `/auth/refresh` marks the presented token's session as
+  revoked and issues a new token in the same **family** (one family = one login).
+- If a token that was **already used** is presented again, someone has a copy of it (theft)
+  or there was a race. Either way the whole family is revoked and the user must log in again.
+  This limits a stolen refresh token to at most one use before the real user's next refresh
+  exposes it.
+- The "claim" is atomic: `findOneAndUpdate({ _id, revokedAt: null }, { revokedAt: now })`.
+  Two concurrent refreshes with the same token can't both win.
+- Only the SHA-256 hash of the token is stored, like a password, so a database dump doesn't
+  contain usable tokens. A TTL index on `expiresAt` removes old sessions automatically.
+- Refresh tokens are signed with a **different secret** from access tokens, so one can never
+  be used as the other (there's a test for this).
+
+### D18. The client sends at most one refresh at a time
+
+- Because refresh tokens are single-use, two parallel refreshes (e.g. several queries all
+  getting a 401 at once, or React StrictMode running effects twice) would look like reuse and
+  log the user out. `refreshAccessToken()` shares one in-flight promise between all callers.
+- The axios interceptor retries a failed request **once** after refreshing. If the refresh
+  also fails, the session is over: the token is dropped, the query cache is cleared, and
+  `ProtectedRoute` redirects to `/login`.
+- Known limit: two browser _tabs_ refreshing in the same instant can still trip reuse
+  detection, since they don't share memory. The cost is a re-login; a cross-tab lock
+  (BroadcastChannel) would fix it if it ever mattered.
+
+### D19. RBAC: ranked roles + per-route `requireRole`
+
+- Roles are ordered `viewer (1) < member (2) < owner (3)`. `requireRole('member')` passes for
+  members and owners. One `hasRole()` function in `shared` is used by the API (enforcement)
+  and the client (hiding buttons), so the two can't disagree.
+- `requireRole` looks up the caller's `Membership` for `:wid` (an indexed lookup on
+  `{workspaceId, userId}`) and attaches it to `req.membership`.
+- **Non-members get 404, not 403.** A 403 would confirm that the workspace id exists. Members
+  with too low a role get 403 with a message saying which role is needed.
+- The client hides actions the user can't take, but that's just UX: the server checks every
+  request on its own.
+
+### D20. A workspace always keeps at least one owner
+
+- Demoting or removing the last owner returns `409 LAST_OWNER`; otherwise nobody could manage
+  the workspace again.
+- **Known edge case:** two owners demoting _each other_ at the same instant could both pass the
+  check (each sees two owners), a classic "write skew". Fixing it means running both writes in
+  a transaction that also writes a shared document (e.g. a counter on the workspace), so one
+  aborts. Not worth the complexity for this project; noted here as a trade-off.
+
+### D21. Transactions where they're possible
+
+- **Registration** creates the user, a personal workspace and the owner membership in one
+  transaction. A user without a workspace would land on an empty, broken app.
+- **Workspace deletion** can't be one transaction, because MongoDB doesn't allow writes to
+  time-series collections inside transactions. Instead children are deleted first and the
+  workspace document last. If something fails halfway, the workspace still exists and the
+  delete can simply be run again.
+
+### D22. Login doesn't reveal which emails have accounts
+
+- Wrong password and unknown email return the same error and status. For unknown emails,
+  bcrypt still compares against a dummy hash so both cases take about the same time, and the
+  response time doesn't leak whether the account exists.
+- Passwords are capped at 72 characters because bcrypt ignores everything past 72 bytes;
+  accepting longer ones would give a false sense of security.
+- bcrypt cost is 12 in production (about 250 ms per hash) and 4 in tests (same code path,
+  much faster suite). It's configurable via `BCRYPT_COST`.
+
+### D23. Rate limiting
+
+- `/auth/login` and `/auth/register`: 20 requests per IP per 15 minutes (`AUTH_RATE_LIMIT_MAX`).
+  `/auth/refresh` gets 3× that, since the client calls it automatically.
+- Limits return the standard error shape with code `RATE_LIMITED` (HTTP 429) and the
+  `RateLimit` headers.
+- Counters live in process memory. With one API instance that's exact; with several, each
+  would count separately. No Redis by design; `rate-limit-mongo` would be the MERN-only
+  fix if needed.
+- `TRUST_PROXY=true` must be set on Render so the limiter sees the real client IP, not the
+  proxy's.
+
+### D24. "Invite by email" adds an existing account
+
+- `POST /workspaces/:wid/members { email, role }` adds a user who already has a PulseBoard
+  account. If no account uses that email, the API explains that they need to sign up first.
+- A real invitation flow (emailed token, pending invites) would need its own collection and
+  email sending. It's a possible extension, but out of scope for the spec.
+
+### D25. Response envelope
+
+- Single resources: `{ data: {...} }`. Lists: `{ data: [...], pagination: { page, limit, total,
+totalPages } }`. Errors: `{ error: {...} }`. The client always reads `res.data.data`.

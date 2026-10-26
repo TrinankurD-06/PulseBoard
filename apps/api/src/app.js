@@ -4,9 +4,14 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
+import { createTokenService } from './lib/tokens.js';
+import { authenticate } from './middleware/authenticate.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
+import { authRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { membersRouter } from './modules/members/members.routes.js';
+import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
 
 /**
  * Builds the Express app without listening, so tests can drive it with Supertest.
@@ -44,9 +49,14 @@ export function createApp({ env, logger, getRealtimeStatus }) {
 
   app.use('/health', healthRouter({ getRealtimeStatus }));
 
+  const tokens = createTokenService(env);
+  const requireAuth = authenticate(tokens);
+
   const api = express.Router();
+  api.use('/auth', authRouter({ env, tokens, logger }));
+  api.use('/workspaces', requireAuth, workspacesRouter());
+  api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   app.use('/api/v1', api);
-  // Feature routers are mounted on `api` in later phases.
 
   app.use(notFoundHandler);
   app.use(errorHandler);

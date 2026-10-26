@@ -1,3 +1,5 @@
 // Zod schemas shared by the API (request validation) and the client (forms).
 // Must stay browser-safe: no mongoose or Node imports here.
+export * from './auth.js';
 export * from './common.js';
+export * from './workspace.js';

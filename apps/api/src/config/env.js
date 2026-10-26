@@ -17,6 +17,9 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
+  // Max login/register attempts per IP per 15 minutes.
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   TRUST_PROXY: booleanString,
   DEMO_MODE: booleanString,
   ALLOW_PRIVATE_TARGETS: booleanString,

@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { ThemeContext } from './ThemeContext.js';
 
 function readTheme() {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
 /** Dark-first theme stored in localStorage; index.html applies it before first paint. */
-export function useTheme() {
+export default function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(readTheme);
 
   const toggleTheme = useCallback(() => {
@@ -19,5 +20,6 @@ export function useTheme() {
     setTheme(next);
   }, []);
 
-  return { theme, toggleTheme };
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

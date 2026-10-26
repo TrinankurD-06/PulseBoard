@@ -11,6 +11,7 @@
     "./db": "./src/db.js",
     "./env": "./src/env.js",
     "./logger": "./src/logger.js",
+    "./roles": "./src/roles.js",
     "./testing": "./src/testing/memoryDb.js"
   },
   "scripts": {

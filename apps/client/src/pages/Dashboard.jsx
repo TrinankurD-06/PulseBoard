@@ -1,11 +1,18 @@
-import { useParams } from 'react-router-dom';
+import { Activity } from 'lucide-react';
+import PageHeader from '../components/PageHeader.jsx';
+import EmptyState from '../components/ui/EmptyState.jsx';
+import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 
 export default function Dashboard() {
-  const { wid } = useParams();
+  const { workspace } = useCurrentWorkspace();
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="mt-2 text-slate-500">Workspace {wid}: monitors arrive in phase 3.</p>
-    </div>
+    <>
+      <PageHeader title={workspace.name} description="Overview of all monitors in this workspace" />
+      <EmptyState
+        icon={Activity}
+        title="No monitors yet"
+        description="Monitors arrive in the next phase."
+      />
+    </>
   );
 }
