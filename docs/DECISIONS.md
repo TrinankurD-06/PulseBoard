@@ -506,3 +506,109 @@ ALERT_DELIVERY_FAILED` with the provider's reason when delivery fails.
 - No checks run while paused, so an open incident could never recover on its own and would
   stay "ongoing" forever. Pausing resolves it with the timeline entry "Closed because
   monitoring was paused" and sends **no** recovery alert (nothing actually recovered).
+
+---
+
+## Phase 6: Realtime & analytics
+
+### D46. Live updates: MongoDB change streams → Socket.io (no message broker)
+
+- The worker only writes to MongoDB. The API opens two change streams
+  (`fullDocument: 'updateLookup'`) and turns events into Socket.io messages:
+  - `monitors`: updates touching `lastCheckedAt` or `status` → `check:result`
+  - `incidents`: insert → `incident:opened`; update setting `resolvedAt` → `incident:resolved`;
+    other updates (alert sent) → `incident:updated`
+- `$match` pipelines run **on the server**, so the API never receives irrelevant events
+  (e.g. renaming a monitor: tested).
+- **Why not watch `checkresults`?** Time-series collections don't support change streams.
+  That's why the worker copies each result onto the Monitor document (`last*` fields).
+- The payload whitelists fields: custom headers (possibly API keys) never reach a socket.
+- Verified with the worker's real pipeline-style updates: in a browser test the dashboard
+  turned red 29 s after the demo target broke, with no page reload.
+
+### D47. Resume tokens + retry with backoff
+
+- After each event, the stream's resume token is saved in `streamCheckpoints` (batched:
+  at most one write per second per stream). On restart the stream continues with
+  `resumeAfter`, so **nothing written while the API was down is lost** (tested: stop,
+  write, restart → the missed event arrives).
+- Events older than 2 minutes on arrival (replayed after a long outage) advance the token
+  but aren't pushed to browsers: stale "live" updates would only confuse.
+- On a stream error: log, close, reopen with exponential backoff (1 s → 2 s → … → 30 s).
+  If the token is too old for the oplog (codes 260/280/286), the checkpoint is dropped and
+  the stream restarts from "now".
+- `/health` reports each stream's state (`connecting | live | retrying | stopped`); the API
+  is "degraded" (still HTTP 200) when a stream isn't live, because REST still works.
+
+### D48. Socket.io authentication and rooms
+
+- The handshake carries the same 15-minute access token as REST (`auth.token`); invalid →
+  `connect_error('unauthorized')`. The client then refreshes once and reconnects.
+- On connect the server joins the socket to `workspace:<id>` for each membership, and the
+  server only ever emits to those rooms, so **a user can't receive another workspace's
+  events** (tested). The client emits `workspaces:sync` after creating/joining a workspace.
+- Trade-offs: an open socket isn't cut off when its token expires mid-connection, and a
+  member removed from a workspace keeps receiving its events until reconnect or sync.
+  Acceptable here; a production system would re-check periodically.
+- **Multiple API instances** would each run their own change streams and each emit every
+  event to its own sockets. That's correct (each browser is connected to one instance) but
+  duplicates the stream work. Fine for one API instance; at scale, use the Socket.io
+  MongoDB adapter or partition streams.
+
+### D49. The client patches its cache instead of refetching
+
+- `check:result` updates the cached monitor list and detail in place (`setQueryData`) and
+  appends a point to the dashboard sparkline, so no request is made per check. Only queries
+  that are actually on screen (charts of an open monitor page) are invalidated and refetched.
+- While the socket is connected, queries don't poll at all; if it drops (or a network blocks
+  websockets), they fall back to polling every 30 s and the sidebar shows "Offline". After a
+  reconnect everything is refetched once to catch up.
+
+### D50. Daily rollups with `$merge`
+
+- `rollupDay(day)`: one aggregation over that UTC day's raw checks → per monitor
+  `totalChecks`, `upChecks`, `avgResponseMs`, `p95ResponseMs` (`$percentile`, MongoDB 7+) →
+  `$merge` into `dailyrollups` **on the unique `{monitorId, date}` index**. Re-running it
+  overwrites the same rows (idempotent, tested).
+- `downtimeSec` comes from **incident overlap** with the day (an incident 23:50–00:10
+  contributes 10 min to each day), more accurate than "failed checks × interval".
+- `rollup` runs every 15 min (today, not final). `finalize-rollup` runs at 00:05 UTC
+  (yesterday, final). The 15-minute job also finalises yesterday if the nightly run was
+  missed (no worker at 00:05), so the 90-day bars never get a hole. `agenda.every()` upserts
+  one job per name, so several workers still produce one schedule.
+
+### D51. Where each uptime number comes from
+
+- **24 h:** raw checks (exact). **7/30/90 days:** rollups, because raw checks expire after
+  7 days. Today's rollup is ≤15 minutes old.
+- Long windows are **weighted by number of checks**, not an average of daily percentages
+  (a day with 10 checks must not weigh as much as a day with 8,640: tested).
+- "No data" is `null`, never 100%: a monitor created yesterday must not claim 90 days of
+  perfect uptime. The 90-day bars draw those days grey.
+
+### D52. Chart data stays small
+
+- `/checks?from&to`: up to 500 points raw; above that, MongoDB groups them into equal
+  `$dateTrunc` buckets (e.g. 24 h → 173 s buckets). A bucket counts as failed if **any**
+  check in it failed, so outages are never averaged away. Range is capped at 7 days (raw
+  data TTL); longer periods use `/daily`.
+- `/monitors/sparklines` returns recent points for **all** monitors in one aggregation
+  instead of one request per dashboard card.
+- Gotcha found by a test: inside `$group`, `$round` is parsed as an accumulator and can't
+  wrap `$avg`; rounding happens after the group.
+
+### D53. Charts follow a data-viz checklist
+
+- **Colour by job:** status colours (green/amber/red/grey) are reserved for state (dots,
+  90-day bars, failure markers). The 5-phase timing breakdown uses a categorical palette
+  **validated for colour-vision deficiency** in both modes against the app's real
+  surfaces (worst adjacent CVD ΔE 9.1 light / 8.4 dark, all ≥ 8), with separate dark steps.
+- **Marks:** 2px lines with a ~10% area wash, ≤ 24px bars with a 2px surface gap between
+  stacked segments, failure markers with a surface ring, solid hairline grid.
+- **Never colour alone, never hover-only:** every chart has a Table view; uptime bars have
+  a text label per level and keyboard-focusable days; the timing chart has a legend with
+  averages. Refetches dim the previous chart instead of flashing a skeleton.
+- Sparklines are plain SVG, not Recharts: dozens render and update every few seconds.
+- The range filter (1h / 24h / 7d) sits in one row above the chart it scopes.
+- Status dots are decorative (`aria-hidden`) because a visible status label is always
+  next to them; otherwise screen readers would announce the status twice.

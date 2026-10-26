@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { formatDuration, formatMs, hostOf, timeAgo } from '../../lib/format.js';
 import { statusStyle } from '../../lib/status.js';
+import Sparkline from '../charts/Sparkline.jsx';
 import StatusDot from './StatusDot.jsx';
 
-export default function MonitorCard({ monitor, wid, now }) {
+export default function MonitorCard({ monitor, wid, now, sparkline }) {
   const style = statusStyle(monitor.status);
   return (
     <Link
@@ -20,7 +21,10 @@ export default function MonitorCard({ monitor, wid, now }) {
         </div>
         <span className={`text-sm font-medium ${style.text}`}>{style.label}</span>
       </div>
-      <dl className="mt-5 grid grid-cols-3 gap-2 text-sm">
+      <div className="mt-4">
+        <Sparkline points={sparkline} />
+      </div>
+      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
         <div>
           <dt className="text-xs text-slate-500">Response</dt>
           <dd className="font-medium tabular-nums">{formatMs(monitor.lastResponseMs)}</dd>

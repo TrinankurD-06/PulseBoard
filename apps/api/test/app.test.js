@@ -10,10 +10,22 @@ afterAll(stopMemoryDb);
 beforeEach(clearMemoryDb);
 
 describe('GET /health', () => {
-  it('reports ok when MongoDB is connected', async () => {
-    const res = await request(app).get('/health');
+  it('is ok when MongoDB is connected and change streams are live', async () => {
+    const live = buildTestApp({
+      getRealtimeStatus: () => ({ monitors: 'live', incidents: 'live' }),
+    });
+    const res = await request(live).get('/health');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: 'ok', mongo: 'connected' });
+  });
+
+  it('is degraded (but still 200) when change streams are not live', async () => {
+    const retrying = buildTestApp({
+      getRealtimeStatus: () => ({ monitors: 'retrying', incidents: 'live' }),
+    });
+    const res = await request(retrying).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('degraded');
   });
 });
 

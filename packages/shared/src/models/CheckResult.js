@@ -27,6 +27,8 @@ const checkResultSchema = new mongoose.Schema(
 
 // Secondary index for "checks of monitor X between from and to".
 checkResultSchema.index({ 'meta.monitorId': 1, timestamp: -1 });
+// Dashboard sparklines: recent checks of every monitor in a workspace.
+checkResultSchema.index({ 'meta.workspaceId': 1, timestamp: -1 });
 
 export const CheckResult =
   mongoose.models.CheckResult || mongoose.model('CheckResult', checkResultSchema, 'checkresults');

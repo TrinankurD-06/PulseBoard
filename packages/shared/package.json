@@ -16,6 +16,8 @@
     "./scheduling": "./src/scheduling/agenda.js",
     "./alerts": "./src/alerts/index.js",
     "./incident": "./src/incident/index.js",
+    "./uptime": "./src/uptime/index.js",
+    "./rollup": "./src/rollup/index.js",
     "./testing": "./src/testing/memoryDb.js"
   },
   "scripts": {

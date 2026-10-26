@@ -6,11 +6,40 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  /* Status colours: used consistently for dots, badges, bars and charts. */
+  /* Status colours: used consistently for dots, badges, bars and charts.
+     Reserved for state; never reused as a data-series colour. */
   --color-status-up: #22c55e;
   --color-status-down: #ef4444;
   --color-status-pending: #f59e0b;
   --color-status-paused: #94a3b8;
+  --color-status-none: #cbd5e1;
+
+  /* Chart tokens (light). Series/timing colours are the first five slots of a
+     categorical palette validated for colour-vision deficiency on these
+     surfaces; dark mode below uses the same hues re-stepped for dark surfaces. */
+  --color-series-1: #2a78d6;
+  --color-timing-dns: #2a78d6;
+  --color-timing-tcp: #eb6834;
+  --color-timing-tls: #1baf7a;
+  --color-timing-ttfb: #eda100;
+  --color-timing-download: #e87ba4;
+  --color-chart-surface: #ffffff;
+  --color-chart-grid: #e2e8f0;
+  --color-chart-axis: #64748b;
+}
+
+/* Dark steps of the same tokens (selected, not an automatic flip). */
+:root.dark {
+  --color-status-none: #334155;
+  --color-series-1: #3987e5;
+  --color-timing-dns: #3987e5;
+  --color-timing-tcp: #d95926;
+  --color-timing-tls: #199e70;
+  --color-timing-ttfb: #c98500;
+  --color-timing-download: #d55181;
+  --color-chart-surface: #0f172a;
+  --color-chart-grid: #1e293b;
+  --color-chart-axis: #94a3b8;
 }
 
 @layer base {

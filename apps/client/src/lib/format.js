@@ -7,11 +7,13 @@ const UNITS = [
   ['second', 1],
 ];
 
-/** "5 seconds ago", "2 hours ago", "in 3 days". */
+/** "5 seconds ago", "2 hours ago". Never in the future. */
 export function timeAgo(date, now = Date.now()) {
   if (!date) return 'never';
   const seconds = Math.round((new Date(date).getTime() - now) / 1000);
-  if (Math.abs(seconds) < 5) return 'just now';
+  // Future times happen when a live update is newer than the last "now" tick,
+  // or the server clock is slightly ahead: treat them as just now.
+  if (seconds > -5) return 'just now';
   for (const [unit, size] of UNITS) {
     if (Math.abs(seconds) >= size || unit === 'second') {
       return relativeTime.format(Math.round(seconds / size), unit);

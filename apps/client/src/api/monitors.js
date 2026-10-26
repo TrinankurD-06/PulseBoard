@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from './http.js';
-
-// Until live updates arrive (Socket.io, phase 6), monitor data is polled.
-const POLL_MS = 15_000;
+import { fallbackPollMs } from './realtimeState.js';
 
 export const monitorKeys = {
   all: (wid) => ['workspaces', wid, 'monitors'],
@@ -14,7 +12,7 @@ export function useMonitors(wid) {
   return useQuery({
     queryKey: monitorKeys.all(wid),
     queryFn: () => http.get(`/workspaces/${wid}/monitors?limit=100`).then((res) => res.data.data),
-    refetchInterval: POLL_MS,
+    refetchInterval: fallbackPollMs,
   });
 }
 
@@ -22,7 +20,7 @@ export function useMonitor(wid, mid) {
   return useQuery({
     queryKey: monitorKeys.detail(wid, mid),
     queryFn: () => http.get(`/workspaces/${wid}/monitors/${mid}`).then((res) => res.data.data),
-    refetchInterval: POLL_MS,
+    refetchInterval: fallbackPollMs,
   });
 }
 

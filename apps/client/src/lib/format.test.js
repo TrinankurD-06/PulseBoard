@@ -23,6 +23,7 @@ describe('format helpers', () => {
     expect(timeAgo('2026-01-01T11:59:58Z', now)).toBe('just now');
     expect(timeAgo('2026-01-01T11:59:30Z', now)).toBe('30 seconds ago');
     expect(timeAgo('2026-01-01T10:00:00Z', now)).toBe('2 hours ago');
+    expect(timeAgo('2026-01-01T12:00:14Z', now)).toBe('just now'); // newer than now
   });
 
   it('hostOf', () => {

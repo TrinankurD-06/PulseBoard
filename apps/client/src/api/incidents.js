@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { http } from './http.js';
+import { fallbackPollMs } from './realtimeState.js';
 
 /**
  * Incidents of a workspace, newest first. `status`: 'open' | 'resolved' | undefined (all).
@@ -13,7 +14,6 @@ export function useIncidents(wid, { status, monitorId, page = 1, limit = 20 } = 
     queryKey: ['workspaces', wid, 'incidents', { status, monitorId, page, limit }],
     queryFn: () => http.get(`/workspaces/${wid}/incidents?${params}`).then((res) => res.data),
     placeholderData: keepPreviousData,
-    // Until live updates (phase 6), poll like the monitor queries do.
-    refetchInterval: 15_000,
+    refetchInterval: fallbackPollMs,
   });
 }

@@ -17,6 +17,7 @@ import { healthRouter } from './modules/health/health.routes.js';
 import { incidentsRouter } from './modules/incidents/incidents.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
 import { metaRouter } from './modules/meta/meta.routes.js';
+import { monitorAnalyticsRouter } from './modules/monitors/analytics.routes.js';
 import { monitorsRouter } from './modules/monitors/monitors.routes.js';
 import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
 import { noopScheduler } from './scheduling/scheduler.js';
@@ -73,6 +74,8 @@ export function createApp({
   api.use('/auth', authRouter({ env, tokens, logger }));
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
+  // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.
+  api.use('/workspaces/:wid/monitors', requireAuth, monitorAnalyticsRouter());
   api.use(
     '/workspaces/:wid/monitors',
     requireAuth,

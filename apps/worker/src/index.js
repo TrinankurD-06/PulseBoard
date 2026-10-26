@@ -19,6 +19,7 @@ import {
 import { env } from './config/env.js';
 import { startHealthServer } from './healthServer.js';
 import { createIncidentEngine } from './incidents/engine.js';
+import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
 import { createRunCheckJob } from './jobs/runCheck.js';
 import { createSendAlertJob } from './jobs/sendAlert.js';
 import { reconcileJobs } from './reconcile.js';
@@ -64,10 +65,16 @@ async function main() {
     }),
     { concurrency: 5 },
   );
+  agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
+  agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
 
   await reconcileJobs({ db: mongoose.connection.db, scheduler, logger });
   await agenda.start();
+  // every() creates a single job per name (upsert), so several workers booting
+  // at once still end up with one rollup job and one nightly finalize job.
+  await agenda.every('15 minutes', JOB_NAMES.ROLLUP);
+  await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
   let agendaRunning = true;
   logger.info('Agenda started, processing jobs');
 

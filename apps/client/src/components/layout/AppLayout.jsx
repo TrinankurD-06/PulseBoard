@@ -14,6 +14,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.js';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { cn } from '../../lib/cn.js';
+import { useRealtime } from '../../realtime/useRealtime.js';
 import NotFound from '../../pages/NotFound.jsx';
 import Logo from '../Logo.jsx';
 import ThemeToggle from '../ThemeToggle.jsx';
@@ -28,7 +29,24 @@ const NAV_ITEMS = [
   { to: 'settings', label: 'Settings', icon: Settings },
 ];
 
-function Sidebar({ onNavigate }) {
+/** Shows whether live updates are flowing (Socket.io connected). */
+function LiveIndicator({ connected }) {
+  return (
+    <span
+      className="flex items-center gap-1.5 text-xs text-slate-500"
+      title={
+        connected ? 'Receiving live updates' : 'Reconnecting; data refreshes every 30s meanwhile'
+      }
+    >
+      <span
+        className={cn('h-2 w-2 rounded-full', connected ? 'bg-status-up' : 'bg-status-paused')}
+      />
+      {connected ? 'Live' : 'Offline'}
+    </span>
+  );
+}
+
+function Sidebar({ onNavigate, connected }) {
   const { wid } = useCurrentWorkspace();
   const { user, logout } = useAuth();
 
@@ -38,6 +56,7 @@ function Sidebar({ onNavigate }) {
         <Logo to={`/app/${wid}`} />
       </div>
       <WorkspaceSwitcher />
+      <LiveIndicator connected={connected} />
       <nav className="flex-1 space-y-1" aria-label="Main">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -83,6 +102,7 @@ function Sidebar({ onNavigate }) {
 export default function AppLayout() {
   const { workspace } = useCurrentWorkspace();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { connected } = useRealtime();
 
   if (!workspace)
     return <NotFound message="This workspace doesn't exist or you're not a member." />;
@@ -91,7 +111,7 @@ export default function AppLayout() {
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
       <aside className="hidden border-r border-slate-200 lg:block dark:border-slate-800">
         <div className="sticky top-0 h-screen">
-          <Sidebar />
+          <Sidebar connected={connected} />
         </div>
       </aside>
 
@@ -120,7 +140,7 @@ export default function AppLayout() {
               <X className="h-5 w-5" />
             </button>
             <div className="h-full pt-10">
-              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+              <Sidebar onNavigate={() => setDrawerOpen(false)} connected={connected} />
             </div>
           </div>
         </div>

@@ -69,13 +69,11 @@ describe('createEmailSender', () => {
   });
 
   it('retries creating the transport after a failure', async () => {
-    createTestAccount
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce({
-        user: 'u',
-        pass: 'p',
-        smtp: { host: 'h', port: 587, secure: false },
-      });
+    createTestAccount.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+      user: 'u',
+      pass: 'p',
+      smtp: { host: 'h', port: 587, secure: false },
+    });
     sendMail.mockResolvedValue({});
     const send = createEmailSender({ smtp: {}, from: 'x@y.z', logger: { info() {} } });
 

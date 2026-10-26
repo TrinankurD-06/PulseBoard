@@ -13,6 +13,7 @@ import {
   useTestSavedMonitor,
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
+import MonitorAnalytics from '../../components/monitors/MonitorAnalytics.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
 import TestResult from '../../components/monitors/TestResult.jsx';
@@ -193,44 +194,48 @@ export default function MonitorDetail() {
 
       {testResult && <TestResult result={testResult} />}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Latest check" />
-          {monitor.lastCheckedAt ? (
-            <dl className="grid grid-cols-2 gap-4 p-5">
-              <Detail label="Checked">{timeAgo(monitor.lastCheckedAt, now)}</Detail>
-              <Detail label="Result">{monitor.lastOk ? 'Passed' : 'Failed'}</Detail>
-              <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
-              <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
-              {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
-              {monitor.lastTimings && (
-                <div className="col-span-2">
-                  <TimingBar timings={monitor.lastTimings} />
-                </div>
-              )}
-            </dl>
-          ) : (
-            <p className="p-5 text-sm text-slate-500">
-              {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
-            </p>
-          )}
-        </Card>
+      <MonitorAnalytics
+        wid={wid}
+        monitorId={monitor.id}
+        latestCheckCard={
+          <Card>
+            <CardHeader title="Latest check" />
+            {monitor.lastCheckedAt ? (
+              <dl className="grid grid-cols-2 gap-4 p-5">
+                <Detail label="Checked">{timeAgo(monitor.lastCheckedAt, now)}</Detail>
+                <Detail label="Result">{monitor.lastOk ? 'Passed' : 'Failed'}</Detail>
+                <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
+                <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
+                {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
+                {monitor.lastTimings && (
+                  <div className="col-span-2">
+                    <TimingBar timings={monitor.lastTimings} />
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p className="p-5 text-sm text-slate-500">
+                {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
+              </p>
+            )}
+          </Card>
+        }
+      />
 
-        <Card>
-          <CardHeader title="Configuration" />
-          <dl className="grid grid-cols-2 gap-4 p-5">
-            <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
-            <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
-            <Detail label="Expected status">
-              {monitor.expectedStatus.min}–{monitor.expectedStatus.max}
-            </Detail>
-            <Detail label="Keyword">{monitor.keyword ? `"${monitor.keyword}"` : 'None'}</Detail>
-            <Detail label="Custom headers">
-              {headerNames.length ? headerNames.join(', ') : 'None'}
-            </Detail>
-          </dl>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader title="Configuration" />
+        <dl className="grid grid-cols-2 gap-4 p-5">
+          <Detail label="Interval">every {formatDuration(monitor.intervalSec)}</Detail>
+          <Detail label="Timeout">{formatMs(monitor.timeoutMs)}</Detail>
+          <Detail label="Expected status">
+            {monitor.expectedStatus.min}–{monitor.expectedStatus.max}
+          </Detail>
+          <Detail label="Keyword">{monitor.keyword ? `"${monitor.keyword}"` : 'None'}</Detail>
+          <Detail label="Custom headers">
+            {headerNames.length ? headerNames.join(', ') : 'None'}
+          </Detail>
+        </dl>
+      </Card>
 
       <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
     </div>

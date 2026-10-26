@@ -1,6 +1,7 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import { Activity, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useSparklines } from '../api/analytics.js';
 import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
 import MonitorCard from '../components/monitors/MonitorCard.jsx';
@@ -30,7 +31,7 @@ function SummaryCard({ label, value, accent }) {
   return (
     <Card className="p-5">
       <p className="text-sm text-slate-500">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold tabular-nums ${accent ?? ''}`}>{value}</p>
+      <p className={`mt-2 text-3xl font-semibold ${accent ?? ''}`}>{value}</p>
     </Card>
   );
 }
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const { data: monitors, isPending, isError } = useMonitors(wid);
   const { data: openIncidents } = useIncidents(wid, { status: 'open', limit: 1 });
   const openCount = openIncidents?.pagination.total;
+  const { data: sparklines } = useSparklines(wid);
   const now = useNow();
   const canEdit = can(ROLES.MEMBER);
 
@@ -119,7 +121,13 @@ export default function Dashboard() {
       {monitors?.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {monitors.map((monitor) => (
-            <MonitorCard key={monitor.id} monitor={monitor} wid={wid} now={now} />
+            <MonitorCard
+              key={monitor.id}
+              monitor={monitor}
+              wid={wid}
+              now={now}
+              sparkline={sparklines?.[monitor.id]}
+            />
           ))}
         </div>
       )}
