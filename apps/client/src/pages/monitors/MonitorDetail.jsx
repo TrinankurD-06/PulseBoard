@@ -22,6 +22,7 @@ import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
 import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
 import NotFound from '../NotFound.jsx';
@@ -150,6 +151,7 @@ export default function MonitorDetail() {
   const { data: monitor, isPending, error } = useMonitor(wid, mid);
   const now = useNow();
   const [testResult, setTestResult] = useState(null);
+  useDocumentTitle(monitor?.name);
 
   if (error?.response?.status === 404) return <NotFound message="This monitor doesn't exist." />;
   if (error) return <p className="text-sm text-red-600">Couldn&apos;t load this monitor.</p>;

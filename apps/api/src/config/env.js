@@ -27,4 +27,8 @@ const envSchema = z.object({
   ...alertEnvFields,
 });
 
-export const env = parseEnv(envSchema);
+// Hosting platforms (Render, Heroku...) tell web services which port to use via PORT.
+export const env = parseEnv(envSchema, {
+  ...process.env,
+  API_PORT: process.env.API_PORT ?? process.env.PORT,
+});

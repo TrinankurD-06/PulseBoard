@@ -1,49 +1,56 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './auth/routes.jsx';
-import AppLayout from './components/layout/AppLayout.jsx';
-import AlertChannels from './pages/AlertChannels.jsx';
-import AppIndex from './pages/AppIndex.jsx';
-import Login from './pages/auth/Login.jsx';
-import Register from './pages/auth/Register.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Incidents from './pages/Incidents.jsx';
+import FullPageSpinner from './components/ui/FullPageSpinner.jsx';
 import Landing from './pages/Landing.jsx';
-import EditMonitor from './pages/monitors/EditMonitor.jsx';
-import MonitorDetail from './pages/monitors/MonitorDetail.jsx';
-import NewMonitor from './pages/monitors/NewMonitor.jsx';
 import NotFound from './pages/NotFound.jsx';
-import PublicStatus from './pages/PublicStatus.jsx';
-import Settings from './pages/Settings.jsx';
-import StatusPages from './pages/StatusPages.jsx';
-import Team from './pages/Team.jsx';
+
+// Route-level code splitting: the landing page and public status pages don't
+// download the dashboard (and its charting library), and vice versa.
+const AlertChannels = lazy(() => import('./pages/AlertChannels.jsx'));
+const AppIndex = lazy(() => import('./pages/AppIndex.jsx'));
+const AppLayout = lazy(() => import('./components/layout/AppLayout.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const EditMonitor = lazy(() => import('./pages/monitors/EditMonitor.jsx'));
+const Incidents = lazy(() => import('./pages/Incidents.jsx'));
+const Login = lazy(() => import('./pages/auth/Login.jsx'));
+const MonitorDetail = lazy(() => import('./pages/monitors/MonitorDetail.jsx'));
+const NewMonitor = lazy(() => import('./pages/monitors/NewMonitor.jsx'));
+const PublicStatus = lazy(() => import('./pages/PublicStatus.jsx'));
+const Register = lazy(() => import('./pages/auth/Register.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
+const StatusPages = lazy(() => import('./pages/StatusPages.jsx'));
+const Team = lazy(() => import('./pages/Team.jsx'));
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/status/:slug" element={<PublicStatus />} />
+    <Suspense fallback={<FullPageSpinner />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/status/:slug" element={<PublicStatus />} />
 
-      <Route element={<GuestRoute />}>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Route>
-
-      <Route path="/app" element={<ProtectedRoute />}>
-        <Route index element={<AppIndex />} />
-        <Route path=":wid" element={<AppLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="monitors/new" element={<NewMonitor />} />
-          <Route path="monitors/:mid" element={<MonitorDetail />} />
-          <Route path="monitors/:mid/edit" element={<EditMonitor />} />
-          <Route path="incidents" element={<Incidents />} />
-          <Route path="alerts" element={<AlertChannels />} />
-          <Route path="status-pages" element={<StatusPages />} />
-          <Route path="team" element={<Team />} />
-          <Route path="settings" element={<Settings />} />
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
         </Route>
-      </Route>
 
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="/app" element={<ProtectedRoute />}>
+          <Route index element={<AppIndex />} />
+          <Route path=":wid" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="monitors/new" element={<NewMonitor />} />
+            <Route path="monitors/:mid" element={<MonitorDetail />} />
+            <Route path="monitors/:mid/edit" element={<EditMonitor />} />
+            <Route path="incidents" element={<Incidents />} />
+            <Route path="alerts" element={<AlertChannels />} />
+            <Route path="status-pages" element={<StatusPages />} />
+            <Route path="team" element={<Team />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }

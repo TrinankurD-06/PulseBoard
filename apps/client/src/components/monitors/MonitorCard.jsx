@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { formatDuration, formatMs, hostOf, timeAgo } from '../../lib/format.js';
+import { formatDuration, formatMs, hostOf, timeAgoShort } from '../../lib/format.js';
 import { statusStyle } from '../../lib/status.js';
 import Sparkline from '../charts/Sparkline.jsx';
 import StatusDot from './StatusDot.jsx';
@@ -35,7 +35,7 @@ export default function MonitorCard({ monitor, wid, now, sparkline }) {
         </div>
         <div>
           <dt className="text-xs text-slate-500">Checked</dt>
-          <dd className="truncate font-medium">{timeAgo(monitor.lastCheckedAt, now)}</dd>
+          <dd className="truncate font-medium">{timeAgoShort(monitor.lastCheckedAt, now)}</dd>
         </div>
       </dl>
     </Link>

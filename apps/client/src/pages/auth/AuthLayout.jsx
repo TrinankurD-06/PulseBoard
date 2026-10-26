@@ -1,8 +1,10 @@
 import Logo from '../../components/Logo.jsx';
 import ThemeToggle from '../../components/ThemeToggle.jsx';
 import Card from '../../components/ui/Card.jsx';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 
 export default function AuthLayout({ title, subtitle, children, footer }) {
+  useDocumentTitle(title);
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-4 py-4 sm:px-6">

@@ -4,20 +4,30 @@ import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
+import { useAppMeta } from '../../api/meta.js';
 import { useAuth } from '../../auth/AuthContext.js';
 import Button from '../../components/ui/Button.jsx';
 import Field from '../../components/ui/Field.jsx';
 import AuthLayout from './AuthLayout.jsx';
 
+// Created by "npm run seed"; only advertised when the server runs in DEMO_MODE.
+const DEMO = { email: 'demo@pulseboard.dev', password: 'demo1234' };
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: meta } = useAppMeta();
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
+  const fillDemo = () => {
+    setValue('email', DEMO.email);
+    setValue('password', DEMO.password);
+  };
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -64,6 +74,18 @@ export default function Login() {
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Log in
         </Button>
+        {meta?.demoMode && (
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+            Demo account: {DEMO.email} / {DEMO.password}{' '}
+            <button
+              type="button"
+              onClick={fillDemo}
+              className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              Fill in
+            </button>
+          </p>
+        )}
       </form>
     </AuthLayout>
   );

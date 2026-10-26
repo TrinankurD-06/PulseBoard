@@ -1,0 +1,62 @@
+# Build progress
+
+Tracks the build phases from the project brief. Updated after every step, so work can
+resume from here if a session ends. Design reasoning lives in [DECISIONS.md](DECISIONS.md).
+
+Legend: `[x]` done and committed · `[~]` done, not yet committed · `[ ]` to do
+
+## Phases
+
+- [x] **1. Foundation**: `b527646`. Monorepo, shared models (time-series CheckResult, Session),
+      Express 5 API skeleton (health, errors, logging), worker skeleton, React/Vite/Tailwind shell.
+- [x] **2. Auth & RBAC**: `b6d0589`. JWT access + rotating refresh cookie with reuse detection,
+      workspaces/members, `requireRole`, client auth flow, Team/Settings pages.
+- [x] **3. Monitors CRUD**: `6fcbff0`. Shared monitor schema, two-layer SSRF guard,
+      monitor API + UI, scheduler interface.
+- [x] **4. Worker & checks**: `26d7482`. Agenda v6 (API schedules, worker runs), check
+      runner with timing breakdown, reconcile on boot, Test now, demo-target (port 4011).
+- [x] **5. Incidents & alerts**: `cbdfcb2`. Pure state machine + guarded DB transitions
+      (race-tested), alert channels, Discord/Slack/email with 30s/2m/8m retries, Incidents UI.
+- [x] **6. Realtime & analytics**: `72d8ccf`. Change streams → Socket.io with resume tokens,
+      rollups via `$merge`, uptime/checks/daily endpoints, all monitor charts.
+- [x] **7. Status pages**: `146b603`. CRUD, whitelist-only public endpoint with 30s cache,
+      polished public page, lazy session restore.
+- [ ] **8. Polish & ship**: in progress (see below).
+
+## Phase 8 checklist
+
+- [~] Seed script `npm run seed`: demo user `demo@pulseboard.dev / demo1234`, workspace
+  "Acme Inc.", 4 monitors, alert channel from `.env`, status page `/status/acme`,
+  30 days of rollups + 24h of checks + past incidents. Re-runnable (verified twice).
+- [~] UI polish: Landing page, demo-login hint (DEMO_MODE), tab titles, route code splitting
+  (no more >500 kB chunk), compact "checked" times on cards, softer uptime label.
+- [~] Deploy config: `render.yaml` (API, worker, demo-target), `apps/client/vercel.json`
+  (`/api` rewrite + SPA fallback); API honours Render's `PORT`.
+- [~] Screenshots in `docs/screenshots/` (taken from a real `npm run seed` + `npm run dev` run).
+- [~] `docs/ARCHITECTURE.md`: system, check lifecycle, incident state, alerts, ER diagrams.
+- [ ] `docs/API.md`: every endpoint with request/response examples.
+- [ ] `README.md`: overview, features, screenshots, architecture, setup, env table,
+      deploy steps, demo script.
+- [ ] DECISIONS.md entries for phase 8.
+- [ ] Final pass: lint, all tests, prettier check, client build, commit.
+
+## Verification log (end to end, real processes)
+
+- Phase 8 run with `npm run seed` + `npm run dev` against a replica set `rs0` on :27017
+  (Docker Desktop was not running, so an in-memory replica set stood in for
+  `docker compose up -d`): demo-target set to `down` → dashboard card red after **21 s**
+  without reload, "is down" toast, incident opened; set back to `up` → "back up" after
+  **20 s**. No browser console errors.
+
+## Resume note
+
+Seed, UI polish, deploy config, screenshots and ARCHITECTURE.md are written but **not
+committed yet**. Next: write `docs/API.md` and `README.md`, add phase-8 DECISIONS entries,
+run lint/tests/build, then commit "Phase 8".
+
+## Still to verify on your machine
+
+- `docker compose up -d` with Docker Desktop running (not possible in this session).
+- Real Discord/Slack alerts need your webhook URL in `SEED_DISCORD_WEBHOOK_URL` /
+  `SEED_SLACK_WEBHOOK_URL` (or added on the Alert channels page).
+- Deployment to Render + Vercel (needs your accounts; see README → Deploy).

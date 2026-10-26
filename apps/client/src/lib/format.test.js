@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, formatMs, hostOf, timeAgo } from './format.js';
+import { formatDuration, formatMs, hostOf, timeAgo, timeAgoShort } from './format.js';
 
 describe('format helpers', () => {
   it('formatDuration', () => {
@@ -24,6 +24,13 @@ describe('format helpers', () => {
     expect(timeAgo('2026-01-01T11:59:30Z', now)).toBe('30 seconds ago');
     expect(timeAgo('2026-01-01T10:00:00Z', now)).toBe('2 hours ago');
     expect(timeAgo('2026-01-01T12:00:14Z', now)).toBe('just now'); // newer than now
+  });
+
+  it('timeAgoShort', () => {
+    const now = Date.parse('2026-01-01T12:00:00Z');
+    expect(timeAgoShort('2026-01-01T11:59:26Z', now)).toBe('34s ago');
+    expect(timeAgoShort('2026-01-01T09:30:00Z', now)).toBe('2h ago');
+    expect(timeAgoShort('2026-01-01T12:00:09Z', now)).toBe('just now');
   });
 
   it('hostOf', () => {

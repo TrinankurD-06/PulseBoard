@@ -3,6 +3,6 @@
 export const UPTIME_LEVELS = {
   good: { label: 'Operational', bar: 'bg-status-up' },
   degraded: { label: 'Degraded', bar: 'bg-status-pending' },
-  bad: { label: 'Major outage', bar: 'bg-status-down' },
+  bad: { label: 'Outage', bar: 'bg-status-down' },
   none: { label: 'No data', bar: 'bg-status-none' },
 };

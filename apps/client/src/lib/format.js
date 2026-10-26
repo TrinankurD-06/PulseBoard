@@ -22,6 +22,22 @@ export function timeAgo(date, now = Date.now()) {
   return '';
 }
 
+/** Compact form for tight spaces: "just now", "34s ago", "5m ago", "2h ago", "3d ago". */
+export function timeAgoShort(date, now = Date.now()) {
+  if (!date) return 'never';
+  const seconds = Math.round((now - new Date(date).getTime()) / 1000);
+  if (seconds < 5) return 'just now';
+  for (const [unit, size] of [
+    ['d', 86_400],
+    ['h', 3_600],
+    ['m', 60],
+    ['s', 1],
+  ]) {
+    if (seconds >= size) return '' + Math.floor(seconds / size) + unit + ' ago';
+  }
+  return 'just now';
+}
+
 /** 30 -> "30s", 60 -> "1m", 5400 -> "1h 30m". */
 export function formatDuration(totalSeconds) {
   if (totalSeconds == null) return '—';

@@ -1,4 +1,7 @@
+import { useDocumentTitle } from '../hooks/useDocumentTitle.js';
+
 export default function PageHeader({ title, description, action }) {
+  useDocumentTitle(typeof title === 'string' ? title : undefined);
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
