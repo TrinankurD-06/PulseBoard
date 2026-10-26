@@ -21,24 +21,26 @@ Legend: `[x]` done and committed · `[~]` done, not yet committed · `[ ]` to do
       rollups via `$merge`, uptime/checks/daily endpoints, all monitor charts.
 - [x] **7. Status pages**: `146b603`. CRUD, whitelist-only public endpoint with 30s cache,
       polished public page, lazy session restore.
-- [ ] **8. Polish & ship**: in progress (see below).
+- [x] **8. Polish & ship**: part 1 `94d4362`, part 2 (docs + final pass) committed after it.
+      Seed script, Landing page, code splitting, deploy configs, README / ARCHITECTURE / API docs.
 
 ## Phase 8 checklist
 
-- [~] Seed script `npm run seed`: demo user `demo@pulseboard.dev / demo1234`, workspace
-  "Acme Inc.", 4 monitors, alert channel from `.env`, status page `/status/acme`,
-  30 days of rollups + 24h of checks + past incidents. Re-runnable (verified twice).
-- [~] UI polish: Landing page, demo-login hint (DEMO_MODE), tab titles, route code splitting
-  (no more >500 kB chunk), compact "checked" times on cards, softer uptime label.
-- [~] Deploy config: `render.yaml` (API, worker, demo-target), `apps/client/vercel.json`
-  (`/api` rewrite + SPA fallback); API honours Render's `PORT`.
-- [~] Screenshots in `docs/screenshots/` (taken from a real `npm run seed` + `npm run dev` run).
-- [~] `docs/ARCHITECTURE.md`: system, check lifecycle, incident state, alerts, ER diagrams.
-- [ ] `docs/API.md`: every endpoint with request/response examples.
-- [ ] `README.md`: overview, features, screenshots, architecture, setup, env table,
+- [x] Seed script `npm run seed`: demo user `demo@pulseboard.dev / demo1234`, workspace
+      "Acme Inc.", 4 monitors, alert channel from `.env`, status page `/status/acme`,
+      30 days of rollups + 24h of checks + past incidents. Re-runnable (verified twice).
+- [x] UI polish: Landing page, demo-login hint (DEMO_MODE), tab titles, route code splitting
+      (no more >500 kB chunk), compact "checked" times on cards, softer uptime label.
+- [x] Deploy config: `render.yaml` (API, worker, demo-target), `apps/client/vercel.json`
+      (`/api` rewrite + SPA fallback); API honours Render's `PORT`.
+- [x] Screenshots in `docs/screenshots/` (taken from a real `npm run seed` + `npm run dev` run).
+- [x] `docs/ARCHITECTURE.md`: system, check lifecycle, incident state, alerts, ER diagrams.
+- [x] `docs/API.md`: every endpoint with request/response examples.
+- [x] `README.md`: overview, features, screenshots, architecture, setup, env table,
       deploy steps, demo script.
-- [ ] DECISIONS.md entries for phase 8.
-- [ ] Final pass: lint, all tests, prettier check, client build, commit.
+- [x] DECISIONS.md entries for phase 8 (D58–D61).
+- [x] Final pass: Prettier clean, ESLint exit 0, 281/281 tests, client build without size
+      warning, no Redis/queue/other-database dependencies, all 6 Mermaid diagrams render.
 
 ## Verification log (end to end, real processes)
 
@@ -50,9 +52,7 @@ Legend: `[x]` done and committed · `[~]` done, not yet committed · `[ ]` to do
 
 ## Resume note
 
-Seed, UI polish, deploy config, screenshots and ARCHITECTURE.md are written but **not
-committed yet**. Next: write `docs/API.md` and `README.md`, add phase-8 DECISIONS entries,
-run lint/tests/build, then commit "Phase 8".
+All eight phases are complete. Nothing is in progress.
 
 ## Still to verify on your machine
 

@@ -28,7 +28,7 @@ flowchart LR
         AG1[Agenda instance<br/>schedule only]
     end
 
-    subgraph DB[(MongoDB replica set)]
+    subgraph DB["MongoDB replica set"]
         M[(monitors)]
         I[(incidents)]
         J[(agendaJobs)]
@@ -112,11 +112,11 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> pending: monitor created / resumed
     pending --> up: first successful check
-    pending --> down: 3 consecutive failures<br/>(open incident, send "down" alerts)
+    pending --> down: 3 consecutive failures<br/>(open incident, send down alerts)
     up --> up: success, or fewer than 3 failures in a row
-    up --> down: 3 consecutive failures<br/>(open incident, send "down" alerts)
+    up --> down: 3 consecutive failures<br/>(open incident, send down alerts)
     down --> down: failures, or a single success
-    down --> up: 2 consecutive successes<br/>(resolve incident, send "recovered" alerts)
+    down --> up: 2 consecutive successes<br/>(resolve incident, send recovered alerts)
     pending --> paused: pause
     up --> paused: pause
     down --> paused: pause (open incident is closed, no alert)
@@ -136,12 +136,12 @@ stateDiagram-v2
 ```mermaid
 flowchart LR
     O[Incident opened / resolved] --> Q["send-alert job per enabled channel<br/>{incidentId, channelId, kind, attempt}"]
-    Q --> D{already delivered?<br/>channelId:kind in deliveredAlerts}
+    Q --> D{"already delivered?<br/>channelId:kind in deliveredAlerts"}
     D -- yes --> X[skip]
     D -- no --> S[Send: Discord embed / Slack blocks / HTML email]
     S -- ok --> OK[timeline: alert_sent<br/>add delivery key]
     S -- error --> F[timeline: alert_failed]
-    F --> R{attempt <= 3?}
+    F --> R{"attempt ≤ 3?"}
     R -- yes --> B[schedule retry in 30s / 2m / 8m]
     B --> Q
     R -- no --> G[give up]
@@ -175,11 +175,40 @@ erDiagram
     MONITOR ||--o{ INCIDENT : has
     STATUS_PAGE }o--o{ MONITOR : shows
 
-    MEMBERSHIP { ObjectId workspaceId ObjectId userId string role }
-    MONITOR { string url int intervalSec string status int consecutiveFailures date lastCheckedAt }
-    CHECK_RESULT { date timestamp object meta bool ok number totalMs object timings }
-    DAILY_ROLLUP { ObjectId monitorId date date int totalChecks int upChecks number p95ResponseMs int downtimeSec }
-    INCIDENT { date startedAt date resolvedAt string cause int durationSec array timeline }
+    MEMBERSHIP {
+        ObjectId workspaceId
+        ObjectId userId
+        string role
+    }
+    MONITOR {
+        string url
+        int intervalSec
+        string status
+        int consecutiveFailures
+        date lastCheckedAt
+    }
+    CHECK_RESULT {
+        date timestamp
+        object meta
+        bool ok
+        number totalMs
+        object timings
+    }
+    DAILY_ROLLUP {
+        ObjectId monitorId
+        date date
+        int totalChecks
+        int upChecks
+        number p95ResponseMs
+        int downtimeSec
+    }
+    INCIDENT {
+        date startedAt
+        date resolvedAt
+        string cause
+        int durationSec
+        array timeline
+    }
 ```
 
 Indexes and the reasoning behind each are listed in [DECISIONS.md](DECISIONS.md) (D10).

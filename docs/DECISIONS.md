@@ -660,3 +660,52 @@ ALERT_DELIVERY_FAILED` with the provider's reason when delivery fails.
   page triggers no auth request at all (no 401 in their console, no cookie needed).
 - Verified in a logged-out browser: the only API call is the public status request; no
   console errors; no horizontal scrolling at 390px width.
+
+---
+
+## Phase 8: Polish & ship
+
+### D58. A seed script that tells a story
+
+- `npm run seed` creates the demo account (`demo@pulseboard.dev / demo1234`), workspace
+  "Acme Inc." with 4 monitors (the demo-target + Google, GitHub, Example.com), an alert
+  channel from `.env` (Discord/Slack webhook, else an email channel → Ethereal), and the public
+  status page `/status/acme`.
+- History is **consistent**: 30 days of rollups plus 24 h of raw checks (every 5 min) are
+  generated from the same list of past outages, so incidents, red/amber days on the bars,
+  uptime %, and the dips in the response chart all agree. Today's rollup is produced by the
+  real `rollupDay()` code, not faked. Random values come from a seeded generator, so every run
+  looks the same.
+- Re-runnable: the previous demo account and everything it owns are deleted first (reusing the
+  API's `deleteWorkspace`, which also cancels jobs). Verified by running it twice.
+- Lives in `apps/api/scripts` so it reuses the API's services and bcrypt; the root
+  `npm run seed` forwards to it.
+
+### D59. Route-level code splitting
+
+- Every page except Landing and NotFound is `React.lazy`. The charting library (Recharts) is
+  now only in the monitor-detail chunk, so the landing page and public status pages don't
+  download it. The Vite "chunk larger than 500 kB" warning is gone.
+
+### D60. Deployment layout
+
+- **Render** (`render.yaml` Blueprint): API as a web service, worker as a background worker
+  (no free plan exists for workers), demo-target as a free web service. Secrets are
+  `sync: false` (entered in the dashboard) or `generateValue` (JWT secrets). The API reads
+  Render's `PORT`; `TRUST_PROXY=true` so rate limits see real IPs.
+- **Vercel** (client, root `apps/client`): rewrites `/api/*` to the Render API and everything
+  else to `index.html` (SPA routing). Same-origin API calls keep the refresh cookie
+  first-party (D15); Socket.io connects to Render directly with the access token.
+- Vercel rewrites can't read environment variables, so the API hostname is written in
+  `vercel.json` and must be edited once per deployment (documented in the README).
+- **Atlas** provides the replica set that change streams need; even M0 works.
+
+### D61. Small UX decisions from reviewing real screenshots
+
+- Dashboard cards use a compact "34s ago" instead of "34 seconds ago" (it was truncated).
+- The lowest uptime band is labelled "Outage" rather than "Major outage": on a 24 h summary
+  tile, a 15-minute incident (98.97 %) read as alarmist. The public banner keeps "Major outage"
+  for its own, different meaning (every service down).
+- The login page offers the demo credentials (with a "Fill in" button) only when the server
+  runs in `DEMO_MODE`.
+- Browser tab titles follow the page ("Incidents · PulseBoard", the monitor's name, …).
