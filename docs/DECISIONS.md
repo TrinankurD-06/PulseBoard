@@ -1430,3 +1430,48 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   Slack messages are unchanged apart from the corrected test link.
 - **Tests:** the link builders and the test-alert link (unit and through the API), the startup warning,
   the email template's structure, colours, escaping and text version, and the layout rule.
+
+### D101. Uptime from confirmed downtime, a checker-offline state, recorded errors and sample data
+
+- **Uptime is `100 × (1 − incident downtime ÷ time watched)`.** Before, the percentage was the share of
+  passed checks while "downtime" already came from incidents, so a single failed check lowered uptime
+  without any outage. Now failed checks that never opened an incident change nothing in uptime; they show
+  only in "Failed checks". Every surface uses the same maths (`uptimeFromDowntime`, `combineRollups`,
+  `fillDailySeries`, `windowUptime` in `packages/shared/src/uptime`): the monitor page, the 90-day bars, the
+  Health deck, the dashboard gauge (a new `GET /monitors/uptime-summary`) and the public status page.
+- **"Time watched" starts at the monitor's first stored result** (the earliest daily rollup if no raw result
+  is left), never at its creation time: a monitor that has produced nothing has `null` ("no data"), not 100 %.
+  Daily rollups store `coveredSec` (first result of the day to the end of the day, or now); rollups from before
+  that existed get a full day when final (migration 005). The consequence worth knowing: raw results live
+  7 days, so the 24 h and 7 d windows come from incidents over the watched time and the 30 d and 90 d windows
+  from rollups.
+- **A checker that is itself offline must not look like an outage.** When a check fails with ETIMEDOUT,
+  ENOTFOUND, ECONNRESET or EAI_AGAIN, the worker first sends a HEAD to two reference hosts
+  (`https://1.1.1.1`, `https://www.cloudflare.com`). If both fail, the result is stored with
+  `state: 'unknown'`, `unknownReason: 'checker_offline'`: it is never fed to the incident engine, the adaptive
+  interval or the budget, and it counts nowhere (uptime, failed checks, rollups, metrics). If one host
+  answers, the failure is real. The request to the customer still counts as usage (it was sent); the probes
+  do not. Charts draw unknown results as "Checker offline" gaps. Agent external checks and probes treat
+  `unknown` as inconclusive (no incident, retried next cycle). Other errors (HTTP status, keyword, refused
+  connection) are never probed: the checker's network demonstrably worked to get them.
+- **Every failure carries a code and a message.** `CheckResult.errorCode` (`ETIMEDOUT`, `ENOTFOUND`,
+  `HTTP_503`, `KEYWORD_MISSING`, `TOO_MANY_REDIRECTS`, `BLOCKED_TARGET`, `HEARTBEAT_MISSED`...) next to `error`;
+  an incident keeps `causeCode` and the `code` on its opened timeline entry. The incident timeline and the
+  Health deck's failed-checks panel (newest 20 from the metrics endpoint) show them.
+- **Gaps are drawn as gaps.** A series is split into contiguous runs at null values; each run is its own
+  line, the area fill exists only under runs of 2+ points, a lone point is a dot, and nothing is drawn
+  across a gap (a single Area with nulls and a monotone curve produced the odd blocks).
+- **Sample data is labelled and removable.** Fake history exists only for fictional demo monitors that point
+  at the demo-target ("Demo API", "Demo Checkout", "Demo Cron Job", "Demo Agent"); Google, GitHub and
+  Example.com are created empty. Everything the seed makes for the fictional monitors has `isSeed: true`
+  (monitors, incidents, rollups, checks, usage, agent reports) and the UI shows a "Sample data" badge on
+  seeded incidents and on charts, gauges and the public page that include it. `npm run seed:clear` deletes
+  every `isSeed` document and everything owned by a seeded monitor, never real monitors or their data.
+  Migration 004 gives older databases the same treatment: history cannot predate its monitor, so incidents
+  and rollups from before a monitor existed are flagged and raw checks from before it are deleted.
+- **Not live-folded.** The Health deck's `uptime` card is no longer updated from live check events (a pass
+  rate would contradict the incident-based figure); it refreshes on the next fetch. Failed checks, average
+  response and job duration still fold.
+- **A test bug found on the way.** A "flaky" model test asserted that the JSON contained no `42`; the JSON
+  holds a random ObjectId and timestamps, so `42` appeared by chance in many runs. It now uses a distinctive
+  provider id.
