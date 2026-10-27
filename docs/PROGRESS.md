@@ -146,18 +146,9 @@ Decisions from D91. Commit after each phase; nothing pushed unless asked.
 - [x] **R1. Audit and plan**: approved (React 19, shadcn `tsx:false`, contrast fixes, old theme dropped).
 - [x] **R2. Tokens and foundations**: React 19.3 (`ceec26f`, also fixed dev-mode client builds),
       tokens.css + Tailwind/shadcn mapping, fonts, grain, halftone, data-theme switch (`135e068`).
-- [ ] **R3. App shell**: rail with the PulseBoard mark, hairline grid, numbered nav, mobile bottom bar.
-- [ ] **R4. Primitives**: buttons (round yellow CTA), inputs, badges, tabs, side sheets, toasts,
-      skeletons, empty states, Recharts theme, status orb.
-- [ ] **R5. Pages**: dashboard, incidents, settings pages, auth; remove the transitional bridge.
+- [x] **R3–R5, R7, R8**: superseded by the "Ambient Signal" redesign below (V3, V6, V7, V8).
 - [x] **R6. Health deck**: own Recharts component,
-      GET /monitors/:mid/metrics, live updates, keyboard radiogroup.
-- [ ] **R7. Showcase pages**: landing and public status page.
-- [ ] **R8. QA**: screenshots 1440/390 dark+light, contrast, focus, reduced motion, Lighthouse ≥ 90.
-
-## Resume note (redesign)
-
-Next: R3 (app shell). R6 (Health deck) was built early: `GET /monitors/:mid/metrics` (D92) and the deck on the monitor page (D93); the shell, primitives and pages (R3–R5, R7–R8) are still to do.
+      GET /monitors/:mid/metrics, live updates, keyboard radiogroup (D92, D93).
 
 ---
 
@@ -173,11 +164,35 @@ page wave driven by status only (the public endpoint exposes no latency), uptime
 - [x] **V3. Header line + nav + shell; primitives** (D95) (ring-dot, CTA, outline cards, pills, inputs, toasts,
       modals, skeletons, empty states, Recharts theme)
 - [x] **V4. Radial tick gauge + stepped cards** (gauge maths unit-tested)
-- [x] **V5. Signal field** (built and tested, not yet mounted on pages) (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded)
+- [x] **V5. Signal field** (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded;
+      on the dashboard, landing and status pages)
 - [x] **V6. App pages** (+ Health deck restyle; bridge and `dark:` variant removed, D97)
 - [x] **V7. Landing + public status page + auth** (D97)
-- [ ] **V8. QA** (screenshots 1440/390 in docs/screenshots, Lighthouse perf ≥ 85 / a11y ≥ 90)
+- [x] **V8. QA**: README screenshots retaken from the live site, pages checked in a browser at 1440 and
+      390 px, error pages and alert emails checked. **Not done:** the Lighthouse run (targets: performance
+      ≥ 85, accessibility ≥ 90).
 
-## Resume note (UI v2)
+---
 
-Next: V8 QA with the live API (screenshots 1440/390 into docs/screenshots, Lighthouse, README screenshots); optional light/dark toggle; Render service for the live API (user step).
+# Live deployment and what followed
+
+- **Hosting:** frontend on Vercel (`vercel.json` at the repo root proxies `/api` to Render), API and
+  worker in one free Render web service (`RUN_MODE=combined`, D96), data on MongoDB Atlas.
+- **Sign-in:** Google and GitHub work on the live site (GitHub needs its own OAuth app, one callback URL
+  per app). OAuth ids and secrets are trimmed, because a pasted newline broke GitHub (`0a9dcec`).
+- **Email alerts:** over Resend's HTTPS API (`RESEND_API_KEY`), since Render's free plan blocks SMTP
+  (D98). Until a domain is verified Resend delivers only to the account owner's address.
+- **Alerts and errors (D100):** test alerts link to the Alert channels page, one module builds every
+  alert link, error pages render exactly one layout, the alert email is in the dark theme, and the Test
+  button shows its result on the row.
+- **Seed (D99):** local-only demo monitors are created only for a local database.
+- **Keep-alive:** an external monitor requests `/health` every 10 minutes so the free service does not
+  sleep (the service stops checking while asleep).
+- **Tests:** 794 across six workspaces (agent 24, shared 255, API 257, client 175, demo-target 22,
+  worker 61); ESLint, Prettier and the client build are clean.
+
+## Resume note
+
+Everything above is deployed and pushed. Optional follow-ups: the Lighthouse pass, a light/dark toggle
+(the design is dark-only on purpose, D94), confirm dialogs in the new style instead of `window.confirm`
+for deletes, and making two timing-sensitive tests more robust (they failed once each under load).

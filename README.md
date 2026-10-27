@@ -274,7 +274,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 npm test
 ```
 
-761 tests across six workspaces, all run against an in-memory MongoDB **replica set**
+794 tests across six workspaces, all run against an in-memory MongoDB **replica set**
 (so change streams and transactions behave like production):
 
 - **Unit**: incident state machine (incl. flapping and per-type thresholds), uptime maths, SSRF
