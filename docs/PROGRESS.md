@@ -111,5 +111,5 @@ currency INR.
 
 ## Resume note (upgrade)
 
-Upgrade complete: U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 `086c3f4`, U5 committed after
+Upgrade complete: U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 `086c3f4`, U5 `b9146d7`. Committed after
 this note. Nothing pushed yet.

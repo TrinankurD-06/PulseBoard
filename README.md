@@ -215,6 +215,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `SEED_SLACK_WEBHOOK_URL`   | seed        | empty                                                                       | Creates a Slack channel when seeding                           |
 | `SEED_ALERT_EMAIL`         | seed        | empty                                                                       | Email channel target (default: the demo user)                  |
 | `SEED_DEMO_TARGET_URL`     | seed        | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)   |
+| `SEED_API_URL`             | seed        | empty → `http://localhost:4000/api/v1`                                      | API URL written to the demo file for the agent and heartbeat   |
 | `DEMO_TARGET_PORT`         | demo-target | `4011`                                                                      | Port (4001 is often taken by VS Code)                          |
 | `PULSEBOARD_AGENT_KEY`     | demo-target | empty → seed file                                                           | Agent key for the demo-target's own agent                      |
 | `PULSEBOARD_ENDPOINT`      | demo-target | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)             |
