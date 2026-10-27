@@ -1359,3 +1359,41 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Open items:** deletes in alert channels and status pages still use `window.confirm` (a `Modal`
   confirm is a follow-up), and the live-API visual pass is outstanding (the pages were checked with a
   mocked API).
+
+### D98. Email alerts over HTTPS (Resend) and short SMTP timeouts
+
+- **The problem, found on the live site.** "Send test alert" on the deployed email channel failed with
+  `Could not deliver: Connection timeout` after 120 s. Render's free plan drops outbound SMTP
+  connections (ports 25, 465 and 587) without answering, and nodemailer waited its default two minutes
+  before giving up. Webhook alerts (Discord, Slack) are HTTPS and were never affected.
+- **Fix 1: fail fast.** Every SMTP transport now has `connectionTimeout` 10 s, `greetingTimeout` 10 s
+  and `socketTimeout` 20 s, so a blocked or silent server fails in seconds, is retried by the normal
+  30 s / 2 min / 8 min schedule and does not hold one of the five alert job slots for two minutes.
+- **Fix 2: an HTTPS path.** With `RESEND_API_KEY` set, email goes through Resend's HTTP API
+  (`POST https://api.resend.com/emails`, 15 s timeout) with plain `fetch`: no new dependency. Order of
+  preference: Resend, then SMTP (`SMTP_HOST`), then the Ethereal test inbox for local development.
+  Resend's refusal reasons (for example "you can only send testing emails to your own address") are
+  surfaced in the incident timeline and the test-alert error.
+- **Sender address.** Resend accepts only a verified domain or `onboarding@resend.dev`. The default
+  `ALERT_FROM_EMAIL` (`alerts@pulseboard.local`) is swapped for `PulseBoard <onboarding@resend.dev>`
+  automatically; a real address on a verified domain is used as given.
+- **Limit worth knowing.** Without a verified domain Resend delivers only to the account owner's own
+  email, which is enough for a personal or demo deployment. A paid Render plan, or an SMTP provider on
+  a port Render does not block (for example 2525), are alternatives that need no code change.
+- **Tests.** Resend request shape and headers, the sender swap, error bodies (JSON and not), timeout
+  and network errors, precedence over SMTP, and the new SMTP timeouts.
+
+### D99. The seed only creates local-only demo monitors for a local database
+
+- **Why.** Seeding a hosted database (the live demo) created three monitors that cannot work there: the
+  demo target (`localhost:4011`, refused as a private target), the heartbeat (waits for the local cron
+  script) and the agent (waits for the local demo app). On the live site they were down at once and
+  opened three incidents, so the dashboard read "3 monitors need attention" from the first visit.
+- **Rule.** `npm run seed` creates them when the database is local (`localhost` / `127.0.0.1`), when
+  `SEED_DEMO_TARGET_URL` points at a public demo target, or when `SEED_LOCAL_DEMO=true`; it skips them
+  otherwise or with `SEED_LOCAL_DEMO=false`. The skipped monitors' demo file (agent key, heartbeat URL)
+  is not written either, and the output says what was skipped and how to include them.
+- **How, without renumbering.** The generators and the outage list refer to monitors by position in one
+  list, so the list is kept intact and a `SEEDED` list of positions chooses what is created.
+- **Tested** against a throwaway replica set: original seed (6 monitors), `SEED_LOCAL_DEMO=false`
+  (Example.com, GitHub, Google; status page of 3; no demo file) and the default local run (6 + file).

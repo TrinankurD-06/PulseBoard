@@ -51,6 +51,8 @@ services:
         sync: false
       - key: SMTP_PASS
         sync: false
+      - key: RESEND_API_KEY
+        sync: false # email alerts over HTTPS: the free plan blocks outbound SMTP
       - key: ALERT_FROM_EMAIL
         sync: false
       # Optional "Sign in with Google/GitHub": leave empty to hide a provider.

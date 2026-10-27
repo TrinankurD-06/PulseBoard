@@ -29,7 +29,8 @@ export function parseEnv(schema, source = process.env) {
 
 /**
  * Alert-delivery settings, used by both the API ("send test alert") and the
- * worker. Empty SMTP_HOST means "use an Ethereal test inbox" (development).
+ * worker. RESEND_API_KEY wins over SMTP; with neither set, an Ethereal test inbox
+ * is used (development).
  */
 export const alertEnvFields = {
   DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
@@ -40,6 +41,8 @@ export const alertEnvFields = {
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
+  // Email over Resend's HTTPS API. Set it where outbound SMTP is blocked (Render's free plan).
+  RESEND_API_KEY: z.string().default(''),
   ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
 };
 
@@ -49,4 +52,5 @@ export const appUrlOf = (env) => env.APP_URL ?? env.DASHBOARD_URL;
 export const alertSenderConfig = (env) => ({
   smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS },
   from: env.ALERT_FROM_EMAIL,
+  resendApiKey: env.RESEND_API_KEY || undefined,
 });

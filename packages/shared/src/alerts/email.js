@@ -59,12 +59,61 @@ export function renderEmail(alert) {
   return { subject: alert.title, html, text };
 }
 
+// A blocked or silent SMTP server must fail in seconds, not hold a job slot for
+// nodemailer's default two minutes (some hosts, e.g. Render's free plan, drop
+// outbound SMTP connections without answering).
+const SMTP_TIMEOUTS = { connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 };
+
+const RESEND_URL = 'https://api.resend.com/emails';
+const RESEND_TIMEOUT_MS = 15_000;
+// Resend only accepts a verified domain or its own test sender. The default
+// ALERT_FROM_EMAIL (alerts@pulseboard.local) is neither, so it is swapped.
+const RESEND_TEST_SENDER = 'PulseBoard <onboarding@resend.dev>';
+
+/** Sends over Resend's HTTPS API: works where outbound SMTP is blocked. */
+async function sendViaResend({ apiKey, from, to, message, fetchImpl }) {
+  let res;
+  try {
+    res = await fetchImpl(RESEND_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        from: from.includes('@pulseboard.local') ? RESEND_TEST_SENDER : from,
+        to: [to],
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      }),
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err.name === 'TimeoutError') throw new Error('Resend did not answer in time');
+    throw new Error(`Could not reach Resend: ${err.message}`);
+  }
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(
+      `Resend rejected the email (${res.status})${detail?.message ? `: ${detail.message}` : ''}`,
+    );
+  }
+  return { previewUrl: null };
+}
+
 /**
- * Email sender. With SMTP settings it uses that server; without them (local
- * development) it creates a free Ethereal test inbox, so nothing real is sent
- * and each message gets a preview URL that is logged in the incident timeline.
+ * Email sender. Order of preference:
+ * 1. `resendApiKey`: Resend's HTTPS API (works where SMTP is blocked).
+ * 2. `smtp.host`: that SMTP server.
+ * 3. Neither (local development): a free Ethereal test inbox, so nothing real
+ *    is sent and each message gets a preview URL that is logged in the
+ *    incident timeline.
  */
-export function createEmailSender({ smtp, from, logger }) {
+export function createEmailSender({
+  smtp,
+  from,
+  resendApiKey,
+  fetchImpl = globalThis.fetch,
+  logger,
+}) {
   let transporterPromise;
 
   function getTransporter() {
@@ -75,6 +124,7 @@ export function createEmailSender({ smtp, from, logger }) {
           port: smtp.port,
           secure: smtp.port === 465,
           auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+          ...SMTP_TIMEOUTS,
         });
       }
       const account = await nodemailer.createTestAccount();
@@ -84,6 +134,7 @@ export function createEmailSender({ smtp, from, logger }) {
         port: account.smtp.port,
         secure: account.smtp.secure,
         auth: { user: account.user, pass: account.pass },
+        ...SMTP_TIMEOUTS,
       });
     })().catch((err) => {
       transporterPromise = undefined; // allow a retry on the next alert
@@ -93,6 +144,15 @@ export function createEmailSender({ smtp, from, logger }) {
   }
 
   return async function sendEmail(to, alert) {
+    if (resendApiKey) {
+      return sendViaResend({
+        apiKey: resendApiKey,
+        from,
+        to,
+        message: renderEmail(alert),
+        fetchImpl,
+      });
+    }
     const transporter = await getTransporter();
     const info = await transporter.sendMail({ from, to, ...renderEmail(alert) });
     const previewUrl = nodemailer.getTestMessageUrl(info) || null;
