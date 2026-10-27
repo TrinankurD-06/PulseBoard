@@ -1334,3 +1334,28 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   worker service is removed, and so is the demo-target service: a blueprint with "a single free web
   service" has no room for it, and the seed's `localhost:4011` demo monitor is refused by a deployed API
   anyway (README says how to drop or re-point it).
+
+### D97. Pages on the new system, and the bridge removed
+
+- **Every page and component now uses tokens only.** The transitional bridge (slate and brand palette
+  aliases, chart series/heat/timing tokens, the always-true `dark:` variant) is deleted from
+  `index.css`; a sweep of `apps/client/src` finds no `slate-*`, `brand-NNN`, `emerald-*`, `red-*`,
+  `amber-*`, `sky-*`, `white`/`black`, `on-brand` or `dark:`.
+- **Dashboard** ("All quiet." / "N monitors need attention."): a 99.9 %-target `TickGauge` from the
+  share of passed checks in the sparkline data the page already loads (falls back to the share of
+  monitors up), `SteppedCards` for up / down / open incidents, a `SignalField` banner fed by
+  `useSignalFeed`, and whole-row monitor links. While anything is down the page raises the ambient
+  alert (`useAmbientAlertSignal`), which warms the background glow.
+- **Monitor detail** keeps every section; a shared hero (name headline, URL as the side phrase, status
+  and SSL badges, 30-day uptime gauge) and hairline-pill actions with "Test now" as the ring-dot
+  primary. The Health deck was restyled only: behaviour, the fold and the keyboard model are unchanged.
+- **Cost & usage:** requests sent / saved / estimated as stepped cards, per-currency costs never summed,
+  and one budget gauge per monitor with a budget whose ring turns red above 80 % (`BUDGET_GAUGE_TARGET`).
+- **Public pages:** the status page's wave is driven by status only, because the public endpoint
+  deliberately exposes no latency (D-no-leak); the landing page runs a synthetic demo signal.
+- **Deviations from "visual only", all behaviour-neutral:** page titles end in a full stop; the incident
+  filter and the monitor range filter are `aria-pressed` pill groups instead of tab/radio roles; the
+  "Avg response" summary card became corner text on the dashboard's signal banner.
+- **Open items:** deletes in alert channels and status pages still use `window.confirm` (a `Modal`
+  confirm is a follow-up), and the live-API visual pass is outstanding (the pages were checked with a
+  mocked API).

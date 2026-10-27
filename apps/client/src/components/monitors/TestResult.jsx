@@ -9,28 +9,26 @@ export default function TestResult({ result }) {
   return (
     <div
       className={cn(
-        'rounded-xl border p-4',
-        result.ok
-          ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/5'
-          : 'border-red-300 bg-red-50 dark:border-red-500/30 dark:bg-red-500/5',
+        'rounded-card border bg-transparent p-5',
+        result.ok ? 'border-line-strong' : 'border-status-down/40',
       )}
       role="status"
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <span
           className={cn(
-            'flex items-center gap-1.5 font-semibold',
-            result.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400',
+            'flex items-center gap-1.5',
+            result.ok ? 'text-status-up' : 'text-status-down',
           )}
         >
-          <Icon className="h-5 w-5" /> {result.ok ? 'Check passed' : 'Check failed'}
+          <Icon className="h-4 w-4" /> {result.ok ? 'Check passed' : 'Check failed'}
         </span>
-        {result.statusCode != null && <span className="text-sm">HTTP {result.statusCode}</span>}
-        <span className="text-sm text-slate-500">{formatMs(result.totalMs)} total</span>
+        {result.statusCode != null && (
+          <span className="font-mono text-sm text-fg">HTTP {result.statusCode}</span>
+        )}
+        <span className="font-mono text-sm text-faint">{formatMs(result.totalMs)} total</span>
       </div>
-      {result.error && (
-        <p className="mt-2 text-sm text-red-700 dark:text-red-400">{result.error}</p>
-      )}
+      {result.error && <p className="mt-2 text-sm text-status-down">{result.error}</p>}
       {result.timings && (
         <div className="mt-4">
           <TimingBar timings={result.timings} />

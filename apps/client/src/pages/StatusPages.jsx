@@ -18,6 +18,7 @@ import Button from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import RingDotCta from '../components/ui/RingDotCta.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 
@@ -35,7 +36,7 @@ function PageCard({ page, canEdit, onEdit, onDelete }) {
   return (
     <Card className="flex flex-col p-5">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-semibold">{page.title}</h3>
+        <h3 className="text-lg font-light tracking-[-0.02em] text-fg">{page.title}</h3>
         {page.isPublic ? (
           <Badge tone="green" className="gap-1">
             <Globe className="h-3 w-3" /> Public
@@ -46,16 +47,16 @@ function PageCard({ page, canEdit, onEdit, onDelete }) {
           </Badge>
         )}
       </div>
-      {page.description && <p className="mt-1 text-sm text-slate-500">{page.description}</p>}
+      {page.description && <p className="mt-1 text-sm text-muted">{page.description}</p>}
       <a
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="mt-3 inline-flex items-center gap-1 text-sm break-all text-brand-700 hover:underline dark:text-brand-400"
+        className="mt-3 inline-flex items-center gap-1 font-mono text-[13px] break-all text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
       >
         /status/{page.slug} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
       </a>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-faint">
         {page.monitorIds.length} monitor{page.monitorIds.length === 1 ? '' : 's'}
       </p>
       <div className="mt-4 flex flex-wrap gap-2 pt-1">
@@ -68,7 +69,7 @@ function PageCard({ page, canEdit, onEdit, onDelete }) {
               <Pencil className="h-4 w-4" /> Edit
             </Button>
             <Button
-              variant="ghost"
+              variant="danger"
               size="sm"
               onClick={onDelete}
               aria-label={`Delete ${page.title}`}
@@ -133,26 +134,27 @@ export default function StatusPages() {
   return (
     <>
       <PageHeader
-        title="Status pages"
-        description="Public pages that show your customers whether your services are up."
+        title="Status pages."
+        phrase="Public pages that show your customers whether your services are up."
         action={newButton}
       />
 
-      {isError && <p className="text-sm text-red-600">Couldn&apos;t load status pages.</p>}
+      {isError && <p className="text-sm text-status-down">Couldn&apos;t load status pages.</p>}
       {isPending && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1].map((i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+            <Skeleton key={i} className="h-44 rounded-card" />
           ))}
         </div>
       )}
 
       {pages?.length === 0 && (
         <EmptyState
-          icon={Globe}
           title="No status pages yet"
           description="Share uptime with your users on a page that needs no login."
-          action={newButton}
+          action={
+            canEdit && <RingDotCta onClick={() => setEditing({})}>New status page</RingDotCta>
+          }
         />
       )}
 

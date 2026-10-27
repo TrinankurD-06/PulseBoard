@@ -15,7 +15,7 @@ export default function SslBadge({ expiresAt, now }) {
 
   if (daysLeft < 0) {
     return (
-      <Badge tone="red" className="gap-1 px-2.5 py-1">
+      <Badge tone="red" className="gap-1">
         <ShieldAlert className="h-3.5 w-3.5" /> SSL expired {date}
       </Badge>
     );
@@ -23,7 +23,7 @@ export default function SslBadge({ expiresAt, now }) {
   return (
     <Badge
       tone={daysLeft <= WARN_DAYS ? 'amber' : 'green'}
-      className="gap-1 px-2.5 py-1"
+      className="gap-1"
       title={`Certificate expires ${date}`}
     >
       {daysLeft <= WARN_DAYS ? (

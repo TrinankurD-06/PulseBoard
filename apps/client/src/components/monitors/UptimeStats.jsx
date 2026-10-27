@@ -16,15 +16,18 @@ export default function UptimeStats({ uptime }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {WINDOWS.map(([key, label]) => {
-        if (!uptime) return <Skeleton key={key} className="h-[92px] rounded-xl" />;
+        if (!uptime) return <Skeleton key={key} className="h-[120px] rounded-card" />;
         const value = uptime[key];
         const level = LEVELS[uptimeLevel(value)];
         return (
-          <Card key={key} className="p-4">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold">{value == null ? '—' : `${value}%`}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-              <span className={cn('h-2 w-2 rounded-full', level.bar)} />
+          <Card key={key} className="p-5">
+            <p className="text-xs text-faint">{label}</p>
+            <p className="mt-3 text-4xl leading-none font-light tracking-[-0.03em] text-fg tabular-nums">
+              {value == null ? '—' : value}
+              {value != null && <span className="ml-0.5 text-lg text-muted">%</span>}
+            </p>
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+              <span className={cn('h-1.5 w-1.5 rounded-pill', level.bar)} />
               {level.label}
             </p>
           </Card>

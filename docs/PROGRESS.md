@@ -174,10 +174,10 @@ page wave driven by status only (the public endpoint exposes no latency), uptime
       modals, skeletons, empty states, Recharts theme)
 - [x] **V4. Radial tick gauge + stepped cards** (gauge maths unit-tested)
 - [x] **V5. Signal field** (built and tested, not yet mounted on pages) (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded)
-- [ ] **V6. App pages** (+ Health deck restyle, remove the bridge and the `dark:` variant)
-- [ ] **V7. Landing + public status page**
+- [x] **V6. App pages** (+ Health deck restyle; bridge and `dark:` variant removed, D97)
+- [x] **V7. Landing + public status page + auth** (D97)
 - [ ] **V8. QA** (screenshots 1440/390 in docs/screenshots, Lighthouse perf ≥ 85 / a11y ≥ 90)
 
 ## Resume note (UI v2)
 
-Next: V6 (pages) and V7 (landing, public status, auth), then V8 QA.
+Next: V8 QA with the live API (screenshots 1440/390 into docs/screenshots, Lighthouse, README screenshots); optional light/dark toggle; Render service for the live API (user step).

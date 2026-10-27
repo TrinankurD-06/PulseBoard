@@ -9,9 +9,9 @@ import BudgetMeter from './BudgetMeter.jsx';
 function Row({ label, children, hint }) {
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium">{children}</dd>
-      {hint && <dd className="text-xs text-slate-500">{hint}</dd>}
+      <dt className="text-xs text-faint">{label}</dt>
+      <dd className="mt-1 text-sm text-fg">{children}</dd>
+      {hint && <dd className="mt-0.5 text-xs text-faint">{hint}</dd>}
     </div>
   );
 }
@@ -47,7 +47,7 @@ export default function UsageCard({ wid, monitorId }) {
           ))}
         </div>
       )}
-      {isError && <p className="p-5 text-sm text-slate-500">Usage isn&apos;t available yet.</p>}
+      {isError && <p className="p-5 text-sm text-muted">Usage isn&apos;t available yet.</p>}
       {usage && (
         <>
           <dl className="grid grid-cols-2 gap-4 p-5">
@@ -72,9 +72,7 @@ export default function UsageCard({ wid, monitorId }) {
               </>
             ) : (
               <Row label="Cost">
-                <span className="font-normal text-slate-500">
-                  No price set (edit the monitor to add one)
-                </span>
+                <span className="text-muted">No price set (edit the monitor to add one)</span>
               </Row>
             )}
             <Row label="Request method">
@@ -83,8 +81,8 @@ export default function UsageCard({ wid, monitorId }) {
           </dl>
           <BudgetBar usage={usage} />
           {usage.headUnsupported && (
-            <p className="mx-5 mb-5 flex gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-              <Info className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+            <p className="mx-5 mb-5 flex gap-2 rounded-card border border-line px-4 py-3 text-xs text-muted">
+              <Info className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
               This server doesn&apos;t support HEAD requests, so checks use GET (headers only, the
               body is not downloaded).
             </p>

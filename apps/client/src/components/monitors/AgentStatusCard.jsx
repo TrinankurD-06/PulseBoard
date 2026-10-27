@@ -12,20 +12,20 @@ import { formatCount, formatDuration, hostOf } from '../../lib/format.js';
 import Card, { CardHeader } from '../ui/Card.jsx';
 
 const AGENT_STATE_STYLE = {
-  reporting: { dot: 'bg-status-up', text: 'text-emerald-700 dark:text-emerald-400' },
-  waiting: { dot: 'bg-status-pending', text: 'text-amber-700 dark:text-amber-400' },
-  late: { dot: 'bg-status-pending', text: 'text-amber-700 dark:text-amber-400' },
-  probing: { dot: 'bg-status-pending', text: 'text-amber-700 dark:text-amber-400' },
-  degraded: { dot: 'bg-status-pending', text: 'text-amber-700 dark:text-amber-400' },
-  silent: { dot: 'bg-status-down', text: 'text-red-700 dark:text-red-400' },
-  paused: { dot: 'bg-status-paused', text: 'text-slate-500' },
+  reporting: { dot: 'bg-status-up', text: 'text-status-up' },
+  waiting: { dot: 'bg-status-degraded', text: 'text-status-degraded' },
+  late: { dot: 'bg-status-degraded', text: 'text-status-degraded' },
+  probing: { dot: 'bg-status-degraded', text: 'text-status-degraded' },
+  degraded: { dot: 'bg-status-degraded', text: 'text-status-degraded' },
+  silent: { dot: 'bg-status-down', text: 'text-status-down' },
+  paused: { dot: 'bg-status-paused', text: 'text-muted' },
 };
 
 function Detail({ label, children }) {
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
+      <dt className="text-xs text-faint">{label}</dt>
+      <dd className="mt-1 text-sm break-words text-fg">{children}</dd>
     </div>
   );
 }
@@ -36,14 +36,11 @@ export function RequestsSaved({ usage, monitor }) {
     usage?.requestsSaved ??
     requestsSavedVsPolling(estimateAgentMonthlyRequests(monitor.externalCheckEverySec));
   return (
-    <p className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-100">
-      <PiggyBank
-        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-        aria-hidden="true"
-      />
+    <p className="flex items-start gap-2 rounded-card border border-line px-4 py-3 text-sm text-muted">
+      <PiggyBank className="mt-0.5 h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
       <span>
-        <span className="font-semibold tabular-nums">≈ {formatCount(saved)}</span> requests/month
-        saved vs 1-minute polling
+        <span className="font-mono text-fg">≈ {formatCount(saved)}</span> requests/month saved vs
+        1-minute polling
       </span>
     </p>
   );
@@ -63,7 +60,7 @@ export default function AgentStatusCard({ wid, monitor, lastReport, now }) {
     <Card>
       <CardHeader title="Reports" />
       <div className="space-y-4 p-5">
-        <p className={cn('flex items-center gap-2 text-sm font-medium', style.text)} role="status">
+        <p className={cn('flex items-center gap-2 text-sm', style.text)} role="status">
           <span className={cn('h-2 w-2 shrink-0 rounded-full', style.dot)} aria-hidden="true" />
           {text}
         </p>

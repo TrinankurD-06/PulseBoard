@@ -17,9 +17,9 @@ const time = (t) => new Date(t).toLocaleString();
 const formatRate = (value) => (value == null ? '—' : `${value}/min`);
 
 const LATENCY_SERIES = [
-  { key: 'p50Ms', label: 'p50', color: 'var(--color-series-1)' },
-  { key: 'p95Ms', label: 'p95', color: 'var(--color-series-2)', dash: '6 3' },
-  { key: 'p99Ms', label: 'p99', color: 'var(--color-series-3)', dash: '2 3' },
+  { key: 'p50Ms', label: 'p50', color: 'var(--text)' },
+  { key: 'p95Ms', label: 'p95', color: 'var(--text-muted)', dash: '6 3' },
+  { key: 'p99Ms', label: 'p99', color: 'var(--text-faint)', dash: '2 3' },
 ];
 
 function TopRoutes({ routes, isPending }) {
@@ -31,45 +31,47 @@ function TopRoutes({ routes, isPending }) {
       />
       {isPending && <Skeleton className="m-5 h-24" />}
       {!isPending && routes.length === 0 && (
-        <p className="p-5 text-sm text-slate-500">No traffic in this range.</p>
+        <p className="p-5 text-sm text-muted">No traffic in this range.</p>
       )}
       {!isPending && routes.length > 0 && (
         <div className="overflow-x-auto p-5">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-slate-500">
+            <thead className="text-[11px] text-faint">
               <tr>
-                <th scope="col" className="py-2 pr-4 font-medium">
+                <th scope="col" className="py-2 pr-4 font-normal">
                   Route
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-medium">
+                <th scope="col" className="py-2 pr-4 text-right font-normal">
                   Requests
                 </th>
-                <th scope="col" className="py-2 pr-4 text-right font-medium">
+                <th scope="col" className="py-2 pr-4 text-right font-normal">
                   5xx
                 </th>
-                <th scope="col" className="py-2 text-right font-medium">
+                <th scope="col" className="py-2 text-right font-normal">
                   p95
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-line">
               {routes.map((route) => (
                 <tr key={route.route}>
                   <td
-                    className="max-w-xs truncate py-1.5 pr-4 font-mono text-xs"
+                    className="max-w-xs truncate py-1.5 pr-4 font-mono text-xs text-muted"
                     title={route.route}
                   >
                     {route.route}
                   </td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">
+                  <td className="py-1.5 pr-4 text-right font-mono text-xs text-muted">
                     {formatCount(route.requests)}
                   </td>
                   <td
-                    className={`py-1.5 pr-4 text-right tabular-nums ${route.errors5xx > 0 ? 'font-medium text-red-700 dark:text-red-400' : ''}`}
+                    className={`py-1.5 pr-4 text-right font-mono text-xs ${route.errors5xx > 0 ? 'text-status-down' : 'text-muted'}`}
                   >
                     {formatCount(route.errors5xx)}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums">{formatMs(route.p95Ms)}</td>
+                  <td className="py-1.5 text-right font-mono text-xs text-muted">
+                    {formatMs(route.p95Ms)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -167,7 +169,7 @@ export default function AgentAnalytics({ wid, monitor, now }) {
               data={rows}
               rangeMs={rangeMs}
               format={formatRate}
-              series={[{ key: 'perMinute', label: 'Requests', color: 'var(--color-series-1)' }]}
+              series={[{ key: 'perMinute', label: 'Requests', color: 'var(--text)' }]}
             />,
           )}
         </ChartCard>
@@ -202,7 +204,7 @@ export default function AgentAnalytics({ wid, monitor, now }) {
               data={rows}
               rangeMs={rangeMs}
               format={formatPercent}
-              series={[{ key: 'errorRate', label: '5xx rate', color: 'var(--color-series-1)' }]}
+              series={[{ key: 'errorRate', label: '5xx rate', color: 'var(--text)' }]}
               thresholds={[
                 {
                   value: monitor.errorRateThreshold,

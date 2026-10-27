@@ -43,7 +43,7 @@ function RaiseBudgetModal({ open, onClose, wid, monitor, used, budget }) {
   return (
     <Modal open={open} onClose={onClose} title="Raise the monthly budget">
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted">
           {formatCount(used)} of {formatCount(budget)} requests used this month. A budget above
           what&apos;s used lifts the {isPausedByBudget(monitor) ? 'pause' : 'slow-down'} right away.
         </p>
@@ -118,22 +118,20 @@ export default function BudgetBanner({ wid, monitor, canEdit }) {
     <div
       role="status"
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3',
-        tone === 'red'
-          ? 'border-red-200 bg-red-50 text-red-950 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100'
-          : 'border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
+        'flex flex-wrap items-center gap-3 rounded-card border bg-transparent px-5 py-4',
+        tone === 'red' ? 'border-status-down/40' : 'border-status-degraded/40',
       )}
     >
       <Icon
         className={cn(
-          'h-5 w-5 shrink-0',
-          tone === 'red' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400',
+          'h-4 w-4 shrink-0',
+          tone === 'red' ? 'text-status-down' : 'text-status-degraded',
         )}
         aria-hidden="true"
       />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">{title}</p>
-        <p className="text-sm opacity-90">{text}</p>
+        <p className="text-fg">{title}</p>
+        <p className="mt-1 text-sm text-muted">{text}</p>
       </div>
       {canEdit && summary && (
         <Button variant="secondary" size="sm" onClick={() => setRaising(true)}>

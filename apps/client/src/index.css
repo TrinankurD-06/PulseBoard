@@ -3,11 +3,6 @@
 @import 'shadcn/tailwind.css';
 @import './styles/tokens.css';
 
-/* The UI is dark only (D94), so `dark:` always applies. This keeps the
-   remaining `dark:` classes working until each page is rebuilt on the new
-   tokens; the variant is deleted with the bridge below. */
-@custom-variant dark (&:where(*));
-
 /* Tokens → Tailwind utilities. `inline` makes each utility read the variable
    at runtime. */
 @theme inline {
@@ -75,45 +70,6 @@
   --color-sidebar-accent-foreground: var(--text);
   --color-sidebar-border: var(--line);
   --color-sidebar-ring: var(--accent);
-}
-
-/* -- Transitional bridge (deleted when the pages are rebuilt, phase 6) --------
-   Pages not yet rebuilt still use Tailwind palette classes (slate-*, brand-*).
-   They are pointed at the new neutrals and the cream accent so the app stays
-   readable in between. Nothing new may use these. */
-@theme {
-  --color-slate-50: #ecead6;
-  --color-slate-100: #e3e1ce;
-  --color-slate-200: #cfcdba;
-  --color-slate-300: #bab8a6;
-  --color-slate-400: #a3a193;
-  --color-slate-500: #7c7b71;
-  --color-slate-600: #5d5c54;
-  --color-slate-700: #3d3d38;
-  --color-slate-800: #232320;
-  --color-slate-900: #121211;
-  --color-slate-950: #0a0a09;
-
-  --color-brand-50: #f6f8dc;
-  --color-brand-100: #eff3c4;
-  --color-brand-200: #e3e8a8;
-  --color-brand-300: #e3e8a8;
-  --color-brand-400: #e3e8a8;
-  --color-brand-500: #e3e8a8;
-  --color-brand-600: #e3e8a8;
-  --color-brand-700: #cdd38d;
-  --color-brand-800: #8f9460;
-  --color-brand-900: #55583a;
-  --color-brand-950: #2b2d1d;
-  --color-on-brand: #0a0a09;
-
-  /* Series tokens: still read by the agent analytics page until it is rebuilt. */
-  --color-series-1: var(--text);
-  --color-series-2: var(--text-muted);
-  --color-series-3: var(--text-faint);
-  --color-chart-surface: var(--bg);
-  --color-chart-grid: var(--line);
-  --color-chart-axis: var(--text-faint);
 }
 
 @layer base {

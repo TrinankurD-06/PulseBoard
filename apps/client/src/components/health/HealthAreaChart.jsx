@@ -15,18 +15,13 @@ import { svgId } from '../charts/chartTheme.js';
 import { isolatedDot } from './isolatedDot.jsx';
 import { tooltipBox } from './tooltipStyles.js';
 
-function SquareMarker({ cx, cy }) {
+function RingMarker({ cx, cy }) {
   if (cx == null || cy == null) return null;
   return (
-    <rect
-      x={cx - 4}
-      y={cy - 4}
-      width={8}
-      height={8}
-      fill="var(--color-fg)"
-      stroke="var(--color-surface)"
-      strokeWidth={2}
-    />
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill="var(--bg)" stroke="var(--text-faint)" strokeWidth={1} />
+      <circle cx={cx} cy={cy} r={2.25} fill="var(--accent)" />
+    </g>
   );
 }
 
@@ -66,8 +61,8 @@ export default function HealthAreaChart({ series, unit, range }) {
         >
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-fg)" stopOpacity={0.18} />
-              <stop offset="100%" stopColor="var(--color-fg)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--text)" stopOpacity={0.1} />
+              <stop offset="100%" stopColor="var(--text)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid {...gridProps} />
@@ -88,19 +83,18 @@ export default function HealthAreaChart({ series, unit, range }) {
           />
           <Tooltip
             content={<ChartTooltip unit={unit} />}
-            cursor={{ stroke: 'var(--color-fg)', strokeOpacity: 0.35, strokeWidth: 1 }}
+            cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
             isAnimationActive={false}
           />
           <Area
             type="monotone"
             dataKey="v"
-            stroke="var(--color-fg)"
-            strokeOpacity={0.8}
-            strokeWidth={1.5}
+            stroke="var(--text)"
+            strokeWidth={1.25}
             fill={`url(#${id})`}
             connectNulls={false}
             dot={isolatedDot(series)}
-            activeDot={<SquareMarker />}
+            activeDot={<RingMarker />}
             isAnimationActive={false}
           />
         </AreaChart>

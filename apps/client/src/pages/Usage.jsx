@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Receipt } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspaceUsage } from '../api/usage.js';
@@ -6,10 +6,11 @@ import BudgetMeter from '../components/monitors/BudgetMeter.jsx';
 import StatusBadge from '../components/monitors/StatusBadge.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/ui/Badge.jsx';
-import Button from '../components/ui/Button.jsx';
-import Card, { CardHeader } from '../components/ui/Card.jsx';
+import Card from '../components/ui/Card.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
-import { inputClasses } from '../components/ui/Field.jsx';
+import RingDotCta from '../components/ui/RingDotCta.jsx';
+import SteppedCards from '../components/ui/SteppedCards.jsx';
+import TickGauge from '../components/gauge/TickGauge.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 import { cn } from '../lib/cn.js';
@@ -26,52 +27,44 @@ import {
   usageInterval,
 } from '../lib/usage.js';
 
-function Tile({ label, value, hint }) {
-  return (
-    <Card className="p-5">
-      <p className="text-sm text-slate-500">{label}</p>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-    </Card>
-  );
-}
+// Budget gauges turn red above this share of the monthly request budget
+// (target 80 with direction 'below': the value is healthy while it stays below).
+const BUDGET_GAUGE_TARGET = 80;
 
-function CostTile({ totals, isCurrentMonth }) {
+/** Cost per currency, never summed: each currency is its own line. */
+function CostSummary({ totals, isCurrentMonth }) {
   const costs = totals.costByCurrency ?? [];
-  if (costs.length === 0) {
-    return (
-      <Tile
-        label="Cost"
-        value={<span className="text-base font-normal text-slate-500">No prices set</span>}
-        hint="Add a price per 1,000 requests when editing a monitor."
-      />
-    );
-  }
   return (
-    <Card className="p-5">
-      <p className="text-sm text-slate-500">{isCurrentMonth ? 'Cost so far' : 'Cost'}</p>
-      <ul className="mt-2 space-y-1">
-        {costs.map((c) => (
-          <li key={c.currency}>
-            <span className="text-2xl font-semibold tabular-nums">
-              {formatCurrency(c.actual, c.currency)}
-            </span>
-            {isCurrentMonth && (
-              <span className="ml-2 text-xs text-slate-500">
-                ≈ {formatCurrency(c.estimatedMonthly, c.currency)} / month
+    <Card className="mt-8 p-6">
+      <p className="text-[11px] text-faint">{isCurrentMonth ? 'Cost so far' : 'Cost'}</p>
+      {costs.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">
+          No prices set. Add a price per 1,000 requests when editing a monitor.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {costs.map((c) => (
+            <li key={c.currency} className="flex flex-wrap items-baseline gap-x-4">
+              <span className="text-4xl font-light tracking-[-0.03em] text-fg tabular-nums">
+                {formatCurrency(c.actual, c.currency)}
               </span>
-            )}
-          </li>
-        ))}
-      </ul>
+              {isCurrentMonth && (
+                <span className="font-mono text-xs text-faint">
+                  ≈ {formatCurrency(c.estimatedMonthly, c.currency)} / month
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {costs.length > 1 && (
-        <p className="mt-1 text-xs text-slate-500">Each currency is totalled separately.</p>
+        <p className="mt-3 text-xs text-faint">Each currency is totalled separately.</p>
       )}
     </Card>
   );
 }
 
-/** Sortable column header: a real button, with aria-sort on the cell. */
+/** Sortable column header: a text button, with aria-sort on the cell. */
 function SortHeader({ label, column, sort, onSort, align = 'left' }) {
   const active = sort.key === column;
   const Icon = !active ? ArrowUpDown : sort.direction === 'asc' ? ArrowUp : ArrowDown;
@@ -79,18 +72,18 @@ function SortHeader({ label, column, sort, onSort, align = 'left' }) {
     <th
       scope="col"
       aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className={cn('px-4 py-2.5 font-medium', align === 'right' && 'text-right')}
+      className={cn('px-4 py-3 font-normal', align === 'right' && 'text-right')}
     >
       <button
         type="button"
         onClick={() => onSort(column)}
         className={cn(
-          'inline-flex items-center gap-1 rounded hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none dark:hover:text-slate-100',
-          active && 'text-slate-900 dark:text-slate-100',
+          'inline-flex items-center gap-1 rounded-pill transition-colors duration-200 hover:text-fg',
+          active && 'text-fg',
         )}
       >
         {label}
-        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+        <Icon className="h-3 w-3" aria-hidden="true" />
       </button>
     </th>
   );
@@ -98,7 +91,7 @@ function SortHeader({ label, column, sort, onSort, align = 'left' }) {
 
 function PlainHeader({ children, align = 'left' }) {
   return (
-    <th scope="col" className={cn('px-4 py-2.5 font-medium', align === 'right' && 'text-right')}>
+    <th scope="col" className={cn('px-4 py-3 font-normal', align === 'right' && 'text-right')}>
       {children}
     </th>
   );
@@ -118,11 +111,11 @@ function UsageRow({ row, wid, isCurrentMonth }) {
   const received = receivedText(row);
 
   return (
-    <tr className="border-t border-slate-200 align-top dark:border-slate-800">
+    <tr className="border-t border-line align-top transition-colors duration-200 hover:bg-surface">
       <th scope="row" className="px-4 py-3 text-left font-normal">
         <Link
           to={`/app/${wid}/monitors/${row.id}`}
-          className="font-medium hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+          className="text-fg transition-colors duration-200 hover:text-brand"
         >
           {row.name}
         </Link>
@@ -133,7 +126,7 @@ function UsageRow({ row, wid, isCurrentMonth }) {
       <td className="px-4 py-3">
         <StatusBadge status={row.status} />
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-4 py-3 font-mono text-[13px] whitespace-nowrap text-muted">
         {interval.label}
         {interval.markers.map((marker) => (
           <Badge key={marker} tone={marker === 'adaptive' ? 'blue' : 'amber'} className="ml-1.5">
@@ -141,23 +134,23 @@ function UsageRow({ row, wid, isCurrentMonth }) {
           </Badge>
         ))}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">
+      <td className="px-4 py-3 text-right font-mono text-[13px] text-fg tabular-nums">
         {formatCount(row.requests)}
         {isCurrentMonth && row.estimatedMonthlyRequests > 0 && (
-          <div className="text-xs text-slate-500">
+          <div className="text-[11px] text-faint">
             ≈ {formatCount(row.estimatedMonthlyRequests)} / month
           </div>
         )}
-        {received && <div className="text-xs text-slate-500">{received}</div>}
+        {received && <div className="text-[11px] text-faint">{received}</div>}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">
+      <td className="px-4 py-3 text-right font-mono text-[13px] text-fg tabular-nums">
         {cost == null ? (
-          <span className="text-slate-500">No price</span>
+          <span className="text-faint">No price</span>
         ) : (
           <>
             {formatCurrency(cost, row.currency)}
             {isCurrentMonth && row.actualCost != null && (
-              <div className="text-xs text-slate-500">
+              <div className="text-[11px] text-faint">
                 {formatCurrency(row.actualCost, row.currency)} so far
               </div>
             )}
@@ -168,10 +161,12 @@ function UsageRow({ row, wid, isCurrentMonth }) {
         {budget ? (
           <BudgetMeter summary={budget} compact />
         ) : (
-          <span className="text-slate-500">No budget</span>
+          <span className="text-faint">No budget</span>
         )}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">{formatCount(row.requestsSaved)}</td>
+      <td className="px-4 py-3 text-right font-mono text-[13px] text-fg tabular-nums">
+        {formatCount(row.requestsSaved)}
+      </td>
     </tr>
   );
 }
@@ -195,14 +190,14 @@ export default function Usage() {
 
   const monthPicker = (
     <div>
-      <label htmlFor="usage-month" className="mb-1.5 block text-sm font-medium">
+      <label htmlFor="usage-month" className="sr-only">
         Month
       </label>
       <select
         id="usage-month"
         value={month}
         onChange={(event) => setParams({ month: event.target.value })}
-        className={cn(inputClasses, 'w-44')}
+        className="h-8 cursor-pointer rounded-pill border border-line bg-transparent px-3.5 text-[13px] text-muted transition-colors duration-200 hover:border-line-strong hover:text-fg [&>option]:bg-bg [&>option]:text-fg"
       >
         {options.map((m) => (
           <option key={m} value={m}>
@@ -214,75 +209,99 @@ export default function Usage() {
     </div>
   );
 
+  const budgetRows = data ? rows.filter((row) => usageBudget(row)) : [];
+
   return (
     <>
       <PageHeader
-        title="Cost & usage"
-        description="Requests PulseBoard sent to your servers, what they cost, and what push monitoring saved."
+        title="Cost & usage."
+        phrase="Requests PulseBoard sent to your servers, what they cost, and what push monitoring saved."
         action={monthPicker}
       />
 
-      {isError && <p className="text-sm text-red-600">Couldn&apos;t load usage.</p>}
+      {isError && <p className="text-sm text-status-down">Couldn&apos;t load usage.</p>}
 
       {isPending && (
         <>
-          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[118px] rounded-xl" />
+          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-56 rounded-card" />
             ))}
           </div>
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-card" />
         </>
       )}
 
       {data && totals.monitors === 0 && (
         <EmptyState
-          icon={Receipt}
           title="No monitors yet"
           description="Usage and costs appear here once you add a monitor."
           action={
-            can('member') && (
-              <Link to={`/app/${wid}/monitors/new`}>
-                <Button>
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  New monitor
-                </Button>
-              </Link>
-            )
+            can('member') && <RingDotCta to={`/app/${wid}/monitors/new`}>New monitor</RingDotCta>
           }
         />
       )}
 
       {data && totals.monitors > 0 && (
         <div className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Tile
-              label={isCurrentMonth ? 'Requests sent this month' : 'Requests sent'}
-              value={formatCount(totals.requests)}
-              hint={`Received from your side: ${formatCount(totals.pings)} pings, ${formatCount(totals.reports)} agent reports`}
-            />
-            <Tile
-              label="Requests saved"
-              value={formatCount(totals.requestsSaved)}
-              hint="Compared with checking every monitor once a minute"
-            />
-            <Tile
-              label="Estimated monthly requests"
-              value={`≈ ${formatCount(totals.estimatedMonthlyRequests)}`}
-              hint="At the current intervals"
-            />
-            <CostTile totals={totals} isCurrentMonth={isCurrentMonth} />
-          </div>
+          <SteppedCards
+            items={[
+              {
+                value: totals.requests,
+                label: isCurrentMonth ? 'Requests sent this month' : 'Requests sent',
+                description: `Received from your side: ${formatCount(totals.pings)} pings, ${formatCount(totals.reports)} agent reports`,
+              },
+              {
+                value: totals.requestsSaved,
+                label: 'Requests saved',
+                description: 'Compared with checking every monitor once a minute',
+              },
+              {
+                value: totals.estimatedMonthlyRequests,
+                label: 'Estimated monthly requests',
+                description: 'At the current intervals, about this many a month',
+              },
+            ]}
+          />
 
-          <Card>
-            <CardHeader
-              title="Per monitor"
-              description={`${formatMonth(month)} · ${byTypeSentence(totals.byType)}`}
-            />
+          <CostSummary totals={totals} isCurrentMonth={isCurrentMonth} />
+
+          {budgetRows.length > 0 && (
+            <section aria-label="Monthly request budgets" className="mt-12">
+              <h2 className="mb-6 text-[11px] text-faint">Monthly request budgets</h2>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
+                {budgetRows.map((row) => {
+                  const budget = usageBudget(row);
+                  return (
+                    <div key={row.id}>
+                      <TickGauge
+                        value={budget.percent}
+                        target={BUDGET_GAUGE_TARGET}
+                        thresholdDirection="below"
+                        size={200}
+                        label="of budget"
+                        caption={`${formatCount(budget.used)} of ${formatCount(budget.budget)}`}
+                        ariaLabel={`${row.name}: ${budget.percent}% of the monthly request budget used`}
+                      />
+                      <p className="mt-3 truncate text-center text-sm text-muted">{row.name}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section className="mt-12">
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+              <h2 className="text-lg font-light tracking-[-0.02em] text-fg">Per monitor</h2>
+              <p className="text-[11px] text-faint">
+                {formatMonth(month)} · {byTypeSentence(totals.byType)}
+              </p>
+            </div>
             {/* Wide table: it scrolls inside the card on small screens, never the page. */}
             {/* Focusable so keyboard users can scroll it too. */}
             <div
-              className="overflow-x-auto focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none focus-visible:ring-inset"
+              className="overflow-x-auto border-y border-line"
               role="region"
               aria-label="Usage per monitor"
               tabIndex={0}
@@ -291,7 +310,7 @@ export default function Usage() {
                 <caption className="sr-only">
                   Requests, cost, budget and savings per monitor for {formatMonth(month)}
                 </caption>
-                <thead className="text-left text-xs text-slate-500">
+                <thead className="text-left text-[11px] text-faint">
                   <tr>
                     <SortHeader
                       label="Monitor"
@@ -326,12 +345,12 @@ export default function Usage() {
                 </tbody>
               </table>
             </div>
-            <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500 dark:border-slate-800">
+            <p className="mt-4 max-w-[70ch] text-[11px] text-faint">
               Heartbeat pings and agent reports are sent by your own jobs and apps, so they put no
               load on your servers. Agent monitors only count the probes PulseBoard sends when an
               agent goes silent.
             </p>
-          </Card>
+          </section>
         </div>
       )}
     </>

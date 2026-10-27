@@ -9,7 +9,7 @@ export default function TimingBar({ timings }) {
   return (
     <div>
       <div
-        className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        className="flex h-1.5 w-full overflow-hidden rounded-pill bg-surface-2"
         role="img"
         aria-label={TIMING_PHASES.map((p) => `${p.label} ${formatMs(timings[p.key])}`).join(', ')}
       >
@@ -28,11 +28,9 @@ export default function TimingBar({ timings }) {
       <dl className="mt-3 grid grid-cols-3 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
         {TIMING_PHASES.map((phase) => (
           <div key={phase.key} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: phase.color }} />
-            <dt className="text-slate-500">{phase.label}</dt>
-            <dd className="ml-auto font-medium tabular-nums sm:ml-0">
-              {formatMs(timings[phase.key])}
-            </dd>
+            <span className="h-1.5 w-1.5 rounded-pill" style={{ backgroundColor: phase.color }} />
+            <dt className="text-faint">{phase.label}</dt>
+            <dd className="ml-auto font-mono text-fg sm:ml-0">{formatMs(timings[phase.key])}</dd>
           </div>
         ))}
       </dl>

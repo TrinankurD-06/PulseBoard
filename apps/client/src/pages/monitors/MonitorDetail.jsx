@@ -1,18 +1,9 @@
 import { ROLES } from '@pulseboard/shared/constants';
-import {
-  Activity,
-  ArrowLeft,
-  Cpu,
-  ExternalLink,
-  FlaskConical,
-  Pause,
-  Pencil,
-  Play,
-  Trash2,
-} from 'lucide-react';
+import { Activity, ArrowLeft, Cpu, ExternalLink, Pause, Pencil, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useUptime } from '../../api/analytics.js';
 import { errorMessage } from '../../api/http.js';
 import { useIncidents } from '../../api/incidents.js';
 import {
@@ -37,8 +28,10 @@ import StatusBadge from '../../components/monitors/StatusBadge.jsx';
 import TestResult from '../../components/monitors/TestResult.jsx';
 import TimingBar from '../../components/monitors/TimingBar.jsx';
 import UsageCard from '../../components/monitors/UsageCard.jsx';
+import TickGauge from '../../components/gauge/TickGauge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
+import RingDotCta from '../../components/ui/RingDotCta.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
@@ -49,11 +42,50 @@ import { isAgent } from '../../lib/agent.js';
 import { isHeartbeat } from '../../lib/heartbeat.js';
 import NotFound from '../NotFound.jsx';
 
+/** Back link, the monitor name as a display headline (URL or summary as the muted phrase), uptime gauge, actions. */
+function MonitorHero({ wid, monitor, phrase, badges, actions }) {
+  const { data: uptime } = useUptime(wid, monitor.id);
+  const value = uptime ? (uptime.d30 ?? uptime.d7 ?? uptime.h24) : null;
+  return (
+    <>
+      <Link
+        to={`/app/${wid}`}
+        className="inline-flex items-center gap-1.5 text-[13px] text-faint transition-colors duration-200 hover:text-fg"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> All monitors
+      </Link>
+
+      <div className="grid items-center gap-10 lg:grid-cols-[1fr_minmax(0,17rem)]">
+        <div className="min-w-0">
+          <h1 className="text-[clamp(32px,4.5vw,56px)] leading-[1.05] font-light tracking-[-0.03em] break-words text-fg">
+            {monitor.name}
+          </h1>
+          <div className="mt-3 text-sm text-muted">{phrase}</div>
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">{badges}</div>
+          {actions && <div className="mt-8">{actions}</div>}
+        </div>
+        {value != null ? (
+          <TickGauge
+            value={value}
+            target={99.9}
+            label="Uptime"
+            caption="Last 30 days"
+            decimals={value >= 99.95 || value < 99 ? 1 : 2}
+            size={272}
+          />
+        ) : (
+          <div className="mx-auto aspect-square w-full max-w-60" aria-hidden="true" />
+        )}
+      </div>
+    </>
+  );
+}
+
 function Detail({ label, children }) {
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
+      <dt className="text-xs text-faint">{label}</dt>
+      <dd className="mt-1 text-sm break-words text-fg">{children}</dd>
     </div>
   );
 }
@@ -69,7 +101,7 @@ function MonitorIncidents({ wid, monitorId, now }) {
           data?.pagination.total > 5 && (
             <Link
               to={`/app/${wid}/incidents?status=all`}
-              className="text-sm text-brand-600 hover:underline dark:text-brand-400"
+              className="text-sm text-muted underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg"
             >
               View all
             </Link>
@@ -77,7 +109,7 @@ function MonitorIncidents({ wid, monitorId, now }) {
         }
       />
       {incidents?.length === 0 && (
-        <p className="p-5 text-sm text-slate-500">No incidents recorded for this monitor.</p>
+        <p className="p-5 text-sm text-muted">No incidents recorded for this monitor.</p>
       )}
       {incidents?.length > 0 && (
         <div className="space-y-3 p-5">
@@ -133,16 +165,17 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
       {canTest && (
-        <Button variant="secondary" loading={testNow.isPending} onClick={onTest}>
-          {!testNow.isPending && <FlaskConical className="h-4 w-4" />} Test now
-        </Button>
+        <RingDotCta loading={testNow.isPending} onClick={onTest}>
+          Test now
+        </RingDotCta>
       )}
       {monitor.isPaused && isPausedByBudget(monitor) ? (
         // The API refuses (409 BUDGET_EXCEEDED) until the budget is raised.
         <Button
           variant="secondary"
+          size="sm"
           disabled
           title="Paused by the monthly request budget: raise the budget to resume"
           aria-describedby="resume-budget-note"
@@ -155,6 +188,7 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
       ) : monitor.isPaused ? (
         <Button
           variant="secondary"
+          size="sm"
           loading={resume.isPending}
           onClick={run(resume, 'Monitoring resumed')}
         >
@@ -163,6 +197,7 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
       ) : (
         <Button
           variant="secondary"
+          size="sm"
           loading={pause.isPending}
           onClick={run(pause, 'Monitor paused')}
         >
@@ -171,11 +206,11 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
       )}
       <Link
         to={`/app/${wid}/monitors/${monitor.id}/edit`}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+        className="inline-flex h-8 items-center justify-center gap-2 rounded-pill border border-line-strong px-3.5 text-[13px] font-medium whitespace-nowrap text-fg transition-colors duration-200 ease-(--ease) hover:border-fg hover:bg-surface-2"
       >
         <Pencil className="h-4 w-4" /> Edit
       </Link>
-      <Button variant="danger" loading={remove.isPending} onClick={onDelete}>
+      <Button variant="danger" size="sm" loading={remove.isPending} onClick={onDelete}>
         <Trash2 className="h-4 w-4" /> Delete
       </Button>
     </div>
@@ -189,28 +224,20 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
  */
 function HeartbeatDetail({ monitor, wid, canEdit, now }) {
   return (
-    <div className="space-y-6">
-      <Link
-        to={`/app/${wid}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-4 w-4" /> All monitors
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
-            <StatusBadge status={monitor.status} />
-          </div>
-          <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
+    <div className="space-y-10">
+      <MonitorHero
+        wid={wid}
+        monitor={monitor}
+        phrase={
+          <span className="inline-flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Heartbeat · expects a ping every {formatDuration(monitor.expectedEverySec)}
             {monitor.graceSec ? ` (+${formatDuration(monitor.graceSec)} grace)` : ''}
-          </p>
-        </div>
-        {canEdit && <Actions monitor={monitor} wid={wid} canTest={false} />}
-      </div>
+          </span>
+        }
+        badges={<StatusBadge status={monitor.status} />}
+        actions={canEdit && <Actions monitor={monitor} wid={wid} canTest={false} />}
+      />
 
       <HealthDeck wid={wid} monitorId={monitor.id} />
 
@@ -236,34 +263,28 @@ function HeartbeatDetail({ monitor, wid, canEdit, now }) {
 function AgentDetail({ monitor, wid, canEdit, now }) {
   const [testResult, setTestResult] = useState(null);
   return (
-    <div className="space-y-6">
-      <Link
-        to={`/app/${wid}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-4 w-4" /> All monitors
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
-            <StatusBadge status={monitor.status} />
-          </div>
-          <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
+    <div className="space-y-10">
+      <MonitorHero
+        wid={wid}
+        monitor={monitor}
+        phrase={
+          <span className="inline-flex items-center gap-1.5">
             <Cpu className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             App agent · reports every {formatDuration(monitor.reportEverySec)}
-          </p>
-        </div>
-        {canEdit && (
-          <Actions
-            monitor={monitor}
-            wid={wid}
-            onTestResult={setTestResult}
-            canTest={Boolean(monitor.probeUrl)}
-          />
-        )}
-      </div>
+          </span>
+        }
+        badges={<StatusBadge status={monitor.status} />}
+        actions={
+          canEdit && (
+            <Actions
+              monitor={monitor}
+              wid={wid}
+              onTestResult={setTestResult}
+              canTest={Boolean(monitor.probeUrl)}
+            />
+          )
+        }
+      />
 
       <HealthDeck wid={wid} monitorId={monitor.id} />
 
@@ -289,12 +310,12 @@ export default function MonitorDetail() {
   useDocumentTitle(monitor?.name);
 
   if (error?.response?.status === 404) return <NotFound message="This monitor doesn't exist." />;
-  if (error) return <p className="text-sm text-red-600">Couldn&apos;t load this monitor.</p>;
+  if (error) return <p className="text-sm text-status-down">Couldn&apos;t load this monitor.</p>;
   if (isPending) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-16" />
-        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-card" />
       </div>
     );
   }
@@ -309,32 +330,30 @@ export default function MonitorDetail() {
   const headerNames = Object.keys(monitor.headers ?? {});
 
   return (
-    <div className="space-y-6">
-      <Link
-        to={`/app/${wid}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-4 w-4" /> All monitors
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
-            <StatusBadge status={monitor.status} />
-            <SslBadge expiresAt={monitor.sslExpiresAt} now={now} />
-          </div>
+    <div className="space-y-10">
+      <MonitorHero
+        wid={wid}
+        monitor={monitor}
+        phrase={
           <a
             href={monitor.url}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-flex max-w-full items-center gap-1 text-sm break-all text-slate-500 hover:text-brand-600 dark:hover:text-brand-400"
+            className="inline-flex max-w-full items-center gap-1.5 font-mono text-[13px] break-all text-muted transition-colors hover:text-fg"
           >
             {monitor.method} {monitor.url} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
           </a>
-        </div>
-        {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} onTestResult={setTestResult} />}
-      </div>
+        }
+        badges={
+          <>
+            <StatusBadge status={monitor.status} />
+            <SslBadge expiresAt={monitor.sslExpiresAt} now={now} />
+          </>
+        }
+        actions={
+          can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} onTestResult={setTestResult} />
+        }
+      />
 
       <HealthDeck wid={wid} monitorId={monitor.id} />
 
@@ -362,7 +381,7 @@ export default function MonitorDetail() {
                 )}
               </dl>
             ) : (
-              <p className="p-5 text-sm text-slate-500">
+              <p className="p-5 text-sm text-muted">
                 {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
               </p>
             )}

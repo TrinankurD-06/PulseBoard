@@ -18,22 +18,22 @@ export function KeyReveal({ agentKey, onAcknowledge, acknowledgeLabel = "I've sa
     <div className="space-y-3">
       <div
         role="alert"
-        className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+        className="flex gap-2 rounded-card border border-status-degraded/40 px-4 py-3 text-sm text-muted"
       >
         <AlertTriangle
-          className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+          className="mt-0.5 h-4 w-4 shrink-0 text-status-degraded"
           aria-hidden="true"
         />
         <p>
-          <span className="font-medium">Copy this key now: it won&apos;t be shown again.</span>{' '}
-          Store it as a secret (e.g. <code>{KEY_ENV_VAR}</code>), never in your source code. Lost
-          it? Regenerate a new one from the monitor page.
+          <span className="text-fg">Copy this key now: it won&apos;t be shown again.</span> Store it
+          as a secret (e.g. <code>{KEY_ENV_VAR}</code>), never in your source code. Lost it?
+          Regenerate a new one from the monitor page.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <KeyRound className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+        <KeyRound className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
         <code
-          className="min-w-0 flex-1 rounded-md bg-slate-100 px-3 py-2 text-sm break-all dark:bg-slate-800"
+          className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 font-mono text-xs break-all text-muted"
           aria-label="Agent key"
         >
           {agentKey}
@@ -55,17 +55,17 @@ export function AgentSnippets({ reportEverySec, agentKey }) {
   return (
     <ol className="space-y-4 text-sm">
       <li>
-        <p className="mb-2 font-medium">1. Install the package (Node.js 18+, Express)</p>
+        <p className="mb-2 text-fg">1. Install the package (Node.js 18+, Express)</p>
         <CodeBlock code={snippets.install} label="install command" />
       </li>
       <li>
-        <p className="mb-2 font-medium">2. Put the key in your app&apos;s environment</p>
+        <p className="mb-2 text-fg">2. Put the key in your app&apos;s environment</p>
         <CodeBlock code={snippets.env} label="environment variable" />
       </li>
       <li>
-        <p className="mb-2 font-medium">3. Add the middleware before your routes</p>
+        <p className="mb-2 text-fg">3. Add the middleware before your routes</p>
         <CodeBlock code={snippets.code} label="Express setup" />
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-faint">
           Only aggregated counts, latency percentiles and route patterns (like /orders/:id) are
           sent: never URLs, ids, query strings, headers or bodies.
         </p>
@@ -108,8 +108,9 @@ function RegenerateKey({ wid, monitor }) {
           <KeyReveal agentKey={newKey} onAcknowledge={close} />
         ) : (
           <>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              The current key stops working <strong>immediately</strong>. Reports sent with it are
+            <p className="text-sm text-muted">
+              The current key stops working{' '}
+              <strong className="font-normal text-fg">immediately</strong>. Reports sent with it are
               rejected until your app is restarted with the new key, so the monitor will go silent
               and may open an incident.
             </p>
@@ -142,15 +143,15 @@ export default function AgentSetup({ wid, monitor, canEdit }) {
       />
       <div className="space-y-4 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <KeyRound className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-          <code className="min-w-0 flex-1 rounded-md bg-slate-100 px-3 py-2 text-sm break-all dark:bg-slate-800">
+          <KeyRound className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
+          <code className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 font-mono text-xs break-all text-muted">
             {maskedKey(monitor.agentKeyPrefix)}
           </code>
         </div>
         {canEdit ? (
           <AgentSnippets reportEverySec={monitor.reportEverySec} />
         ) : (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             Only workspace members and owners can see the setup snippets and regenerate the key.
           </p>
         )}

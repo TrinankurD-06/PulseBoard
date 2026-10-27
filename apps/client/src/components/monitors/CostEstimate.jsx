@@ -29,26 +29,26 @@ export default function CostEstimate({
 
   return (
     <div className="space-y-2" aria-live="polite">
-      <p className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-        <Calculator className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+      <p className="flex items-center gap-2 rounded-card border border-line px-4 py-3 text-sm text-muted">
+        <Calculator className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
         <span>
           {adaptive ? 'At most ≈ ' : '≈ '}
-          <span className="font-medium">{formatCount(requests)}</span> requests/month
+          <span className="font-mono text-fg">{formatCount(requests)}</span> requests/month
           {cost != null && (
             <>
               {' · ≈ '}
-              <span className="font-medium">{formatCurrency(cost, currency)}</span>/month
+              <span className="font-mono text-fg">{formatCurrency(cost, currency)}</span>/month
             </>
           )}
           {adaptive && (
-            <span className="text-slate-500"> (fewer while the endpoint stays healthy)</span>
+            <span className="text-faint"> (fewer while the endpoint stays healthy)</span>
           )}
         </span>
       </p>
       {hint && (
-        <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+        <p className="flex items-start gap-2 rounded-card border border-status-degraded/40 px-4 py-3 text-sm text-muted">
           <AlertTriangle
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+            className="mt-0.5 h-4 w-4 shrink-0 text-status-degraded"
             aria-hidden="true"
           />
           <span>{hint}</span>

@@ -48,7 +48,7 @@ export default function NewMonitor() {
       <TypeChooser value={type} onChange={setType} />
       {/* The wizard creates the monitor itself: the key is shown once, then it waits for a report. */}
       {type === AGENT_TYPE && <AgentWizard wid={wid} onCancel={cancel} />}
-      {!meta && type !== AGENT_TYPE && <Skeleton className="h-96 rounded-xl" />}
+      {!meta && type !== AGENT_TYPE && <Skeleton className="h-96 rounded-card" />}
       {meta && type === HEARTBEAT_TYPE && (
         <HeartbeatForm
           minIntervalSec={meta.minIntervalSec}

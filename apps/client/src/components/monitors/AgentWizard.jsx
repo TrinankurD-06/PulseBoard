@@ -28,20 +28,20 @@ function Stepper({ step }) {
           >
             <span
               className={cn(
-                'inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold',
-                current && 'bg-brand-600 text-on-brand',
-                done && 'bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-400',
-                !current && !done && 'bg-slate-100 text-slate-500 dark:bg-slate-800',
+                'inline-flex h-6 w-6 items-center justify-center rounded-pill border font-mono text-[11px]',
+                current && 'border-brand bg-brand text-brand-ink',
+                done && 'border-line-strong text-brand',
+                !current && !done && 'border-line text-faint',
               )}
             >
               {done ? '✓' : i + 1}
             </span>
-            <span className={cn(current ? 'font-medium' : 'text-slate-500')}>
+            <span className={cn(current ? 'text-fg' : 'text-faint')}>
               {label}
               {done && <span className="sr-only"> (done)</span>}
             </span>
             {i < STEPS.length - 1 && (
-              <span className="mx-1 h-px w-6 bg-slate-300 dark:bg-slate-700" aria-hidden="true" />
+              <span className="mx-1 h-px w-6 bg-line-strong" aria-hidden="true" />
             )}
           </li>
         );
@@ -62,21 +62,16 @@ function WaitForReport({ wid, monitorId }) {
       <div className="space-y-4 p-5">
         <p
           role="status"
-          className={cn(
-            'flex items-center gap-2 font-medium',
-            connected
-              ? 'text-emerald-700 dark:text-emerald-400'
-              : 'text-slate-600 dark:text-slate-300',
-          )}
+          className={cn('flex items-center gap-2', connected ? 'text-status-up' : 'text-muted')}
         >
           {connected ? (
-            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           )}
           {connected ? 'Connected: first report received' : 'Waiting for the first report…'}
         </p>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           {connected
             ? 'Your app is reporting. Charts fill in with every report.'
             : `The first report arrives one interval after your app starts, even with no traffic. This page updates by itself.`}
@@ -85,10 +80,10 @@ function WaitForReport({ wid, monitorId }) {
           <Link
             to={detailPath}
             className={cn(
-              'inline-flex h-10 items-center rounded-lg px-4 text-sm font-medium',
+              'inline-flex h-10 items-center rounded-pill px-5 text-sm font-medium transition-colors duration-200 ease-(--ease)',
               connected
                 ? primaryButtonClasses
-                : 'border border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800',
+                : 'border border-line-strong text-fg hover:border-fg hover:bg-surface-2',
             )}
           >
             {connected ? 'Go to monitor' : 'Skip to the monitor'}
@@ -149,7 +144,7 @@ export default function AgentWizard({ wid, onCancel }) {
               {created.agentKey ? (
                 <KeyReveal agentKey={created.agentKey} />
               ) : (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted">
                   The server didn&apos;t return a key. Regenerate one from the monitor page.
                 </p>
               )}

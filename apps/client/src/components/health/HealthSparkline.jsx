@@ -5,18 +5,13 @@ import { svgId } from '../charts/chartTheme.js';
 import { isolatedDot } from './isolatedDot.jsx';
 import { tooltipBox } from './tooltipStyles.js';
 
-function SquareMarker({ cx, cy }) {
+function RingMarker({ cx, cy }) {
   if (cx == null || cy == null) return null;
   return (
-    <rect
-      x={cx - 3.5}
-      y={cy - 3.5}
-      width={7}
-      height={7}
-      fill="var(--color-fg)"
-      stroke="var(--color-surface-2)"
-      strokeWidth={1.5}
-    />
+    <g>
+      <circle cx={cx} cy={cy} r={6} fill="var(--bg)" stroke="var(--text-faint)" strokeWidth={1} />
+      <circle cx={cx} cy={cy} r={2.25} fill="var(--accent)" />
+    </g>
   );
 }
 
@@ -36,8 +31,8 @@ function SparkTooltip({ active, payload, unit }) {
 
 /**
  * Decorative area sparkline: fills its (absolutely positioned) parent edge to
- * edge. 1.5px light stroke, faint gradient, no axes or grid. Hovering draws a
- * crosshair, a square marker and a small tooltip. aria-hidden: the card's text
+ * edge. 1.25px light stroke, faint gradient, no axes or grid. Hovering draws a
+ * crosshair, a ring-dot marker and a small tooltip. aria-hidden: the card's text
  * carries the value.
  */
 export default function HealthSparkline({ series, unit }) {
@@ -60,28 +55,27 @@ export default function HealthSparkline({ series, unit }) {
         >
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-fg)" stopOpacity={0.16} />
-              <stop offset="100%" stopColor="var(--color-fg)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--text)" stopOpacity={0.1} />
+              <stop offset="100%" stopColor="var(--text)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis dataKey="t" hide />
           <YAxis hide domain={yDomain} />
           <Tooltip
             content={<SparkTooltip unit={unit} />}
-            cursor={{ stroke: 'var(--color-fg)', strokeOpacity: 0.35, strokeWidth: 1 }}
+            cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
             position={{ y: 2 }}
             isAnimationActive={false}
           />
           <Area
             type="monotone"
             dataKey="v"
-            stroke="var(--color-fg)"
-            strokeOpacity={0.75}
-            strokeWidth={1.5}
+            stroke="var(--text)"
+            strokeWidth={1.25}
             fill={`url(#${id})`}
             connectNulls={false}
             dot={isolatedDot(series)}
-            activeDot={<SquareMarker />}
+            activeDot={<RingMarker />}
             isAnimationActive={false}
           />
         </AreaChart>

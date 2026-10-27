@@ -32,7 +32,7 @@ export default function EditMonitor() {
     }
   }
 
-  if (isError) return <p className="text-sm text-red-600">Couldn&apos;t load this monitor.</p>;
+  if (isError) return <p className="text-sm text-status-down">Couldn&apos;t load this monitor.</p>;
 
   return (
     <div className="max-w-3xl">
@@ -63,7 +63,7 @@ export default function EditMonitor() {
           onCancel={() => navigate(detailPath)}
         />
       ) : (
-        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-96 rounded-card" />
       )}
     </div>
   );

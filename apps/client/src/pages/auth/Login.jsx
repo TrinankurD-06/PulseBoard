@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
 import { useAppMeta } from '../../api/meta.js';
 import { useAuth } from '../../auth/AuthContext.js';
-import Button from '../../components/ui/Button.jsx';
+import RingDotCta from '../../components/ui/RingDotCta.jsx';
 import Field from '../../components/ui/Field.jsx';
 import { oauthErrorMessage } from '../../lib/oauth.js';
 import AuthLayout from './AuthLayout.jsx';
@@ -51,10 +51,7 @@ export default function Login() {
       footer={
         <>
           New here?{' '}
-          <Link
-            to="/register"
-            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-          >
+          <Link to="/register" className="text-fg underline-offset-4 hover:underline">
             Create an account
           </Link>
         </>
@@ -63,13 +60,13 @@ export default function Login() {
       {oauthError && (
         <p
           role="alert"
-          className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+          className="mb-6 rounded-card border border-status-down/50 px-4 py-3 text-sm text-fg"
         >
           {oauthErrorMessage(oauthError)}
         </p>
       )}
       <OAuthButtons next={next} />
-      <form onSubmit={onSubmit} noValidate className="space-y-4">
+      <form onSubmit={onSubmit} noValidate className="space-y-6">
         <Field
           label="Email"
           type="email"
@@ -85,16 +82,16 @@ export default function Login() {
           error={errors.password?.message}
           {...register('password')}
         />
-        <Button type="submit" className="w-full" loading={isSubmitting}>
+        <RingDotCta type="submit" className="mt-4" loading={isSubmitting}>
           Log in
-        </Button>
+        </RingDotCta>
         {meta?.demoMode && (
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+          <p className="rounded-card border border-line px-4 py-3 text-center text-xs text-muted">
             Demo account: {DEMO.email} / {DEMO.password}{' '}
             <button
               type="button"
               onClick={fillDemo}
-              className="font-medium text-brand-700 hover:underline dark:text-brand-400"
+              className="text-fg underline-offset-4 hover:underline"
             >
               Fill in
             </button>

@@ -1,3 +1,3 @@
 // Tooltip box shared by the Health deck charts (tokens only).
 export const tooltipBox =
-  'rounded-sm border border-line-strong bg-surface-3 px-2 py-1 text-xs text-fg shadow-panel';
+  'rounded-md border border-line-strong bg-bg/80 px-2.5 py-1.5 text-xs text-fg backdrop-blur-md';

@@ -191,17 +191,16 @@ export default function MonitorForm({
             error={errors.name?.message}
             {...register('name')}
           />
-          <p className="flex gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600 sm:col-span-2 dark:bg-slate-800/60 dark:text-slate-300">
-            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+          <p className="flex items-start gap-2 rounded-card border border-line px-4 py-3 text-sm text-muted sm:col-span-2">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
             <span>
-              <span className="font-medium text-slate-800 dark:text-slate-100">Tip:</span> point
-              PulseBoard at a lightweight <code className="text-xs">/health</code> endpoint that
-              doesn&apos;t touch your database or paid services. Every check is a real request to
-              your server;{' '}
+              <span className="text-fg">Tip:</span> point PulseBoard at a lightweight{' '}
+              <code className="text-xs">/health</code> endpoint that doesn&apos;t touch your
+              database or paid services. Every check is a real request to your server;{' '}
               <Link
                 to="/bot"
                 target="_blank"
-                className="font-medium text-brand-700 hover:underline dark:text-brand-400"
+                className="text-fg underline decoration-line-strong underline-offset-4 hover:decoration-fg"
               >
                 here&apos;s how to recognise them
               </Link>
@@ -239,10 +238,10 @@ export default function MonitorForm({
             control={control}
             name="adaptive"
             render={({ field }) => (
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-3 py-2.5 sm:col-span-2 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-4 rounded-card border border-line px-4 py-3 sm:col-span-2">
                 <div>
-                  <p className="text-sm font-medium">Adaptive interval</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-fg">Adaptive interval</p>
+                  <p className="mt-0.5 max-w-[52ch] text-xs text-faint">
                     Checks less often while everything is healthy (doubling after 10 good checks)
                     and speeds up straight away when something fails.
                   </p>
@@ -341,7 +340,7 @@ export default function MonitorForm({
         />
         <div className="space-y-3 p-5">
           {headerRows.fields.length === 0 && (
-            <p className="text-sm text-slate-500">No custom headers.</p>
+            <p className="text-sm text-muted">No custom headers.</p>
           )}
           {headerRows.fields.map((row, index) => (
             <div key={row.id} className="flex gap-2">
@@ -367,7 +366,7 @@ export default function MonitorForm({
             </div>
           ))}
           {errors.headers?.message && (
-            <p className="text-xs text-red-600 dark:text-red-400">{errors.headers.message}</p>
+            <p className="text-xs text-status-down">{errors.headers.message}</p>
           )}
         </div>
       </Card>
@@ -423,7 +422,7 @@ export default function MonitorForm({
         </div>
       </Card>
 
-      {errors.root?.message && <p className="text-sm text-red-600">{errors.root.message}</p>}
+      {errors.root?.message && <p className="text-sm text-status-down">{errors.root.message}</p>}
 
       {testResult && <TestResult result={testResult} />}
 

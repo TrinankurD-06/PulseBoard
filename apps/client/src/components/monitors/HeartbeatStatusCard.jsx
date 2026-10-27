@@ -5,17 +5,17 @@ import { heartbeatState, lastPingLabel } from '../../lib/heartbeat.js';
 import Card, { CardHeader } from '../ui/Card.jsx';
 
 const STATE_STYLE = {
-  ok: { dot: 'bg-status-up', text: 'text-emerald-700 dark:text-emerald-400' },
-  waiting: { dot: 'bg-status-pending', text: 'text-amber-700 dark:text-amber-400' },
-  overdue: { dot: 'bg-status-down', text: 'text-red-700 dark:text-red-400' },
-  paused: { dot: 'bg-status-paused', text: 'text-slate-500' },
+  ok: { dot: 'bg-status-up', text: 'text-status-up' },
+  waiting: { dot: 'bg-status-degraded', text: 'text-status-degraded' },
+  overdue: { dot: 'bg-status-down', text: 'text-status-down' },
+  paused: { dot: 'bg-status-paused', text: 'text-muted' },
 };
 
 function Detail({ label, children }) {
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium break-words">{children}</dd>
+      <dt className="text-xs text-faint">{label}</dt>
+      <dd className="mt-1 text-sm break-words text-fg">{children}</dd>
     </div>
   );
 }
@@ -33,7 +33,7 @@ export default function HeartbeatStatusCard({ wid, monitor, now }) {
     <Card>
       <CardHeader title="Pings" />
       <div className="space-y-4 p-5">
-        <p className={cn('flex items-center gap-2 text-sm font-medium', style.text)} role="status">
+        <p className={cn('flex items-center gap-2 text-sm', style.text)} role="status">
           <span className={cn('h-2 w-2 shrink-0 rounded-full', style.dot)} aria-hidden="true" />
           {text}
         </p>

@@ -5,7 +5,7 @@ import StatusDot from './StatusDot.jsx';
 export default function StatusBadge({ status }) {
   const style = statusStyle(status);
   return (
-    <Badge tone={style.tone} className="gap-1.5 px-2.5 py-1">
+    <Badge tone={style.tone} className="gap-1.5">
       <StatusDot status={status} />
       {style.label}
     </Badge>

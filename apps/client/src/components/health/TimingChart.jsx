@@ -78,7 +78,7 @@ export default function TimingChart({ timings, range }) {
             />
             <Tooltip
               content={<TimingTooltip />}
-              cursor={{ stroke: 'var(--color-fg)', strokeOpacity: 0.35, strokeWidth: 1 }}
+              cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
               isAnimationActive={false}
             />
             {TIMING_PHASES.map((phase) => (
@@ -87,7 +87,7 @@ export default function TimingChart({ timings, range }) {
                 type="monotone"
                 dataKey={phase.key}
                 stackId="timings"
-                stroke="var(--color-surface)"
+                stroke="var(--bg)"
                 strokeWidth={1}
                 fill={phase.color}
                 fillOpacity={0.9}

@@ -2,7 +2,7 @@ import { formatCount } from '../../lib/format.js';
 
 const TONES = {
   ok: { bar: 'bg-status-up', label: 'Within budget' },
-  warning: { bar: 'bg-status-pending', label: 'Nearly used up' },
+  warning: { bar: 'bg-status-degraded', label: 'Nearly used up' },
   exceeded: { bar: 'bg-status-down', label: 'Budget reached' },
 };
 
@@ -15,18 +15,18 @@ export default function BudgetMeter({ summary, compact = false }) {
   const width = Math.min(100, summary.percent);
   return (
     <div>
-      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
-        <span className="text-slate-500">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+        <span className="text-faint">
           {compact
             ? `${formatCount(summary.used)} / ${formatCount(summary.budget)}`
             : `Monthly budget: ${formatCount(summary.used)} of ${formatCount(summary.budget)} requests`}
         </span>
-        <span className="font-medium">
+        <span className="font-mono text-muted">
           {summary.percent}% · {tone.label}
         </span>
       </div>
       <div
-        className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+        className="h-px w-full bg-line-strong"
         role="progressbar"
         aria-label="Monthly request budget used"
         aria-valuemin={0}
@@ -34,7 +34,7 @@ export default function BudgetMeter({ summary, compact = false }) {
         aria-valuenow={width}
         aria-valuetext={`${summary.percent}%, ${tone.label}`}
       >
-        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${width}%` }} />
+        <div className={`-mt-px h-0.5 ${tone.bar}`} style={{ width: `${width}%` }} />
       </div>
     </div>
   );

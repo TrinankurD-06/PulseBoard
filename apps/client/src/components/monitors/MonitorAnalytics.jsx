@@ -6,7 +6,6 @@ import {
   useResponseTimes,
   useUptime,
 } from '../../api/analytics.js';
-import { cn } from '../../lib/cn.js';
 import { formatDuration, formatMs } from '../../lib/format.js';
 import { TIMING_PHASES } from '../../lib/timings.js';
 import ChartCard from '../charts/ChartCard.jsx';
@@ -14,6 +13,7 @@ import ResponseTimeChart from '../charts/ResponseTimeChart.jsx';
 import TimingBreakdownChart from '../charts/TimingBreakdownChart.jsx';
 import UptimeBars from '../charts/UptimeBars.jsx';
 import UptimeLegend from '../charts/UptimeLegend.jsx';
+import { PillGroup } from '../ui/Pill.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import UptimeStats from './UptimeStats.jsx';
 
@@ -23,30 +23,13 @@ const time = (t) => new Date(t).toLocaleString();
 export function RangeFilter({ value, onChange, ranges = RANGES }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-slate-500">Time range</span>
-      <div
-        role="radiogroup"
-        aria-label="Time range"
-        className="inline-flex rounded-lg border border-slate-200 p-1 dark:border-slate-800"
-      >
-        {Object.keys(ranges).map((range) => (
-          <button
-            key={range}
-            type="button"
-            role="radio"
-            aria-checked={value === range}
-            onClick={() => onChange(range)}
-            className={cn(
-              'rounded-md px-3 py-1 text-sm font-medium',
-              value === range
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {range}
-          </button>
-        ))}
-      </div>
+      <span className="text-xs text-faint">Time range</span>
+      <PillGroup
+        label="Time range"
+        options={Object.keys(ranges)}
+        value={value}
+        onChange={onChange}
+      />
     </div>
   );
 }

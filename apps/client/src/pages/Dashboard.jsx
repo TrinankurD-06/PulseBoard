@@ -1,21 +1,24 @@
 import { ROLES } from '@pulseboard/shared/constants';
-import { Activity, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSparklines } from '../api/analytics.js';
 import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
+import { useAmbientAlertSignal } from '../components/ambient/ambientStore.js';
+import TickGauge from '../components/gauge/TickGauge.jsx';
 import MonitorCard from '../components/monitors/MonitorCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import { primaryButtonClasses } from '../components/ui/Button.jsx';
-import Card from '../components/ui/Card.jsx';
+import SignalFieldLazy from '../components/signal/SignalFieldLazy.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
+import RingDotCta from '../components/ui/RingDotCta.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
+import SteppedCards from '../components/ui/SteppedCards.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 import { useNow } from '../hooks/useNow.js';
-import { formatMs } from '../lib/format.js';
+import { useSignalFeed } from '../hooks/useSignalFeed.js';
+import { formatDuration, formatMs } from '../lib/format.js';
 import { isOperational } from '../lib/status.js';
 
-const newMonitorButtonClasses = `inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-medium ${primaryButtonClasses}`;
+const UPTIME_TARGET = 99.9;
 
 function summarize(monitors) {
   const count = (status) => monitors.filter((m) => m.status === status).length;
@@ -27,21 +30,42 @@ function summarize(monitors) {
   const avgResponseMs = responseTimes.length
     ? responseTimes.reduce((sum, ms) => sum + ms, 0) / responseTimes.length
     : null;
+  const intervals = monitors
+    .filter((m) => !m.isPaused && (m.type ?? 'http') === 'http' && m.intervalSec > 0)
+    .map((m) => m.intervalSec);
   return {
     up: monitors.filter((m) => isOperational(m.status)).length,
     down: count('down'),
     total: monitors.length,
     avgResponseMs,
+    fastestIntervalSec: intervals.length ? Math.min(...intervals) : null,
   };
 }
 
-function SummaryCard({ label, value, accent }) {
-  return (
-    <Card className="p-5">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className={`mt-2 text-3xl font-semibold ${accent ?? ''}`}>{value}</p>
-    </Card>
-  );
+/**
+ * Average uptime across the monitors from the recent checks the page already
+ * loads for the sparklines (the share that passed). Falls back to the share of
+ * monitors that are up while there is no check history yet.
+ */
+function averageUptime(monitors, sparklines, summary) {
+  let passed = 0;
+  let total = 0;
+  for (const monitor of monitors) {
+    for (const point of sparklines?.[monitor.id] ?? []) {
+      total += 1;
+      if (point.ok) passed += 1;
+    }
+  }
+  if (total > 0) {
+    return { value: (passed / total) * 100, caption: 'Share of recent checks that passed' };
+  }
+  return { value: (summary.up / summary.total) * 100, caption: 'Share of monitors that are up' };
+}
+
+function headline(summary) {
+  if (!summary) return 'Overview.';
+  if (summary.down === 0) return 'All quiet.';
+  return `${summary.down} monitor${summary.down === 1 ? ' needs' : 's need'} attention.`;
 }
 
 export default function Dashboard() {
@@ -50,72 +74,34 @@ export default function Dashboard() {
   const { data: openIncidents } = useIncidents(wid, { status: 'open', limit: 1 });
   const openCount = openIncidents?.pagination.total;
   const { data: sparklines } = useSparklines(wid);
+  const signal = useSignalFeed(wid);
   const now = useNow();
   const canEdit = can(ROLES.MEMBER);
 
-  const newButton = canEdit && (
-    <Link to={`/app/${wid}/monitors/new`} className={newMonitorButtonClasses}>
-      <Plus className="h-4 w-4" /> New monitor
-    </Link>
-  );
+  const summary = monitors?.length ? summarize(monitors) : null;
+  useAmbientAlertSignal((summary?.down ?? 0) > 0);
 
-  const summary = monitors && summarize(monitors);
+  const newButton = canEdit && <RingDotCta to={`/app/${wid}/monitors/new`}>New monitor</RingDotCta>;
+  const uptime = summary && averageUptime(monitors, sparklines, summary);
+  const side = monitors
+    ? `${workspace.name} · ${monitors.length} monitor${monitors.length === 1 ? '' : 's'}`
+    : workspace.name;
 
   return (
     <>
-      <PageHeader
-        title={workspace.name}
-        description={
-          summary
-            ? `${summary.total} monitor${summary.total === 1 ? '' : 's'}`
-            : 'All monitors at a glance'
-        }
-        action={newButton}
-      />
+      <PageHeader title={headline(summary)} phrase={side} action={newButton} />
 
-      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {isPending
-          ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[106px] rounded-xl" />)
-          : summary && (
-              <>
-                <SummaryCard
-                  label="Up"
-                  value={summary.up}
-                  accent="text-emerald-600 dark:text-emerald-400"
-                />
-                <SummaryCard
-                  label="Down"
-                  value={summary.down}
-                  accent={summary.down > 0 ? 'text-red-600 dark:text-red-400' : undefined}
-                />
-                <Link
-                  to={`/app/${wid}/incidents`}
-                  className="rounded-xl focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
-                >
-                  <SummaryCard
-                    label="Open incidents"
-                    value={openCount ?? '—'}
-                    accent={openCount > 0 ? 'text-red-600 dark:text-red-400' : undefined}
-                  />
-                </Link>
-                <SummaryCard label="Avg response" value={formatMs(summary.avgResponseMs)} />
-              </>
-            )}
-      </div>
-
-      {isError && <p className="text-sm text-red-600">Couldn&apos;t load monitors.</p>}
+      {isError && <p className="text-sm text-status-down">Couldn&apos;t load monitors.</p>}
 
       {isPending && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
-          ))}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,20rem)_1fr]">
+          <Skeleton className="mx-auto aspect-square w-full max-w-72 rounded-card" />
+          <Skeleton className="h-64 rounded-card" />
         </div>
       )}
 
       {monitors?.length === 0 && (
         <EmptyState
-          icon={Activity}
           title="No monitors yet"
           description={
             canEdit
@@ -126,18 +112,85 @@ export default function Dashboard() {
         />
       )}
 
-      {monitors?.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {monitors.map((monitor) => (
-            <MonitorCard
-              key={monitor.id}
-              monitor={monitor}
-              wid={wid}
-              now={now}
-              sparkline={sparklines?.[monitor.id]}
+      {summary && (
+        <>
+          <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-12">
+            <TickGauge
+              value={uptime.value}
+              target={UPTIME_TARGET}
+              label="Average uptime"
+              caption={uptime.caption}
+              decimals={uptime.value >= 99.95 || uptime.value < 99 ? 1 : 2}
+              size={300}
             />
-          ))}
-        </div>
+            <div>
+              <SteppedCards
+                items={[
+                  {
+                    value: summary.up,
+                    label: 'Up',
+                    description: `of ${summary.total} monitor${summary.total === 1 ? '' : 's'} answering normally.`,
+                  },
+                  {
+                    value: summary.down,
+                    label: 'Down',
+                    description:
+                      summary.down > 0
+                        ? 'Not answering right now. Open one for detail.'
+                        : 'Nothing is failing.',
+                  },
+                  {
+                    value: openCount ?? 0,
+                    label: 'Open incidents',
+                    description:
+                      openCount > 0 ? 'Waiting to be resolved.' : 'No incidents are open.',
+                  },
+                ]}
+              />
+              <p className="mt-4 text-right text-[11px] text-faint">
+                <Link
+                  to={`/app/${wid}/incidents`}
+                  className="underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg"
+                >
+                  View incidents
+                </Link>
+              </p>
+            </div>
+          </div>
+
+          <div className="relative mt-12">
+            <SignalFieldLazy
+              {...signal}
+              height={220}
+              ariaLabel={
+                summary.down > 0
+                  ? `Live signal: ${summary.down} of ${summary.total} monitors down`
+                  : `Live signal: all ${summary.total} monitors up`
+              }
+            />
+            <p className="pointer-events-none absolute top-0 left-0 text-[11px] text-faint">
+              {summary.fastestIntervalSec
+                ? `Checks every ${formatDuration(summary.fastestIntervalSec)}`
+                : 'Waiting for checks'}
+              {summary.avgResponseMs != null && ` · avg ${formatMs(summary.avgResponseMs)}`}
+            </p>
+            <p className="pointer-events-none absolute top-0 right-0 text-[11px] text-faint">
+              Live ↗
+            </p>
+          </div>
+
+          <section className="mt-12" aria-label="Monitors">
+            {monitors.map((monitor) => (
+              <MonitorCard
+                key={monitor.id}
+                monitor={monitor}
+                wid={wid}
+                now={now}
+                sparkline={sparklines?.[monitor.id]}
+              />
+            ))}
+          </section>
+        </>
       )}
     </>
   );

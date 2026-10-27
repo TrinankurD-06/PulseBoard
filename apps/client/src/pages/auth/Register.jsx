@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
 import { useAuth } from '../../auth/AuthContext.js';
-import Button from '../../components/ui/Button.jsx';
+import RingDotCta from '../../components/ui/RingDotCta.jsx';
 import Field from '../../components/ui/Field.jsx';
 import AuthLayout from './AuthLayout.jsx';
 import OAuthButtons from './OAuthButtons.jsx';
@@ -39,17 +39,14 @@ export default function Register() {
       footer={
         <>
           Already have an account?{' '}
-          <Link
-            to="/login"
-            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-          >
+          <Link to="/login" className="text-fg underline-offset-4 hover:underline">
             Log in
           </Link>
         </>
       }
     >
       <OAuthButtons />
-      <form onSubmit={onSubmit} noValidate className="space-y-4">
+      <form onSubmit={onSubmit} noValidate className="space-y-6">
         <Field
           label="Name"
           autoComplete="name"
@@ -72,9 +69,9 @@ export default function Register() {
           error={errors.password?.message}
           {...register('password')}
         />
-        <Button type="submit" className="w-full" loading={isSubmitting}>
+        <RingDotCta type="submit" className="mt-4" loading={isSubmitting}>
           Create account
-        </Button>
+        </RingDotCta>
       </form>
     </AuthLayout>
   );

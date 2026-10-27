@@ -69,7 +69,7 @@ function DangerZone({ workspace }) {
   }
 
   return (
-    <Card className="border-red-300 dark:border-red-900/60">
+    <Card className="border-status-down/40">
       <CardHeader
         title="Delete workspace"
         description="Permanently deletes all monitors, check history, incidents, alert channels and status pages. This can't be undone."
@@ -98,10 +98,14 @@ export default function Settings() {
   const isOwner = can(ROLES.OWNER);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-8">
       <PageHeader
-        title="Settings"
-        description={isOwner ? undefined : 'Only workspace owners can change these settings.'}
+        title="Settings."
+        phrase={
+          isOwner
+            ? 'Name and lifecycle of this workspace.'
+            : 'Only workspace owners can change these settings.'
+        }
       />
       <RenameForm workspace={workspace} disabled={!isOwner} />
       {isOwner && <DangerZone workspace={workspace} />}

@@ -40,9 +40,10 @@ function RegenerateToken({ wid, monitor }) {
         <RefreshCw className="h-4 w-4" /> Regenerate
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Regenerate ping URL?">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          The current URL stops working <strong>immediately</strong>. Every job that pings it must
-          be updated with the new URL, or its pings will be rejected and the monitor will go down.
+        <p className="text-sm text-muted">
+          The current URL stops working <strong className="font-normal text-fg">immediately</strong>
+          . Every job that pings it must be updated with the new URL, or its pings will be rejected
+          and the monitor will go down.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -77,15 +78,15 @@ export default function HeartbeatSetup({ wid, monitor, canEdit }) {
       />
       <div className="space-y-4 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <KeyRound className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-          <code className="min-w-0 flex-1 rounded-md bg-slate-100 px-3 py-2 text-sm break-all dark:bg-slate-800">
+          <KeyRound className="h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
+          <code className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 font-mono text-xs break-all text-muted">
             {url}
           </code>
           {visible && <CopyButton text={url} label="Copy ping URL" />}
         </div>
 
         {!visible && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             Only workspace members and owners can see the ping URL and setup snippets.
           </p>
         )}
@@ -95,7 +96,7 @@ export default function HeartbeatSetup({ wid, monitor, canEdit }) {
             <div
               role="tablist"
               aria-label="Setup snippets"
-              className="mb-3 inline-flex flex-wrap rounded-lg border border-slate-200 p-1 dark:border-slate-800"
+              className="mb-3 inline-flex flex-wrap rounded-pill border border-line p-0.5"
             >
               {SNIPPET_TABS.map(({ key, label }) => (
                 <button
@@ -105,17 +106,15 @@ export default function HeartbeatSetup({ wid, monitor, canEdit }) {
                   aria-selected={tab === key}
                   onClick={() => setTab(key)}
                   className={cn(
-                    'rounded-md px-3 py-1 text-sm font-medium',
-                    tab === key
-                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
+                    'rounded-pill px-3 py-1 text-[13px] transition-colors duration-200',
+                    tab === key ? 'bg-surface-2 text-fg' : 'text-faint hover:text-fg',
                   )}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <p className="mb-2 text-sm text-slate-500">{SNIPPET_HELP[tab]}</p>
+            <p className="mb-2 text-sm text-muted">{SNIPPET_HELP[tab]}</p>
             <CodeBlock code={snippets[tab]} label={SNIPPET_TABS.find((t) => t.key === tab).label} />
           </div>
         )}

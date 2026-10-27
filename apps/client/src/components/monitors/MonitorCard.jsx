@@ -1,22 +1,13 @@
-import { Activity, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { agentIntervalLabel, agentState, isAgent } from '../../lib/agent.js';
 import { intervalLabel } from '../../lib/budget.js';
+import { cn } from '../../lib/cn.js';
 import { formatMs, hostOf, timeAgoShort } from '../../lib/format.js';
 import { heartbeatIntervalLabel, heartbeatState, isHeartbeat } from '../../lib/heartbeat.js';
 import { statusStyle } from '../../lib/status.js';
 import Sparkline from '../charts/Sparkline.jsx';
+import RingDot from '../ui/RingDot.jsx';
 import StatusDot from './StatusDot.jsx';
-
-/** Push monitors have no response-time sparkline: show where the next ping/report stands instead. */
-function StateStrip({ icon: Icon, text }) {
-  return (
-    <p className="flex h-8 items-center gap-1.5 truncate text-xs text-slate-500">
-      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span className="truncate">{text}</span>
-    </p>
-  );
-}
 
 const VARIANTS = {
   http: {
@@ -27,20 +18,23 @@ const VARIANTS = {
   },
   heartbeat: {
     subtitle: () => 'Heartbeat (your job pings us)',
-    strip: (monitor, now) => (
-      <StateStrip icon={Activity} text={heartbeatState(monitor, now).text} />
-    ),
+    strip: (monitor, now) => heartbeatState(monitor, now).text,
     last: { label: 'Last ping', field: 'lastPingAt' },
     interval: heartbeatIntervalLabel,
   },
   agent: {
     subtitle: () => 'App agent (your app reports to us)',
-    strip: (monitor, now) => <StateStrip icon={Cpu} text={agentState(monitor, now).text} />,
+    strip: (monitor, now) => agentState(monitor, now).text,
     last: { label: 'Last report', field: 'lastReportAt' },
     interval: agentIntervalLabel,
   },
 };
 
+/**
+ * One monitor as a clean row: status dot, name, a tiny trend (or, for push
+ * monitors, where the next ping/report stands), mono latency and a ring-dot.
+ * The whole row is the link to the monitor.
+ */
 export default function MonitorCard({ monitor, wid, now, sparkline }) {
   const style = statusStyle(monitor.status);
   const variant = isAgent(monitor)
@@ -49,51 +43,45 @@ export default function MonitorCard({ monitor, wid, now, sparkline }) {
       ? VARIANTS.heartbeat
       : VARIANTS.http;
   const push = variant !== VARIANTS.http;
+  const last = timeAgoShort(monitor[variant.last.field], now);
+
   return (
     <Link
       to={`/app/${wid}/monitors/${monitor.id}`}
-      className="group block rounded-xl border border-slate-200 bg-white p-5 hover:border-brand-500/60 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-brand-500/50"
+      className="group flex items-center gap-4 border-b border-line px-1 py-5 transition-colors duration-200 ease-(--ease) first:border-t hover:bg-surface sm:gap-6 sm:px-3"
     >
-      <div className="flex items-start gap-3">
-        <StatusDot status={monitor.status} className="mt-1.5" />
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate font-medium group-hover:text-brand-700 dark:group-hover:text-brand-400">
-            {monitor.name}
-          </h3>
-          <p className="truncate text-sm text-slate-500">{variant.subtitle(monitor)}</p>
-        </div>
-        <span className={`text-sm font-medium ${style.text}`}>{style.label}</span>
+      <StatusDot status={monitor.status} />
+      <div className="min-w-0 flex-1 sm:flex-[1.2]">
+        <h3 className="truncate text-[15px] text-fg">{monitor.name}</h3>
+        <p className="mt-0.5 truncate text-xs text-faint">{variant.subtitle(monitor)}</p>
       </div>
-      <div className="mt-4">
-        {push ? variant.strip(monitor, now) : <Sparkline points={sparkline} />}
-      </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+      <div className="hidden min-w-0 flex-1 md:block">
         {push ? (
-          <div>
-            <dt className="text-xs text-slate-500">{variant.last.label}</dt>
-            <dd className="truncate font-medium">
-              {timeAgoShort(monitor[variant.last.field], now)}
-            </dd>
-          </div>
+          <p className="truncate text-xs text-muted">{variant.strip(monitor, now)}</p>
         ) : (
-          <div>
-            <dt className="text-xs text-slate-500">Response</dt>
-            <dd className="font-medium tabular-nums">{formatMs(monitor.lastResponseMs)}</dd>
+          <div className="w-full max-w-36">
+            <Sparkline points={sparkline} />
           </div>
         )}
-        <div className={push ? 'col-span-2' : undefined}>
-          <dt className="text-xs text-slate-500">Interval</dt>
-          <dd className="truncate font-medium">{variant.interval(monitor, now)}</dd>
-        </div>
-        {!push && (
-          <div>
-            <dt className="text-xs text-slate-500">{variant.last.label}</dt>
-            <dd className="truncate font-medium">
-              {timeAgoShort(monitor[variant.last.field], now)}
-            </dd>
-          </div>
-        )}
-      </dl>
+      </div>
+      <div className="w-24 text-right">
+        <p className="font-mono text-[13px] text-fg">
+          {push ? last : formatMs(monitor.lastResponseMs)}
+        </p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-faint">
+          {push ? variant.last.label : variant.interval(monitor, now)}
+        </p>
+      </div>
+      <span
+        className={cn('w-16 text-right text-xs max-sm:sr-only', style.text)}
+        data-status={monitor.status}
+      >
+        {style.label}
+      </span>
+      <RingDot
+        className="text-faint transition-colors duration-200 group-hover:text-fg"
+        filled={false}
+      />
     </Link>
   );
 }

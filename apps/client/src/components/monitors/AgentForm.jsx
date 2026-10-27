@@ -132,10 +132,10 @@ export default function AgentForm({ monitor, submitLabel, onSubmit, onCancel }) 
               </option>
             ))}
           </Field>
-          <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:col-span-2 dark:bg-slate-800/60 dark:text-slate-300">
-            <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+          <div className="flex items-start gap-2 rounded-card border border-line px-4 py-3 text-sm text-muted sm:col-span-2">
+            <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
             <p>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
+              <span className="text-fg">
                 ≈ {formatCount(monthly)} requests/month to your servers
               </span>{' '}
               · ≈ {formatCount(requestsSavedVsPolling(monthly))} saved vs checking every minute
@@ -145,7 +145,7 @@ export default function AgentForm({ monitor, submitLabel, onSubmit, onCancel }) 
         </div>
       </Card>
 
-      {errors.root?.message && <p className="text-sm text-red-600">{errors.root.message}</p>}
+      {errors.root?.message && <p className="text-sm text-status-down">{errors.root.message}</p>}
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>

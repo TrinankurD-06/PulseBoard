@@ -92,10 +92,10 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
         control={control}
         name="isPublic"
         render={({ field }) => (
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-4 rounded-card border border-line px-4 py-3">
             <div>
-              <p className="text-sm font-medium">Public</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-fg">Public</p>
+              <p className="text-xs text-faint">
                 Anyone with the link can view it, no login needed.
               </p>
             </div>
@@ -109,25 +109,25 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
         name="monitorIds"
         render={({ field }) => (
           <fieldset>
-            <legend className="mb-1.5 text-sm font-medium">Monitors shown on the page</legend>
+            <legend className="mb-1.5 text-xs text-faint">Monitors shown on the page</legend>
             {monitors.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted">
                 No monitors yet.{' '}
                 <Link
                   to={`/app/${wid}/monitors/new`}
-                  className="text-brand-600 hover:underline dark:text-brand-400"
+                  className="text-fg underline decoration-line-strong underline-offset-4 hover:decoration-fg"
                 >
                   Create one first
                 </Link>
                 .
               </p>
             ) : (
-              <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              <ul className="max-h-56 divide-y divide-line overflow-y-auto rounded-card border border-line">
                 {monitors.map((monitor) => {
                   const checked = field.value.includes(monitor.id);
                   return (
                     <li key={monitor.id}>
-                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors hover:bg-surface-2">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -138,11 +138,11 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
                                 : [...field.value, monitor.id],
                             )
                           }
-                          className="h-4 w-4 accent-brand-600"
+                          className="h-4 w-4 accent-(--accent)"
                         />
                         <StatusDot status={monitor.status} />
                         <span className="min-w-0 flex-1 truncate text-sm">{monitor.name}</span>
-                        <span className="truncate text-xs text-slate-500">
+                        <span className="truncate text-xs text-faint">
                           {monitor.url ? hostOf(monitor.url) : (TYPE_LABELS[monitor.type] ?? '')}
                         </span>
                       </label>
@@ -152,7 +152,7 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
               </ul>
             )}
             {errors.monitorIds && (
-              <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-1.5 text-xs text-status-down">
                 {errors.monitorIds.message ?? 'Check the selected monitors'}
               </p>
             )}
@@ -160,7 +160,7 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
         )}
       />
 
-      {errors.root?.message && <p className="text-sm text-red-600">{errors.root.message}</p>}
+      {errors.root?.message && <p className="text-sm text-status-down">{errors.root.message}</p>}
 
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="secondary" onClick={onCancel}>

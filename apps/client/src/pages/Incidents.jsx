@@ -1,14 +1,13 @@
-import { CheckCircle2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useIncidents } from '../api/incidents.js';
 import IncidentCard from '../components/incidents/IncidentCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Button from '../components/ui/Button.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
+import { PillGroup } from '../components/ui/Pill.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 import { useNow } from '../hooks/useNow.js';
-import { cn } from '../lib/cn.js';
 
 const TABS = [
   { value: 'open', label: 'Open' },
@@ -21,6 +20,9 @@ const EMPTY = {
   resolved: { title: 'No resolved incidents yet', description: 'Past outages will appear here.' },
   all: { title: 'No incidents yet', description: 'Incidents open after 3 failed checks in a row.' },
 };
+
+const PHRASE =
+  'An incident opens after 3 consecutive failed checks and resolves after 2 successful ones.';
 
 export default function Incidents() {
   const { wid } = useCurrentWorkspace();
@@ -38,50 +40,39 @@ export default function Incidents() {
 
   const go = (next) => setParams({ status: next.status ?? tab, page: String(next.page ?? 1) });
 
+  // State-aware headline on the open tab; the plain name elsewhere.
+  const total = pagination?.total;
+  let headline = 'Incidents.';
+  if (tab === 'open' && typeof total === 'number') {
+    headline = total === 0 ? 'Nothing open.' : `${total} open.`;
+  }
+
   return (
     <>
-      <PageHeader
-        title="Incidents"
-        description="An incident opens after 3 consecutive failed checks and resolves after 2 successful ones."
+      <PageHeader title={headline} phrase={PHRASE} />
+
+      <PillGroup
+        label="Filter incidents"
+        options={TABS}
+        value={tab}
+        onChange={(value) => go({ status: value })}
+        className="mb-8"
       />
 
-      <div
-        role="tablist"
-        className="mb-6 inline-flex rounded-lg border border-slate-200 p-1 dark:border-slate-800"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            role="tab"
-            type="button"
-            aria-selected={tab === t.value}
-            onClick={() => go({ status: t.value })}
-            className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value
-                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {isError && <p className="text-sm text-red-600">Couldn&apos;t load incidents.</p>}
+      {isError && <p className="text-sm text-status-down">Couldn&apos;t load incidents.</p>}
 
       {isPending && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+            <Skeleton key={i} className="h-20 rounded-card" />
           ))}
         </div>
       )}
 
-      {incidents?.length === 0 && <EmptyState icon={CheckCircle2} {...EMPTY[tab]} />}
+      {incidents?.length === 0 && <EmptyState {...EMPTY[tab]} />}
 
       {incidents?.length > 0 && (
-        <div className="space-y-3">
+        <div className="border-t border-line">
           {incidents.map((incident) => (
             <IncidentCard key={incident.id} incident={incident} wid={wid} now={now} />
           ))}
@@ -98,7 +89,7 @@ export default function Incidents() {
           >
             Previous
           </Button>
-          <span className="text-slate-500">
+          <span className="font-mono text-xs text-faint">
             Page {pagination.page} of {pagination.totalPages}
           </span>
           <Button

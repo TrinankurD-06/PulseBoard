@@ -16,7 +16,7 @@ function RangeControl({ range, onChange }) {
       role="radiogroup"
       aria-label="Time range"
       onKeyDown={onGroupKeyDown}
-      className="inline-flex rounded-md border border-line bg-surface p-0.5"
+      className="inline-flex rounded-pill border border-line p-0.5"
     >
       {HEALTH_RANGES.map((value) => (
         <button
@@ -27,8 +27,8 @@ function RangeControl({ range, onChange }) {
           tabIndex={range === value ? 0 : -1}
           onClick={() => onChange(value)}
           className={cn(
-            'rounded-sm px-3 py-1 font-mono text-xs transition-colors motion-reduce:transition-none',
-            range === value ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg',
+            'rounded-pill px-3 py-1 font-mono text-xs transition-colors duration-200 motion-reduce:transition-none',
+            range === value ? 'bg-surface-2 text-fg' : 'text-faint hover:text-fg',
           )}
         >
           {value}
@@ -38,20 +38,20 @@ function RangeControl({ range, onChange }) {
   );
 }
 
-const block = 'rounded-md bg-surface-3 motion-safe:animate-pulse';
+const block = 'animate-shimmer rounded-md bg-surface-2';
 
 function SkeletonCard() {
   return (
-    <div className="relative h-40 overflow-hidden rounded-lg border border-line bg-surface p-4">
+    <div className="relative h-40 overflow-hidden rounded-card border border-line p-5">
       <div className={cn(block, 'h-4 w-24')} />
       <div className={cn(block, 'mt-4 h-8 w-32')} />
-      <div className="absolute inset-x-0 bottom-0 h-10 bg-surface-3/60" />
+      <div className="absolute inset-x-0 bottom-0 h-10 bg-surface-2" />
     </div>
   );
 }
 
 function GhostCard() {
-  return <div className="h-40 rounded-lg border border-dashed border-line bg-surface" />;
+  return <div className="h-40 rounded-card border border-dashed border-line" />;
 }
 
 /** Same footprint as the real panel, with a quiet message (empty, error) or a skeleton. */
@@ -59,7 +59,7 @@ function PanelBlock({ children, skeleton }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-center rounded-lg border border-line bg-surface p-5 text-center',
+        'flex items-center justify-center rounded-card border border-line p-5 text-center',
         PANEL_HEIGHT,
       )}
     >
@@ -98,11 +98,11 @@ export default function HealthDeck({ wid, monitorId }) {
         <div className="min-w-0">
           <h2
             id={`${deckId}-title`}
-            className="font-heading text-3xl font-extrabold tracking-tight text-fg"
+            className="font-heading text-[clamp(28px,3.5vw,40px)] leading-[1.05] font-light tracking-[-0.03em] text-fg"
           >
             Health.
           </h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted">
             Live signals for this monitor. Select a card for detail.
           </p>
         </div>
@@ -111,7 +111,7 @@ export default function HealthDeck({ wid, monitorId }) {
 
       {showSkeleton || showError || showEmpty ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2" aria-hidden={showSkeleton || undefined}>
+          <div className="grid gap-4 sm:grid-cols-2" aria-hidden={showSkeleton || undefined}>
             {Array.from({ length: ghostCount }, (_, i) =>
               showSkeleton ? <SkeletonCard key={i} /> : <GhostCard key={i} />,
             )}
@@ -124,7 +124,7 @@ export default function HealthDeck({ wid, monitorId }) {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="h-8 rounded-md border border-line-strong bg-surface-2 px-3 text-sm text-fg transition-colors hover:bg-surface-3 motion-reduce:transition-none"
+                  className="h-8 rounded-pill border border-line-strong px-4 text-[13px] text-fg transition-colors hover:bg-surface-2 motion-reduce:transition-none"
                 >
                   Retry
                 </button>
@@ -142,7 +142,7 @@ export default function HealthDeck({ wid, monitorId }) {
       ) : (
         <div
           className={cn(
-            'space-y-3 transition-opacity motion-reduce:transition-none',
+            'space-y-4 transition-opacity motion-reduce:transition-none',
             isPlaceholderData && isFetching && 'opacity-60',
           )}
           aria-busy={isPlaceholderData || undefined}
@@ -151,7 +151,7 @@ export default function HealthDeck({ wid, monitorId }) {
             role="radiogroup"
             aria-label="Health metrics"
             onKeyDown={onGroupKeyDown}
-            className="grid gap-3 sm:grid-cols-2"
+            className="grid gap-4 sm:grid-cols-2"
           >
             {metrics.map((m) => (
               <MetricCard

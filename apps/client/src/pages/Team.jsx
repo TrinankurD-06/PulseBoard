@@ -109,14 +109,14 @@ function MemberRow({ member, wid, isOwner, isSelf }) {
 
   return (
     <li className="flex flex-wrap items-center gap-3 px-5 py-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold uppercase dark:bg-slate-800">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border border-line text-sm text-muted uppercase">
         {member.name.charAt(0)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {member.name} {isSelf && <span className="text-slate-500">(you)</span>}
+        <p className="truncate text-sm text-fg">
+          {member.name} {isSelf && <span className="text-faint">(you)</span>}
         </p>
-        <p className="truncate text-xs text-slate-500">{member.email}</p>
+        <p className="truncate text-xs text-faint">{member.email}</p>
       </div>
       {isOwner ? (
         <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ function MemberRow({ member, wid, isOwner, isSelf }) {
             <option value={ROLES.OWNER}>Owner</option>
           </select>
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             onClick={onRemove}
             loading={removeMember.isPending}
@@ -157,8 +157,8 @@ export default function Team() {
   const isOwner = can(ROLES.OWNER);
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Team" description="People with access to this workspace" />
+    <div className="space-y-8">
+      <PageHeader title="Team." phrase="People with access to this workspace." />
 
       {isOwner && <AddMemberForm wid={wid} />}
 
@@ -174,9 +174,9 @@ export default function Team() {
             ))}
           </div>
         )}
-        {isError && <p className="p-5 text-sm text-red-600">Couldn&apos;t load members.</p>}
+        {isError && <p className="p-5 text-sm text-status-down">Couldn&apos;t load members.</p>}
         {members && (
-          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+          <ul className="divide-y divide-line">
             {members.map((member) => (
               <MemberRow
                 key={member.userId}
@@ -191,7 +191,7 @@ export default function Team() {
       </Card>
 
       <Card className="p-5">
-        <h2 className="mb-3 text-sm font-semibold">Roles</h2>
+        <h2 className="mb-4 font-medium text-fg">Roles</h2>
         <dl className="grid gap-2 text-sm sm:grid-cols-3">
           {Object.entries(ROLE_DESCRIPTIONS).map(([role, description]) => (
             <div key={role}>
@@ -200,7 +200,7 @@ export default function Team() {
                   {role}
                 </Badge>
               </dt>
-              <dd className="mt-1 text-slate-500">{description}</dd>
+              <dd className="mt-1 text-muted">{description}</dd>
             </div>
           ))}
         </dl>

@@ -1,74 +1,43 @@
-import { AlertTriangle, CheckCircle2, CircleSlash, XCircle } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { usePublicStatus } from '../api/statusPages.js';
 import UptimeBars from '../components/charts/UptimeBars.jsx';
 import UptimeLegend from '../components/charts/UptimeLegend.jsx';
-import Logo from '../components/Logo.jsx';
+import TickGauge from '../components/gauge/TickGauge.jsx';
+import PublicHeader from '../components/public/PublicHeader.jsx';
+import SignalFieldLazy from '../components/signal/SignalFieldLazy.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { useNow } from '../hooks/useNow.js';
+import { useStatusSignal } from '../hooks/useSignalFeed.js';
 import { cn } from '../lib/cn.js';
 import { formatDuration, timeAgo } from '../lib/format.js';
 
-// Overall banner. Colour is always paired with an icon and words.
+// Overall headline. The dot and the words always travel together.
 const OVERALL = {
-  operational: {
-    icon: CheckCircle2,
-    text: 'All systems operational',
-    classes:
-      'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100',
-    iconClass: 'text-emerald-600 dark:text-emerald-400',
-  },
-  partial_outage: {
-    icon: AlertTriangle,
-    text: 'Some systems are experiencing problems',
-    classes:
-      'border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100',
-    iconClass: 'text-amber-600 dark:text-amber-400',
-  },
-  major_outage: {
-    icon: XCircle,
-    text: 'Major outage',
-    classes:
-      'border-red-200 bg-red-50 text-red-950 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100',
-    iconClass: 'text-red-600 dark:text-red-400',
-  },
-  no_data: {
-    icon: CircleSlash,
-    text: 'No services are being monitored yet',
-    classes:
-      'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200',
-    iconClass: 'text-slate-500',
-  },
+  operational: { text: 'Everything is running.', dot: 'bg-status-up' },
+  partial_outage: { text: 'Some systems are degraded.', dot: 'bg-status-degraded' },
+  major_outage: { text: "We're having an outage.", dot: 'bg-status-down' },
+  no_data: { text: 'Nothing is monitored yet.', dot: 'bg-status-paused' },
 };
 
 // Customer-facing wording for each monitor status.
 const COMPONENT_STATUS = {
-  up: { label: 'Operational', dot: 'bg-status-up', text: 'text-emerald-700 dark:text-emerald-400' },
+  up: { label: 'Operational', dot: 'bg-status-up' },
   // Agent silent but the app answers: an internal concern, operational to visitors.
-  degraded: {
-    label: 'Operational',
-    dot: 'bg-status-up',
-    text: 'text-emerald-700 dark:text-emerald-400',
-  },
-  down: { label: 'Outage', dot: 'bg-status-down', text: 'text-red-700 dark:text-red-400' },
-  pending: {
-    label: 'Checking',
-    dot: 'bg-status-pending',
-    text: 'text-amber-700 dark:text-amber-400',
-  },
-  paused: { label: 'Not monitored', dot: 'bg-status-paused', text: 'text-slate-500' },
+  degraded: { label: 'Operational', dot: 'bg-status-up' },
+  down: { label: 'Outage', dot: 'bg-status-down' },
+  pending: { label: 'Checking', dot: 'bg-status-pending' },
+  paused: { label: 'Not monitored', dot: 'bg-status-paused' },
 };
 
-function Shell({ children }) {
+function Shell({ children, footer }) {
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-        {children}
-        <footer className="mt-12 flex items-center justify-center gap-2 text-xs text-slate-500">
-          Powered by <Logo />
-        </footer>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <PublicHeader />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pt-10 pb-16 sm:px-8">
+        <div className="max-w-4xl">{children}</div>
+      </main>
+      {footer}
     </div>
   );
 }
@@ -76,16 +45,16 @@ function Shell({ children }) {
 function ComponentRow({ monitor }) {
   const status = COMPONENT_STATUS[monitor.status] ?? COMPONENT_STATUS.pending;
   return (
-    <li className="px-5 py-5 sm:px-6">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="font-medium">{monitor.name}</h3>
-        <span className={cn('flex items-center gap-1.5 text-sm font-medium', status.text)}>
-          <span className={cn('h-2 w-2 rounded-full', status.dot)} aria-hidden="true" />
+    <li className="py-7">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h3 className="text-lg font-light tracking-[-0.02em] text-fg">{monitor.name}</h3>
+        <span className="flex items-center gap-2 text-sm text-muted">
+          <span className={cn('h-1.5 w-1.5 rounded-pill', status.dot)} aria-hidden="true" />
           {status.label}
         </span>
       </div>
       <UptimeBars days={monitor.days} />
-      <p className="mt-1 text-right text-xs text-slate-500">
+      <p className="mt-1 text-right text-[11px] text-faint">
         {monitor.uptime90 == null ? 'No data yet' : `${monitor.uptime90}% uptime over 90 days`}
       </p>
     </li>
@@ -98,31 +67,36 @@ function IncidentRow({ incident, now }) {
     ? (now - new Date(incident.startedAt).getTime()) / 1000
     : incident.durationSec;
   return (
-    <li className="flex flex-wrap items-start justify-between gap-2 px-5 py-4 sm:px-6">
-      <div>
-        <p className="font-medium">
+    <li className="relative pb-8 pl-8 last:pb-0">
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute top-1.5 left-0 h-2 w-2 rounded-pill',
+          ongoing ? 'bg-status-down' : 'bg-status-up',
+        )}
+      />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="text-fg">
           {incident.monitorName} {ongoing ? 'is unavailable' : 'was unavailable'}
         </p>
-        <p className="text-sm text-slate-500">
-          {new Date(incident.startedAt).toLocaleString(undefined, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}{' '}
-          · {ongoing ? 'ongoing for' : 'lasted'} {formatDuration(duration)}
-        </p>
+        <span className="text-xs text-muted">{ongoing ? 'Investigating' : 'Resolved'}</span>
       </div>
-      <span
-        className={cn(
-          'rounded-full px-2.5 py-0.5 text-xs font-medium',
-          ongoing
-            ? 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
-            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-        )}
-      >
-        {ongoing ? 'Investigating' : 'Resolved'}
-      </span>
+      <p className="mt-1 text-sm text-muted">
+        {new Date(incident.startedAt).toLocaleString(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        })}{' '}
+        · {ongoing ? 'ongoing for' : 'lasted'} {formatDuration(duration)}
+      </p>
     </li>
   );
+}
+
+/** Average of the monitors' 90-day uptime (only those with data), or null. */
+function overallUptime(monitors) {
+  const values = monitors.map((m) => m.uptime90).filter((v) => typeof v === 'number');
+  if (values.length === 0) return null;
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
 }
 
 /** /status/:slug: the public status page. No login; refreshes every 30s. */
@@ -130,6 +104,7 @@ export default function PublicStatus() {
   const { slug } = useParams();
   const { data, isPending, error, dataUpdatedAt } = usePublicStatus(slug);
   const now = useNow(5000);
+  const signal = useStatusSignal(data?.monitors);
 
   useEffect(() => {
     document.title = data ? `${data.title} · Status` : 'Status';
@@ -138,9 +113,9 @@ export default function PublicStatus() {
   if (isPending) {
     return (
       <Shell>
-        <Skeleton className="h-9 w-56" />
-        <Skeleton className="mt-8 h-20 rounded-xl" />
-        <Skeleton className="mt-6 h-64 rounded-xl" />
+        <Skeleton className="h-16 w-full max-w-md" />
+        <Skeleton className="mt-8 h-5 w-56" />
+        <Skeleton className="mt-16 h-48" />
       </Shell>
     );
   }
@@ -149,16 +124,19 @@ export default function PublicStatus() {
     const missing = error.response?.status === 404;
     return (
       <Shell>
-        <div className="py-20 text-center">
-          <h1 className="text-2xl font-semibold">
-            {missing ? 'Status page not found' : 'Status is temporarily unavailable'}
+        <div className="py-16">
+          <h1
+            className="font-light tracking-[-0.03em] text-fg"
+            style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05 }}
+          >
+            {missing ? 'Status page not found.' : 'Status is temporarily unavailable.'}
           </h1>
-          <p className="mt-2 text-slate-500">
+          <p className="mt-4 max-w-[38ch] text-[15px] text-muted">
             {missing ? "This page doesn't exist or isn't public." : 'Please try again in a moment.'}
           </p>
           <Link
             to="/"
-            className="mt-6 inline-block text-brand-600 hover:underline dark:text-brand-400"
+            className="mt-8 inline-block text-sm text-fg underline-offset-4 hover:underline"
           >
             Go to PulseBoard
           </Link>
@@ -168,70 +146,95 @@ export default function PublicStatus() {
   }
 
   const overall = OVERALL[data.overall] ?? OVERALL.no_data;
-  const OverallIcon = overall.icon;
+  const uptime = overallUptime(data.monitors);
 
   return (
-    <Shell>
-      <header className="flex items-start justify-between gap-4">
+    <Shell
+      footer={
+        <footer className="mx-auto flex w-full max-w-6xl justify-between gap-3 px-5 py-8 text-[11px] text-faint sm:px-8">
+          <span>Checks every 60s</span>
+          <span>
+            Powered by{' '}
+            <Link to="/" className="transition-colors duration-200 hover:text-fg">
+              PulseBoard
+            </Link>
+          </span>
+        </footer>
+      }
+    >
+      <p className="text-[11px] text-faint">{data.title}</p>
+      <div className="mt-4 grid items-center gap-10 md:grid-cols-[1fr_220px]">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{data.title}</h1>
+          <h1
+            role="status"
+            className="animate-rise font-light tracking-[-0.03em] text-fg"
+            style={{ fontSize: 'clamp(40px, 6vw, 80px)', lineHeight: 1.03 }}
+          >
+            <span
+              className={cn(
+                'mr-4 inline-block h-3 w-3 rounded-pill align-middle md:h-4 md:w-4',
+                overall.dot,
+              )}
+              aria-hidden="true"
+            />
+            {overall.text}
+          </h1>
           {data.description && (
-            <p className="mt-2 text-slate-600 dark:text-slate-400">{data.description}</p>
+            <p className="mt-5 max-w-[46ch] text-[15px] text-muted">{data.description}</p>
           )}
+          <p className="mt-6 text-[11px] text-faint">
+            Updated {timeAgo(dataUpdatedAt, now)} · refreshes every 30 seconds
+          </p>
         </div>
-      </header>
-
-      <section
-        className={cn(
-          'mt-8 flex items-center gap-3 rounded-xl border px-5 py-5 sm:px-6',
-          overall.classes,
+        {uptime != null && (
+          <TickGauge
+            value={uptime}
+            target={99.9}
+            size={220}
+            decimals={2}
+            label="Uptime"
+            caption="last 90 days"
+            ariaLabel={`${uptime} percent uptime over the last 90 days`}
+          />
         )}
-        role="status"
-      >
-        <OverallIcon className={cn('h-7 w-7 shrink-0', overall.iconClass)} aria-hidden="true" />
-        <p className="text-lg font-semibold">{overall.text}</p>
-      </section>
-      <p className="mt-2 text-right text-xs text-slate-500">
-        Updated {timeAgo(dataUpdatedAt, now)} · refreshes every 30 seconds
-      </p>
+      </div>
+
+      <div className="relative -mx-5 mt-10 sm:-mx-8">
+        <SignalFieldLazy {...signal} height={200} ariaLabel={`Signal field: ${overall.text}`} />
+        <span className="pointer-events-none absolute right-5 bottom-2 text-[11px] text-faint sm:right-8">
+          Live ↗
+        </span>
+      </div>
 
       {data.monitors.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">
-            Services
-          </h2>
-          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
-            <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.monitors.map((monitor, i) => (
-                <ComponentRow key={`${monitor.name}-${i}`} monitor={monitor} />
-              ))}
-            </ul>
-            <div className="border-t border-slate-200 px-5 py-3 sm:px-6 dark:border-slate-800">
-              <UptimeLegend />
-            </div>
+        <section className="mt-12" aria-label="Services">
+          <h2 className="border-b border-line pb-3 text-[11px] text-faint">Services</h2>
+          <ul className="divide-y divide-line">
+            {data.monitors.map((monitor, i) => (
+              <ComponentRow key={`${monitor.name}-${i}`} monitor={monitor} />
+            ))}
+          </ul>
+          <div className="border-t border-line pt-3">
+            <UptimeLegend />
           </div>
         </section>
       )}
 
-      <section className="mt-10">
-        <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">
-          Past 30 days
-        </h2>
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
-          {data.incidents.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-slate-500 sm:px-6">No incidents reported. 🎉</p>
-          ) : (
-            <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-              {data.incidents.map((incident) => (
-                <IncidentRow
-                  key={`${incident.monitorName}-${incident.startedAt}`}
-                  incident={incident}
-                  now={now}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
+      <section className="mt-16" aria-label="Past 30 days">
+        <h2 className="border-b border-line pb-3 text-[11px] text-faint">Past 30 days</h2>
+        {data.incidents.length === 0 ? (
+          <p className="pt-6 text-sm text-muted">No incidents reported.</p>
+        ) : (
+          <ul className="relative mt-7 before:absolute before:top-2 before:bottom-2 before:left-[3.5px] before:w-px before:bg-line">
+            {data.incidents.map((incident) => (
+              <IncidentRow
+                key={`${incident.monitorName}-${incident.startedAt}`}
+                incident={incident}
+                now={now}
+              />
+            ))}
+          </ul>
+        )}
       </section>
     </Shell>
   );

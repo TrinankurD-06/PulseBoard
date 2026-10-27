@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ROLES } from '@pulseboard/shared/constants';
 import { alertChannelSchema } from '@pulseboard/shared/schemas';
-import { BellOff, Hash, Mail, MessageSquare, Plus, Send, Trash2 } from 'lucide-react';
+import { Hash, Mail, MessageSquare, Plus, Send, Trash2 } from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
@@ -17,6 +17,7 @@ import Button from '../components/ui/Button.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Field from '../components/ui/Field.jsx';
+import RingDotCta from '../components/ui/RingDotCta.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import Switch from '../components/ui/Switch.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
@@ -138,16 +139,15 @@ function ChannelRow({ channel, wid, canEdit }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-3 px-5 py-4">
-      <div className="rounded-lg bg-slate-100 p-2 dark:bg-slate-800">
-        <Icon className="h-5 w-5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
+    <li className="flex flex-wrap items-center gap-3 px-5 py-4 transition-colors duration-200 hover:bg-surface">
+      <div className="rounded-pill border border-line p-2.5">
+        <Icon className="h-4 w-4 text-muted" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">
-          {channel.name || label}{' '}
-          {channel.name && <span className="font-normal text-slate-500">· {label}</span>}
+        <p className="text-sm text-fg">
+          {channel.name || label} {channel.name && <span className="text-faint">· {label}</span>}
         </p>
-        <p className="truncate text-xs text-slate-500">{channel.target}</p>
+        <p className="truncate font-mono text-[11px] text-faint">{channel.target}</p>
       </div>
       <Switch
         checked={channel.isEnabled}
@@ -161,7 +161,7 @@ function ChannelRow({ channel, wid, canEdit }) {
             {!testChannel.isPending && <Send className="h-4 w-4" />} Test
           </Button>
           <Button
-            variant="ghost"
+            variant="danger"
             size="sm"
             loading={deleteChannel.isPending}
             onClick={onDelete}
@@ -181,29 +181,35 @@ export default function AlertChannels() {
   const canEdit = can(ROLES.MEMBER);
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-8">
       <PageHeader
-        title="Alert channels"
-        description="Where PulseBoard sends down and recovery alerts."
+        title="Alert channels."
+        phrase="Where PulseBoard sends down and recovery alerts."
       />
 
       {canEdit && <AddChannelForm wid={wid} />}
 
-      {isError && <p className="text-sm text-red-600">Couldn&apos;t load alert channels.</p>}
-      {isPending && <Skeleton className="h-32 rounded-xl" />}
+      {isError && <p className="text-sm text-status-down">Couldn&apos;t load alert channels.</p>}
+      {isPending && <Skeleton className="h-32 rounded-card" />}
 
       {channels?.length === 0 && (
         <EmptyState
-          icon={BellOff}
           title="No alert channels"
           description="Without a channel, incidents are still recorded but nobody is notified."
+          action={
+            canEdit && (
+              <RingDotCta onClick={() => document.querySelector('select[name="type"]')?.focus()}>
+                Add a channel
+              </RingDotCta>
+            )
+          }
         />
       )}
 
       {channels?.length > 0 && (
         <Card>
           <CardHeader title="Channels" />
-          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+          <ul className="divide-y divide-line">
             {channels.map((channel) => (
               <ChannelRow key={channel.id} channel={channel} wid={wid} canEdit={canEdit} />
             ))}
