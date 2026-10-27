@@ -2,13 +2,14 @@ import { humanDuration } from '@pulseboard/shared/alerts';
 import {
   CHECK_SOURCES,
   HEARTBEAT_MAX_MISSED_PER_RUN,
+  MISSED_PING_PREFIX,
   MONITOR_TYPES,
 } from '@pulseboard/shared/constants';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
 
 /** Why a missed period counts as a failure, shown in the UI and alerts. */
 export function missedPingMessage(monitor) {
-  return `No ping received within ${humanDuration(monitor.expectedEverySec)} + ${humanDuration(
+  return `${MISSED_PING_PREFIX} ${humanDuration(monitor.expectedEverySec)} + ${humanDuration(
     monitor.graceSec,
   )} grace`;
 }

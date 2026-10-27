@@ -139,7 +139,7 @@ To go live with OAuth: README → "Sign in with Google/GitHub".
 
 ---
 
-# UI redesign: "Dark Editorial" + per-monitor analytics (React Bits Pro Analytics 7)
+# UI redesign: "Dark Editorial" + per-monitor Health deck
 
 Decisions from D91. Commit after each phase; nothing pushed unless asked.
 
@@ -150,11 +150,11 @@ Decisions from D91. Commit after each phase; nothing pushed unless asked.
 - [ ] **R4. Primitives**: buttons (round yellow CTA), inputs, badges, tabs, side sheets, toasts,
       skeletons, empty states, Recharts theme, status orb.
 - [ ] **R5. Pages**: dashboard, incidents, settings pages, auth; remove the transitional bridge.
-- [ ] **R6. Analytics 7**: needs `REACTBITS_LICENSE_KEY` in `apps/client/.env.local` and the
-      registries snippet from the React Bits Pro installation page.
+- [x] **R6. Health deck**: own Recharts component,
+      GET /monitors/:mid/metrics, live updates, keyboard radiogroup.
 - [ ] **R7. Showcase pages**: landing and public status page.
 - [ ] **R8. QA**: screenshots 1440/390 dark+light, contrast, focus, reduced motion, Lighthouse ≥ 90.
 
 ## Resume note (redesign)
 
-Next: R3 (app shell).
+Next: R3 (app shell). R6 (Health deck) was built early: `GET /monitors/:mid/metrics` (D92) and the deck on the monitor page (D93); the shell, primitives and pages (R3–R5, R7–R8) are still to do.

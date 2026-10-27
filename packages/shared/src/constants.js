@@ -55,6 +55,9 @@ export const HEARTBEAT_MAX_EXPECTED_SEC = 30 * 24 * 60 * 60;
 // Max missed periods the overdue detector records per monitor per run (it
 // catches up on the next runs), so one long-dead minutely job can't stall it.
 export const HEARTBEAT_MAX_MISSED_PER_RUN = 50;
+// Start of the error on a check the overdue detector writes for a missed ping;
+// the metrics aggregation matches on it, so both read this one constant.
+export const MISSED_PING_PREFIX = 'No ping received within';
 
 // Agent monitors (U4): the customer's app reports aggregated metrics to us.
 export const AGENT_DEFAULT_REPORT_EVERY_SEC = 60;

@@ -600,6 +600,88 @@ when there are more reports):
 
 `errorRate` is the 5xx percentage. Reports are kept for 7 days.
 
+### `GET /workspaces/:wid/monitors/:mid/metrics?range=1h|24h|7d` (viewer)
+
+Health deck data: per monitor type, four metrics, each as a bucketed series plus the value over
+the whole window and the change against the previous window. `range` defaults to `24h`; anything
+else is `400 VALIDATION_ERROR`; a monitor of another workspace is `404`.
+
+| range | bucket | buckets |
+| ----- | ------ | ------- |
+| `1h`  | 1 min  | 60      |
+| `24h` | 15 min | 96      |
+| `7d`  | 2 h    | 84      |
+
+The grid is epoch-aligned and ends with the bucket containing now (partial). Every bucket is in
+`series`; a bucket without data has `v: null` (a gap). The previous window is the same length,
+directly before `from`. `change` = `(value - previous) / |previous| × 100`, 1 decimal, `null` when
+either is `null` or `previous` is 0. `current` is the last non-null bucket; `peak`, `low` and
+`average` are over the non-null buckets. `empty` is `true` when the monitor has no data in either
+window.
+
+```json
+{
+  "data": {
+    "type": "http",
+    "range": "24h",
+    "bucketMs": 900000,
+    "from": "2026-10-26T12:15:00.000Z",
+    "to": "2026-10-27T12:21:40.000Z",
+    "empty": false,
+    "metrics": [
+      {
+        "key": "uptime",
+        "label": "Uptime",
+        "unit": "%",
+        "value": 99.93,
+        "previous": 99.81,
+        "change": 0.1,
+        "current": 100,
+        "peak": 100,
+        "average": 99.94,
+        "low": 98.9,
+        "series": [{ "t": "2026-10-26T12:15:00.000Z", "v": 100 }]
+      }
+    ],
+    "timings": [
+      {
+        "t": "2026-10-26T12:15:00.000Z",
+        "dnsMs": 3,
+        "tcpMs": 10,
+        "tlsMs": 20,
+        "ttfbMs": 80,
+        "downloadMs": 2
+      }
+    ],
+    "live": {
+      "lastAt": "2026-10-27T12:21:30.000Z",
+      "last": { "t": "2026-10-27T12:15:00.000Z", "n": 4, "ok": 4, "sumMs": 812, "nMs": 4 },
+      "range": { "n": 96, "ok": 95, "sumMs": 20112, "nMs": 95 }
+    }
+  }
+}
+```
+
+`timings` is for `http` monitors only (`null` otherwise): per-bucket averages over ok checks.
+`live` holds accumulators over all check results of the monitor (`ok` checks, and `sumMs`/`nMs` =
+sum/count of `totalMs` over ok checks that have one) so a client can fold new checks in.
+Rounding: `%` 2 decimals, `ms` integers (agent `p95Latency`: 1 decimal), `req/s` 2 decimals, counts integers. `p95` is approximate.
+
+| type      | key           | unit  | definition                                                                                                                   |
+| --------- | ------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
+| http      | `uptime`      | %     | ok checks / checks                                                                                                           |
+| http      | `p95`         | ms    | approximate 95th percentile of `totalMs` over ok checks                                                                      |
+| http      | `failed`      | %     | failed checks / checks                                                                                                       |
+| http      | `avgResponse` | ms    | mean `totalMs` over ok checks                                                                                                |
+| heartbeat | `uptime`      | %     | ok / (pings + missed periods)                                                                                                |
+| heartbeat | `missed`      | pings | failures written by the overdue detector; buckets without any result are `null`                                              |
+| heartbeat | `lateness`    | ms    | mean of `max(0, gap to the previous ping - expectedEverySec)` per ping (success or `/fail`; one ping before the window used) |
+| heartbeat | `duration`    | ms    | mean `totalMs` of pings that carry one (timed `/start` runs)                                                                 |
+| agent     | `requestRate` | req/s | requests / bucket seconds (`value`: requests / window seconds)                                                               |
+| agent     | `p95Latency`  | ms    | requests-weighted mean of the reports' `p95Ms` (1 decimal)                                                                   |
+| agent     | `errorRate`   | %     | 5xx / requests; `null` when there were no requests                                                                           |
+| agent     | `uptime`      | %     | ok / checks (agent, probe and external sources)                                                                              |
+
 ### `GET /workspaces/:wid/usage?month=YYYY-MM` (viewer)
 
 The Cost & Usage page: the whole workspace for one month (default: the current UTC month).

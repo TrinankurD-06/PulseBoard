@@ -23,6 +23,7 @@ import {
   useTestSavedMonitor,
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
+import HealthDeck from '../../components/health/HealthDeck.jsx';
 import AgentAnalytics from '../../components/monitors/AgentAnalytics.jsx';
 import AgentBanner from '../../components/monitors/AgentBanner.jsx';
 import AgentSetup from '../../components/monitors/AgentSetup.jsx';
@@ -211,6 +212,8 @@ function HeartbeatDetail({ monitor, wid, canEdit, now }) {
         {canEdit && <Actions monitor={monitor} wid={wid} canTest={false} />}
       </div>
 
+      <HealthDeck wid={wid} monitorId={monitor.id} />
+
       <HeartbeatAnalytics
         wid={wid}
         monitorId={monitor.id}
@@ -261,6 +264,8 @@ function AgentDetail({ monitor, wid, canEdit, now }) {
           />
         )}
       </div>
+
+      <HealthDeck wid={wid} monitorId={monitor.id} />
 
       <AgentBanner monitor={monitor} now={now} />
 
@@ -330,6 +335,8 @@ export default function MonitorDetail() {
         </div>
         {can(ROLES.MEMBER) && <Actions monitor={monitor} wid={wid} onTestResult={setTestResult} />}
       </div>
+
+      <HealthDeck wid={wid} monitorId={monitor.id} />
 
       <BudgetBanner wid={wid} monitor={monitor} canEdit={can(ROLES.MEMBER)} />
 

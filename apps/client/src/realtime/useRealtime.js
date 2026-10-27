@@ -8,6 +8,7 @@ import { monitorKeys } from '../api/monitors.js';
 import { setRealtimeConnected } from '../api/realtimeState.js';
 import { getAccessToken } from '../api/tokenStore.js';
 import { useAuth } from '../auth/AuthContext.js';
+import { createMetricsFolder } from './metricsLive.js';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const SPARKLINE_POINTS = 30;
@@ -87,7 +88,12 @@ export function useRealtime() {
       }
     });
 
-    socket.on('check:result', (payload) => applyCheckResult(queryClient, payload));
+    // The Health deck folds each check into its cached metrics (throttled to 1/s).
+    const metricsFolder = createMetricsFolder(queryClient);
+    socket.on('check:result', (payload) => {
+      applyCheckResult(queryClient, payload);
+      metricsFolder.push(payload);
+    });
 
     socket.on('incident:opened', (incident) => {
       queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
@@ -106,6 +112,7 @@ export function useRealtime() {
     });
 
     return () => {
+      metricsFolder.dispose();
       socket.disconnect();
       socketRef.current = null;
       setLive(false);

@@ -14,6 +14,7 @@ import {
   getUptime,
   getUsage,
 } from './analytics.service.js';
+import { getMetrics, METRIC_RANGES } from './metrics.service.js';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const HOUR_MS = 60 * 60 * 1000;
@@ -29,6 +30,7 @@ const rangeQuery = z.object({
   to: z.coerce.date().optional(),
 });
 const dailyQuery = z.object({ days: z.coerce.number().int().min(1).max(90).default(90) });
+const metricsQuery = z.object({ range: z.enum(Object.keys(METRIC_RANGES)).default('24h') });
 const sparklineQuery = z.object({ points: z.coerce.number().int().min(2).max(60).default(30) });
 
 /** 404 unless the monitor belongs to this workspace (same rule as the CRUD routes). */
@@ -95,6 +97,17 @@ export function monitorAnalyticsRouter() {
       if (start >= end) throw badRequest('"from" must be before "to"');
       if (end - start > 24 * HOUR_MS) throw badRequest('Range can be at most 24 hours');
       res.json({ data: await getAgentMetrics(req.params.mid, start, end) });
+    },
+  );
+
+  // Health deck: bucketed metrics per monitor type with change vs the previous window.
+  router.get(
+    '/:mid/metrics',
+    viewer,
+    assertMonitorInWorkspace,
+    validate({ query: metricsQuery }),
+    async (req, res) => {
+      res.json({ data: await getMetrics(req.params.mid, req.valid.query.range) });
     },
   );
 

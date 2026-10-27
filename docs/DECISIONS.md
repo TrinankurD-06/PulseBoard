@@ -1170,7 +1170,7 @@ exactly the wiring that differs between types.
   file system made shadcn's `button.jsx` overwrite our `Button.jsx` in `components/ui`. Every shadcn
   semantic colour points at a token (shadcn's `accent` = our `surface-3` hover; our yellow is
   `primary`/`brand`). `cn` is clsx + tailwind-merge.
-- **React 19.3** (React Bits Pro and current shadcn components pass refs as props). One copy after
+- **React 19.3** (current shadcn/ui components pass refs as props). One copy after
   `npm dedupe`. While upgrading we found the client was being built in development mode: the root
   `.env` sets `NODE_ENV=development` for the API, and Vite turns a `.env` NODE_ENV into a dev build.
   `vite.config.js` claims `VITE_USER_NODE_ENV` first on `vite build`; the entry chunk went from
@@ -1178,3 +1178,72 @@ exactly the wiring that differs between types.
 - **Transitional bridge:** until phases 3–5 rebuild every page, the old palette classes (`slate-*`,
   `brand-*`, chart series/heat tokens) are pointed at the new neutrals, the yellow accent and text
   shades, and the old 3D utilities are flattened. The bridge is deleted at the end of phase 5.
+
+### D92. Metrics endpoint for the Health deck
+
+The monitor page's Health deck shows four cards per monitor type, each with a big value, a change
+against the previous window and a sparkline. It reads one new endpoint,
+`GET /workspaces/:wid/monitors/:mid/metrics?range=1h|24h|7d`, instead of composing `/checks`,
+`/agent-metrics` and `/uptime` in the browser: that would need several requests per type, would
+derive buckets differently per chart, and `/checks` returns raw points under 500 checks, so the
+series would not line up between cards.
+
+- **Fixed grids.** 1 h = 60 × 1 min, 24 h = 96 × 15 min, 7 d = 84 × 2 h. The last bucket is the one
+  containing now (partial). Bucket starts are epoch-aligned, which is what `$dateTrunc` produces
+  for these sizes (bins anchor at 2000-01-01T00:00Z, a whole number of days from the epoch); a test
+  asserts the JS grid equals the `$dateTrunc` output for all three ranges.
+- **Every bucket is present; no data is `v: null`**, which the charts draw as a gap. A bucket
+  without checks is not 0 % uptime and not 0 ms.
+- **Previous window** (the same length, directly before) gives `previous` and `change`. It comes
+  from the same `$facet` as the current buckets, so each collection is read with one aggregation
+  bounded by monitor and time (the time-series indexes apply). Raw data only lives 7 days, so the
+  7 d change is mostly `null`.
+- **p95 is approximate** (`$percentile`, method `approximate`): exact percentiles would need all
+  values in memory. Agent p95 is the requests-weighted mean of the reports' p95, not a true p95 of
+  all requests, rounded to 0.1 ms (agent latencies are often under 1 ms).
+- **Heartbeat lateness** uses `$setWindowFields` with `$shift` over the pings (missed records
+  excluded), with one ping before the previous window as predecessor of the first. Missed pings are
+  found by the error prefix, exported as `MISSED_PING_PREFIX` in the shared constants and used by
+  both the overdue job's message and the aggregation.
+- **Live accumulators** (`live.last`, `live.range`: n, ok, sumMs, nMs) let the client fold incoming
+  `check:result` events into uptime, failed %, average response and duration without refetching;
+  p95 and agent metrics resync on the next poll.
+- No existing route, schema or index changed. Pure helpers (grid, rounding, change, series summary,
+  assembly) are exported from `metrics.service.js` and unit-tested.
+
+### D93. Health deck
+
+- **Own component, no library.** The deck is built from Recharts, Tailwind and the design tokens
+  only (`components/health/`: `HealthDeck`, `MetricCard`, `DetailPanel`, `HealthSparkline`,
+  `HealthAreaChart`, `TimingChart`). Pure logic lives in `lib/health.js` (value and change
+  formatting, selection fallback, key maths) and `lib/metricsFold.js`; `lib/metricsFixture.js` is a
+  seeded fixture generator used by the tests.
+- **Cards and selection.** Cards render whatever `metrics` the API returns, in order. Exactly one is
+  always selected; the first by default. The selection is stored as a key and resolved on every
+  render (`resolveSelection`): it survives a range or type change while the key exists, else the
+  first card wins. Ranges are 1h / 24h (default) / 7d. `p95` and `avgResponse` get a second detail tab,
+  "Timing breakdown", only when `timings` is non-null (http).
+- **Query.** `useMetrics` keys `['workspaces', wid, 'monitors', mid, 'metrics', range]`, outside
+  `analyticsKey`, so check events do not invalidate it. `keepPreviousData`; refetch every 60 s, or
+  the shared fallback poll when the socket is down, whichever is shorter.
+- **Live fold and throttle.** `check:result` events are buffered per monitor in
+  `realtime/metricsLive.js` and flushed at most once a second with `setQueryData` on every cached
+  range of that monitor. `foldCheck` ignores events not newer than `live.lastAt`, shifts the grid
+  when the check is past the last bucket (the oldest bucket drops, `live.last` resets), updates the
+  accumulators and recomputes uptime, failed, avgResponse (http) and duration (heartbeat). The
+  range accumulator is only reset when the shift passes the whole window, so it can drift slightly
+  until the next refetch resyncs it. Agent metrics, p95, missed and lateness wait for the refetch.
+  No refetch is triggered and the existing invalidation is untouched.
+- **Keyboard model.** The cards are a radiogroup of `role="radio"` items with a roving tabindex.
+  Arrows (all four, wrapping), Home and End move focus and selection together; Space and Enter
+  select. The range control and the detail tabs share the same handler. Sparklines and charts are
+  `aria-hidden`; the value is text; the panel is labelled by the selected card. Charts never
+  animate and the Recharts accessibility layer is off, so it cannot add tab stops.
+- **Arrow and colour rule.** The arrow shows direction only (up/down of the % change); a null change
+  is a dash. Colour is the exception: the down status colour is used only when the direction is
+  clearly bad (failed checks, missed pings or error rate rising; uptime falling). Nothing is ever
+  green; a good move is quiet.
+- **States.** Skeleton cards and panel while loading; "Collecting data…" when `empty`; error with a
+  Retry button. All three keep the card grid and the panel's height, so nothing jumps.
+- **Left alone.** The existing charts and sections on the monitor page are untouched; the deck sits
+  above them and integration decides what to retire. Isolated buckets between gaps are drawn as dots.
