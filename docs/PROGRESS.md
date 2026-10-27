@@ -136,3 +136,25 @@ against the user's MongoDB Atlas (`MONGODB_URI` in `.env`), no Docker needed.
 
 Done and committed locally (two commits: OAuth server, then theme + OAuth client). Nothing pushed.
 To go live with OAuth: README → "Sign in with Google/GitHub".
+
+---
+
+# UI redesign: "Dark Editorial" + per-monitor analytics (React Bits Pro Analytics 7)
+
+Decisions from D91. Commit after each phase; nothing pushed unless asked.
+
+- [x] **R1. Audit and plan**: approved (React 19, shadcn `tsx:false`, contrast fixes, old theme dropped).
+- [x] **R2. Tokens and foundations**: React 19.3 (`ceec26f`, also fixed dev-mode client builds),
+      tokens.css + Tailwind/shadcn mapping, fonts, grain, halftone, data-theme switch (`135e068`).
+- [ ] **R3. App shell**: rail with the PulseBoard mark, hairline grid, numbered nav, mobile bottom bar.
+- [ ] **R4. Primitives**: buttons (round yellow CTA), inputs, badges, tabs, side sheets, toasts,
+      skeletons, empty states, Recharts theme, status orb.
+- [ ] **R5. Pages**: dashboard, incidents, settings pages, auth; remove the transitional bridge.
+- [ ] **R6. Analytics 7**: needs `REACTBITS_LICENSE_KEY` in `apps/client/.env.local` and the
+      registries snippet from the React Bits Pro installation page.
+- [ ] **R7. Showcase pages**: landing and public status page.
+- [ ] **R8. QA**: screenshots 1440/390 dark+light, contrast, focus, reduced motion, Lighthouse ≥ 90.
+
+## Resume note (redesign)
+
+Next: R3 (app shell).
