@@ -2,7 +2,7 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 
 /** Brand fill with a pressable 3D edge; also used by links styled as primary buttons. */
-export const primaryButtonClasses = 'press-3d bg-brand-600 text-on-brand hover:bg-brand-700';
+export const primaryButtonClasses = 'bg-brand-600 text-on-brand hover:bg-brand-700';
 
 const VARIANTS = {
   primary: `${primaryButtonClasses} disabled:bg-brand-600/50`,

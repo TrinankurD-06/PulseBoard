@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import Sparkline from '../components/charts/Sparkline.jsx';
 import UptimeBars from '../components/charts/UptimeBars.jsx';
 import Logo from '../components/Logo.jsx';
-import ThemeToggle from '../components/ThemeToggle.jsx';
 import { primaryButtonClasses } from '../components/ui/Button.jsx';
 import { cn } from '../lib/cn.js';
 
@@ -79,7 +78,7 @@ const PREVIEW_MONITORS = [
 
 function ProductPreview() {
   return (
-    <div className="tilt-3d rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-orange-900/15 sm:p-6 dark:border-slate-800 dark:bg-slate-900 dark:shadow-brand-500/10">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-orange-900/15 sm:p-6 dark:border-slate-800 dark:bg-slate-900 dark:shadow-brand-500/10">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold">Acme Inc.</p>
         <span className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -90,7 +89,7 @@ function ProductPreview() {
         {PREVIEW_MONITORS.map((monitor) => (
           <li
             key={monitor.name}
-            className="surface-3d rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="flex items-center gap-2">
               <span className={cn('h-2 w-2 rounded-full', monitor.dot)} />
@@ -132,7 +131,6 @@ export default function Landing() {
           >
             Status page demo
           </Link>
-          <ThemeToggle />
           <Link to="/login" className="rounded-md px-3 py-2 text-sm font-medium hover:underline">
             Log in
           </Link>
@@ -197,7 +195,7 @@ export default function Landing() {
               {FEATURES.map(({ icon: Icon, title, text }) => (
                 <div
                   key={title}
-                  className="surface-3d rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
+                  className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
                 >
                   <div className="inline-flex rounded-lg bg-brand-50 p-2 shadow-sm ring-1 ring-brand-200 dark:bg-brand-500/10 dark:shadow-none dark:ring-brand-500/20">
                     <Icon

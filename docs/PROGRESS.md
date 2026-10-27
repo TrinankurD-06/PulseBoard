@@ -158,3 +158,26 @@ Decisions from D91. Commit after each phase; nothing pushed unless asked.
 ## Resume note (redesign)
 
 Next: R3 (app shell). R6 (Health deck) was built early: `GET /monitors/:mid/metrics` (D92) and the deck on the monitor page (D93); the shell, primitives and pages (R3–R5, R7–R8) are still to do.
+
+---
+
+# UI v2: "Ambient Signal" (replaces the Dark Editorial plan above)
+
+Decisions from D94. Dark only. Commit after each phase; nothing pushed unless asked.
+Defaults agreed: raw WebGL signal field (2D canvas fallback), `--text-faint` #7C7B71, public status
+page wave driven by status only (the public endpoint exposes no latency), uptime SLA target 99.9%.
+
+- [x] **V1. Audit and plan**
+- [x] **V2. Tokens, fonts, ambient glow; old theme, light mode, grain removed** (D94). A transitional
+      bridge keeps unrebuilt pages readable; it is deleted in V6.
+- [ ] **V3. Header line + nav + shell; primitives** (ring-dot, CTA, outline cards, pills, inputs, toasts,
+      modals, skeletons, empty states, Recharts theme)
+- [ ] **V4. Radial tick gauge + stepped cards** (gauge maths unit-tested)
+- [ ] **V5. Signal field** (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded)
+- [ ] **V6. App pages** (+ Health deck restyle, remove the bridge and the `dark:` variant)
+- [ ] **V7. Landing + public status page**
+- [ ] **V8. QA** (screenshots 1440/390 in docs/screenshots, Lighthouse perf ≥ 85 / a11y ≥ 90)
+
+## Resume note (UI v2)
+
+Next: V3.

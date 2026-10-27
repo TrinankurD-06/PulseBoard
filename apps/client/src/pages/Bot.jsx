@@ -1,6 +1,5 @@
 import { Bot as BotIcon, Filter, Gauge, ShieldCheck } from 'lucide-react';
 import Logo from '../components/Logo.jsx';
-import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js';
 
 function Section({ icon: Icon, title, children }) {
@@ -34,11 +33,10 @@ export default function Bot() {
   const botUrl = `${window.location.origin}/bot`;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-black">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="flex items-center justify-between gap-4">
           <Logo />
-          <ThemeToggle />
         </header>
 
         <h1 className="mt-10 text-3xl font-bold tracking-tight">About the PulseBoard checker</h1>

@@ -3,17 +3,17 @@
 @import 'shadcn/tailwind.css';
 @import './styles/tokens.css';
 
-/* Theme is a data-theme attribute on <html> ("dark" by default, set before
-   first paint by index.html). `dark:` utilities follow it. */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+/* The UI is dark only (D94), so `dark:` always applies. This keeps the
+   remaining `dark:` classes working until each page is rebuilt on the new
+   tokens; the variant is deleted with the bridge below. */
+@custom-variant dark (&:where(*));
 
-/* Tokens → Tailwind utilities. `inline` makes each utility read the token at
-   runtime, so switching data-theme repaints everything without a rebuild. */
+/* Tokens → Tailwind utilities. `inline` makes each utility read the variable
+   at runtime. */
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-fg: var(--text);
@@ -21,92 +21,93 @@
   --color-faint: var(--text-faint);
   --color-brand: var(--accent);
   --color-brand-ink: var(--accent-ink);
+  --color-glow: var(--glow);
+  --color-glow-2: var(--glow-2);
 
   --color-status-up: var(--status-up);
   --color-status-down: var(--status-down);
   --color-status-degraded: var(--status-degraded);
   --color-status-paused: var(--status-paused);
   --color-status-pending: var(--status-pending);
-  --color-status-none: var(--surface-3);
+  --color-status-none: var(--line);
 
-  --font-sans: var(--font-body);
-  --font-heading: var(--font-display);
-  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
 
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-lg);
-  --radius-2xl: var(--radius-lg);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 16px;
+  --radius-2xl: 16px;
+  --radius-card: var(--radius-card);
+  --radius-pill: var(--radius-pill);
 
-  --shadow-panel: var(--shadow-panel);
+  --ease-out-soft: var(--ease);
 
-  /* shadcn/ui semantic colours, all pointing at our tokens (no shadcn
-     defaults left). Note shadcn's "accent" is its subtle hover surface; our
-     yellow is "brand" / "primary". */
+  /* shadcn/ui semantic colours, all pointing at our tokens. shadcn's
+     "accent" is its subtle hover surface; our cream accent is primary/brand. */
   --color-background: var(--bg);
   --color-foreground: var(--text);
   --color-card: var(--surface);
   --color-card-foreground: var(--text);
-  --color-popover: var(--surface-2);
+  --color-popover: var(--bg);
   --color-popover-foreground: var(--text);
   --color-primary: var(--accent);
   --color-primary-foreground: var(--accent-ink);
   --color-secondary: var(--surface-2);
   --color-secondary-foreground: var(--text);
   --color-muted-foreground: var(--text-muted);
-  --color-accent: var(--surface-3);
+  --color-accent: var(--surface-2);
   --color-accent-foreground: var(--text);
   --color-destructive: var(--status-down);
   --color-border: var(--line);
   --color-input: var(--line-strong);
-  --color-ring: var(--focus-ring);
+  --color-ring: var(--accent);
   --color-chart-1: var(--text);
   --color-chart-2: color-mix(in oklab, var(--text) 75%, var(--bg));
   --color-chart-3: color-mix(in oklab, var(--text) 55%, var(--bg));
   --color-chart-4: color-mix(in oklab, var(--text) 38%, var(--bg));
   --color-chart-5: color-mix(in oklab, var(--text) 24%, var(--bg));
-  --color-sidebar: var(--surface);
+  --color-sidebar: var(--bg);
   --color-sidebar-foreground: var(--text);
   --color-sidebar-primary: var(--accent);
   --color-sidebar-primary-foreground: var(--accent-ink);
-  --color-sidebar-accent: var(--surface-3);
+  --color-sidebar-accent: var(--surface-2);
   --color-sidebar-accent-foreground: var(--text);
   --color-sidebar-border: var(--line);
-  --color-sidebar-ring: var(--focus-ring);
+  --color-sidebar-ring: var(--accent);
 }
 
-/* -- Transitional bridge (removed once phases 3–5 have restyled every page) --
+/* -- Transitional bridge (deleted when the pages are rebuilt, phase 6) --------
    Pages not yet rebuilt still use Tailwind palette classes (slate-*, brand-*).
-   They are pointed at the new neutrals and the yellow accent here so the app
-   stays coherent in between. Nothing new may use these. */
+   They are pointed at the new neutrals and the cream accent so the app stays
+   readable in between. Nothing new may use these. */
 @theme {
-  --color-slate-50: #f4f2ed;
-  --color-slate-100: #efede7;
-  --color-slate-200: #e3e1db;
-  --color-slate-300: #c9c7c1;
-  --color-slate-400: #9a9aa3;
-  --color-slate-500: #6e6e77;
-  --color-slate-600: #55555e;
-  --color-slate-700: #2e2e33;
-  --color-slate-800: #1f1f23;
-  --color-slate-900: #111113;
-  --color-slate-950: #0a0a0b;
+  --color-slate-50: #ecead6;
+  --color-slate-100: #e3e1ce;
+  --color-slate-200: #cfcdba;
+  --color-slate-300: #bab8a6;
+  --color-slate-400: #a3a193;
+  --color-slate-500: #7c7b71;
+  --color-slate-600: #5d5c54;
+  --color-slate-700: #3d3d38;
+  --color-slate-800: #232320;
+  --color-slate-900: #121211;
+  --color-slate-950: #0a0a09;
 
-  --color-brand-50: #fff8db;
-  --color-brand-100: #fff0b3;
-  --color-brand-200: #ffe680;
-  --color-brand-300: #ffdb4d;
-  --color-brand-400: #ffcc00;
-  --color-brand-500: #ffcc00;
-  --color-brand-600: #f2b705;
-  --color-brand-700: #d9a404;
-  --color-brand-800: #8a6a00;
-  --color-brand-900: #4d3b00;
-  --color-brand-950: #2b2100;
-  --color-on-brand: #0a0a0b;
+  --color-brand-50: #f6f8dc;
+  --color-brand-100: #eff3c4;
+  --color-brand-200: #e3e8a8;
+  --color-brand-300: #e3e8a8;
+  --color-brand-400: #e3e8a8;
+  --color-brand-500: #e3e8a8;
+  --color-brand-600: #e3e8a8;
+  --color-brand-700: #cdd38d;
+  --color-brand-800: #8f9460;
+  --color-brand-900: #55583a;
+  --color-brand-950: #2b2d1d;
+  --color-on-brand: #0a0a09;
 
-  /* Chart tokens until the Recharts theme is rebuilt in phase 4. */
+  /* Chart tokens until the Recharts theme is rebuilt in phase 3. */
   --color-heat-low: var(--text-faint);
   --color-heat-mid: var(--text-muted);
   --color-heat-high: var(--text);
@@ -118,7 +119,7 @@
   --color-timing-tls: color-mix(in oklab, var(--text) 55%, var(--bg));
   --color-timing-ttfb: color-mix(in oklab, var(--text) 38%, var(--bg));
   --color-timing-download: color-mix(in oklab, var(--text) 24%, var(--bg));
-  --color-chart-surface: var(--surface);
+  --color-chart-surface: var(--bg);
   --color-chart-grid: var(--line);
   --color-chart-axis: var(--text-faint);
 }
@@ -126,37 +127,25 @@
 @layer base {
   html {
     @apply font-sans;
+    background: var(--bg);
   }
 
   body {
-    @apply bg-bg text-fg antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    @apply text-fg antialiased;
+    font-size: 15px;
+    font-weight: 400;
+    /* Ambient glows are positioned against the page, never scrolled sideways. */
+    overflow-x: hidden;
   }
 
   * {
     @apply border-line;
   }
 
-  /* Film grain over everything: fixed, never interactive, never selectable. */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 2147483000;
-    pointer-events: none;
-    background-image: var(--grain);
-    opacity: var(--grain-opacity);
-    mix-blend-mode: overlay;
-  }
-
-  /* One focus style everywhere: 2px ring in --focus-ring (yellow on dark,
-     ink with a yellow halo on light). */
+  /* One focus style everywhere: 1.5px accent ring, 2px offset. */
   :focus-visible {
-    outline: 2px solid var(--focus-ring);
+    outline: 1.5px solid var(--accent);
     outline-offset: 2px;
-  }
-  [data-theme='light'] :focus-visible {
-    box-shadow: 0 0 0 5px color-mix(in oklab, var(--accent) 70%, transparent);
   }
 
   /* Numbers and timings line up in columns. */
@@ -165,31 +154,66 @@
   kbd {
     font-variant-numeric: tabular-nums;
   }
-}
 
-/* Halftone dot panel, like the textured blocks of a printed page. */
-@utility halftone {
-  background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
-  background-size: 4px 4px;
-}
-
-/* Legacy depth utilities from the previous theme, flattened: panels sit on the
-   hairline grid now. Removed with the bridge. */
-@utility surface-3d {
-  box-shadow: var(--shadow-panel);
-}
-@utility lift-3d {
-  transition: border-color 200ms ease;
-  &:hover {
-    border-color: var(--line-strong);
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
   }
+}
+
+/* -- Motion ---------------------------------------------------------------------
+   Enter: fade + 12px rise, 500ms, staggered 60ms by --i (set per element).
+   Everything that moves is switched off under prefers-reduced-motion. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: rise var(--dur-enter) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * var(--dur-stagger));
   @media (prefers-reduced-motion: reduce) {
-    transition: none;
+    animation: none;
   }
 }
-@utility press-3d {
-  box-shadow: none;
+
+/* -- Ambient light (see components/ambient/AmbientGlow.jsx) -----------------------
+   Large blurred radial glows that drift very slowly (40-60 s loops). */
+@keyframes glow-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5vw, -3vh, 0) scale(1.08);
+  }
 }
-@utility tilt-3d {
-  transform: none;
+
+@keyframes glow-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-4vw, 4vh, 0) scale(0.94);
+  }
+}
+
+@utility glow-drift-a {
+  animation: glow-drift-a 52s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility glow-drift-b {
+  animation: glow-drift-b 44s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }

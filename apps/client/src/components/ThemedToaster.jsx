@@ -1,15 +1,13 @@
 import { Toaster } from 'sonner';
-import { useTheme } from '../theme/ThemeContext.js';
 
-// Plain toasts sit on the panel surface with a hairline; success/error keep
-// sonner's rich colours (state, not brand).
+// Plain toasts sit on the page with a hairline; success/error keep sonner's
+// rich colours (state, not brand). Restyled as bottom-centre pills in phase 3.
 const SURFACE = {
-  '--normal-bg': 'var(--surface-2)',
+  '--normal-bg': 'var(--bg)',
   '--normal-border': 'var(--line-strong)',
   '--normal-text': 'var(--text)',
 };
 
 export default function ThemedToaster() {
-  const { theme } = useTheme();
-  return <Toaster theme={theme} position="top-right" richColors closeButton style={SURFACE} />;
+  return <Toaster theme="dark" position="bottom-center" richColors closeButton style={SURFACE} />;
 }

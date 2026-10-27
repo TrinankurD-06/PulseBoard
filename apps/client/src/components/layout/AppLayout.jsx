@@ -18,7 +18,6 @@ import { cn } from '../../lib/cn.js';
 import { useRealtime } from '../../realtime/useRealtime.js';
 import NotFound from '../../pages/NotFound.jsx';
 import Logo from '../Logo.jsx';
-import ThemeToggle from '../ThemeToggle.jsx';
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 
 const NAV_ITEMS = [
@@ -85,7 +84,6 @@ function Sidebar({ onNavigate, connected }) {
           <p className="truncate text-sm font-medium">{user?.name}</p>
           <p className="truncate text-xs text-slate-500">{user?.email}</p>
         </div>
-        <ThemeToggle />
         <button
           type="button"
           onClick={logout}

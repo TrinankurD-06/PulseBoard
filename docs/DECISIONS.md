@@ -1247,3 +1247,35 @@ series would not line up between cards.
   Retry button. All three keep the card grid and the panel's height, so nothing jumps.
 - **Left alone.** The existing charts and sections on the monitor page are untouched; the deck sits
   above them and integration decides what to retire. Isolated buckets between gaps are drawn as dots.
+
+## UI v2: "Ambient Signal"
+
+### D94. Dark only, new tokens and an ambient light system
+
+- **Supersedes the theme parts of D88, D90 and D91** (peach/orange, heat ramp, yellow editorial
+  tokens, film grain, halftone, status orb, light mode). Kept from D91: React 19, the shadcn/ui
+  foundations (`tsx: false`, `@/components/shadcn`, `cn`) and the `@/` alias.
+- **Dark only; the light-mode toggle is removed.** The look depends on moss light on near-black;
+  a second theme would be a different design, not a recolour, and every glow, hairline and gauge tick
+  would need its own light variant to stay legible. One theme means one set of contrast numbers to
+  maintain. `ThemeProvider`, `ThemeContext`, `ThemeToggle` and the saved preference are deleted;
+  `<html>` declares `color-scheme: dark` and a dark `theme-color`.
+- **Tokens** (`src/styles/tokens.css`) follow the brief: `--bg`, `--surface(-2)`, `--line(-strong)`,
+  `--text(-muted/-faint)`, `--accent` (pale lime), `--glow(-2)` (moss), status colours, `--radius-card`
+  (16 px) / `--radius-pill`, Manrope + JetBrains Mono, and motion tokens (`--ease`, 200 ms hover,
+  500 ms enter, 60 ms stagger, 800 ms gauge). **One deviation:** `--text-faint` is #7C7B71 (4.7:1 on
+  `--bg`) instead of #6F6E64 (3.9:1), because it is used for 11 px micro text; `--text-muted` is 7.6:1.
+  `--status-paused` keeps #6F6E64 but is only ever a dot or bar colour, never text.
+- **Utilities keep their names** (`bg-surface`, `border-line`, `text-muted`, `text-faint`, `text-fg`,
+  `bg-brand`, `status-*`, `rounded-card`, `rounded-pill`), so the Health deck and other
+  token-based code needed no rewrite.
+- **Ambient light:** `AmbientGlow` is mounted once and sits behind everything (fixed, `-z-10`, so page
+  roots must not paint an opaque background; the two that did were fixed): two blurred (80 px) radial
+  moss glows that drift on 44 s and 52 s loops, off-centre. A third, in `--status-down`, fades in over
+  4 s at 20 % opacity while a page reports a down monitor (`useAmbientAlertSignal`, a tiny
+  module-level store; it resets on unmount). Motion is off under `prefers-reduced-motion`.
+- **Focus** is a 1.5 px `--accent` outline with a 2 px offset everywhere.
+- **Transitional bridge.** Until the pages are rebuilt (phase 6), the old palette classes (`slate-*`,
+  `brand-*`, chart series/heat/timing tokens) are pointed at the new neutrals, the cream accent and
+  text shades, and `dark:` is an always-true variant so the existing `dark:` classes keep applying.
+  The bridge and the variant are deleted with the last page.
