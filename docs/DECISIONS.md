@@ -1142,3 +1142,39 @@ exactly the wiring that differs between types.
   identity never depends on hue alone.
 - **Status colours are untouched.** Uptime bars, status dots and badges still mean green = up,
   amber = degraded, red = down; the heat ramp is only for measurements.
+
+## UI redesign: "Dark Editorial"
+
+### D91. Design tokens, shadcn/ui foundations and React 19
+
+- **Supersedes D88 and D90.** The warm peach / orange theme and the yellow-to-red chart ramp are
+  replaced by the editorial direction: near-black canvas, hairlines, one yellow accent, charts in
+  status or text shades.
+- **One tokens file** (`apps/client/src/styles/tokens.css`): `:root` is dark, `[data-theme="light"]`
+  redefines the same names. `index.css` maps tokens into Tailwind with `@theme inline` (utilities
+  read the variable at runtime, so a theme switch needs no rebuild): `bg-bg`, `bg-surface(-2/-3)`,
+  `border-line(-strong)`, `text-fg/muted/faint`, `bg-brand` + `text-brand-ink` (yellow),
+  `status-*`, `font-heading`, `font-mono`, `rounded-sm/md/lg`, `shadow-panel`. Where a Tailwind
+  theme key has the token's own name (`--radius-sm`, `--font-mono`), Tailwind emits a
+  self-reference in its theme layer; the unlayered tokens file wins the cascade, verified in the
+  browser (4px, JetBrains Mono).
+- **Contrast fixes to the brief's values:** `--text-faint` is #7C7C86 dark (4.8:1 on --bg, was
+  3.6:1) and #6E6E77 light (4.5:1, was 3.3:1), since it is used for 11px labels. Light `--accent`
+  (#F2B705) is 1.8:1 against the page, so it is only ever a fill with `--accent-ink` text; the light
+  focus ring is ink with a yellow halo (`--focus-ring`). Added `--status-pending` (grey, pulses).
+- **Theme switch** is `data-theme` on `<html>` (was a `dark` class); `dark:` utilities follow it.
+- **Texture:** film grain is a fixed `body::after` with an inline SVG `feTurbulence` data URI
+  (5 % dark, 4 % light, overlay blend, no pointer events); `halftone` is a 4 px dot utility.
+- **shadcn/ui** initialised with `tsx: false` (components arrive as `.jsx`, our ESLint and JS
+  codebase stay as they are), components in `@/components/shadcn` because Windows' case-insensitive
+  file system made shadcn's `button.jsx` overwrite our `Button.jsx` in `components/ui`. Every shadcn
+  semantic colour points at a token (shadcn's `accent` = our `surface-3` hover; our yellow is
+  `primary`/`brand`). `cn` is clsx + tailwind-merge.
+- **React 19.3** (React Bits Pro and current shadcn components pass refs as props). One copy after
+  `npm dedupe`. While upgrading we found the client was being built in development mode: the root
+  `.env` sets `NODE_ENV=development` for the API, and Vite turns a `.env` NODE_ENV into a dev build.
+  `vite.config.js` claims `VITE_USER_NODE_ENV` first on `vite build`; the entry chunk went from
+  565 kB to 358 kB.
+- **Transitional bridge:** until phases 3–5 rebuild every page, the old palette classes (`slate-*`,
+  `brand-*`, chart series/heat tokens) are pointed at the new neutrals, the yellow accent and text
+  shades, and the old 3D utilities are flattened. The bridge is deleted at the end of phase 5.

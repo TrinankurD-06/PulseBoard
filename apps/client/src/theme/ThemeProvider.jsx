@@ -2,16 +2,20 @@ import { useCallback, useMemo, useState } from 'react';
 import { ThemeContext } from './ThemeContext.js';
 
 function readTheme() {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
-/** Dark-first theme stored in localStorage; index.html applies it before first paint. */
+/**
+ * Dark-first theme stored in localStorage, applied as data-theme on <html>
+ * (tokens.css redefines the tokens for "light"); index.html sets it before
+ * first paint.
+ */
 export default function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(readTheme);
 
   const toggleTheme = useCallback(() => {
     const next = readTheme() === 'dark' ? 'light' : 'dark';
-    document.documentElement.classList.toggle('dark', next === 'dark');
+    document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem('theme', next);
     } catch {

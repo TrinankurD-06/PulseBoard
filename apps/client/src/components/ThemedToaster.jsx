@@ -1,24 +1,15 @@
 import { Toaster } from 'sonner';
 import { useTheme } from '../theme/ThemeContext.js';
 
-// Plain toasts use the app's warm surfaces; success/error keep sonner's rich
-// green/red (state colours, not brand).
-const SURFACES = {
-  light: {
-    '--normal-bg': 'var(--color-white)',
-    '--normal-border': 'var(--color-slate-200)',
-    '--normal-text': 'var(--color-slate-900)',
-  },
-  dark: {
-    '--normal-bg': 'var(--color-slate-900)',
-    '--normal-border': 'var(--color-slate-800)',
-    '--normal-text': 'var(--color-slate-100)',
-  },
+// Plain toasts sit on the panel surface with a hairline; success/error keep
+// sonner's rich colours (state, not brand).
+const SURFACE = {
+  '--normal-bg': 'var(--surface-2)',
+  '--normal-border': 'var(--line-strong)',
+  '--normal-text': 'var(--text)',
 };
 
 export default function ThemedToaster() {
   const { theme } = useTheme();
-  return (
-    <Toaster theme={theme} position="top-right" richColors closeButton style={SURFACES[theme]} />
-  );
+  return <Toaster theme={theme} position="top-right" richColors closeButton style={SURFACE} />;
 }
