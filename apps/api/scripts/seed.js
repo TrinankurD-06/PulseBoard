@@ -69,6 +69,11 @@ const env = parseEnv(
     // Empty variables in .env mean "not set".
     SEED_DEMO_TARGET_URL: z.preprocess((value) => value || undefined, z.string().url().optional()),
     SEED_API_URL: z.preprocess((value) => value || undefined, z.string().url().optional()),
+    // Force the local-only demo monitors on or off (default: on for a local database).
+    SEED_LOCAL_DEMO: z.preprocess(
+      (value) => value || undefined,
+      z.enum(['true', 'false']).optional(),
+    ),
     SEED_DISCORD_WEBHOOK_URL: z.string().optional(),
     SEED_SLACK_WEBHOOK_URL: z.string().optional(),
     SEED_ALERT_EMAIL: z.string().optional(),
@@ -89,6 +94,14 @@ const demoMode = env.DEMO_MODE === 'true';
 const schemas = buildMonitorSchemas({ demoMode });
 const DEMO_TARGET_URL = env.SEED_DEMO_TARGET_URL ?? `http://localhost:${env.DEMO_TARGET_PORT}/`;
 const API_URL = (env.SEED_API_URL ?? `http://localhost:${env.API_PORT}/api/v1`).replace(/\/$/, '');
+// The demo target, the heartbeat and the agent only work beside a local demo-target
+// and its heartbeat script, so on a hosted database they would sit there down and
+// open incidents. They are seeded for a local database, when a public demo target
+// is given, or when SEED_LOCAL_DEMO=true.
+const LOCAL_DB = /\/\/(?:[^/@]*@)?(?:localhost|127\.0\.0\.1)[:/]/.test(env.MONGODB_URI);
+const includeLocalDemo = env.SEED_LOCAL_DEMO
+  ? env.SEED_LOCAL_DEMO === 'true'
+  : LOCAL_DB || Boolean(env.SEED_DEMO_TARGET_URL);
 const DEMO_FILE = fileURLToPath(
   new URL('../../demo-target/.pulseboard-demo.json', import.meta.url),
 );
@@ -194,6 +207,14 @@ const random = () => {
 const round1 = (value) => Math.round(value * 10) / 10;
 
 const typeOf = (spec) => spec.type ?? MONITOR_TYPES.HTTP;
+
+const needsLocalDemo = (spec) =>
+  typeOf(spec) !== MONITOR_TYPES.HTTP || spec.url === DEMO_TARGET_URL;
+// Positions in MONITORS that get created. The positions are kept (not re-numbered)
+// because OUTAGES and the generators below refer to monitors by that position.
+const SEEDED = MONITORS.map((_, index) => index).filter(
+  (index) => includeLocalDemo || !needsLocalDemo(MONITORS[index]),
+);
 
 /** Seconds between two results of this monitor (check, ping or report). */
 function periodSec(spec) {
@@ -538,14 +559,15 @@ async function main() {
   const workspace = await createWorkspaceWithOwner({ name: 'Acme Inc.', ownerId: user._id });
 
   const monitors = await Monitor.insertMany(
-    MONITORS.map((spec) => ({
+    SEEDED.map((index) => MONITORS[index]).map((spec) => ({
       ...monitorDoc(spec, secrets),
       workspaceId: workspace._id,
       status: MONITOR_STATUS.PENDING,
     })),
   );
 
-  for (const [index, monitor] of monitors.entries()) {
+  for (const [position, monitor] of monitors.entries()) {
+    const index = SEEDED[position];
     const spec = MONITORS[index];
     const checks = rawChecks(monitor, index);
     await CheckResult.insertMany(checks);
@@ -580,32 +602,38 @@ async function main() {
   });
 
   const heartbeatUrl = `${API_URL}/ping/${secrets.heartbeatToken}`;
-  const agentSpec = MONITORS.find((spec) => typeOf(spec) === MONITOR_TYPES.AGENT);
-  const demoFile = {
-    agentKey: secrets.agentKey,
-    endpoint: API_URL,
-    // The demo-target's agent reports at the interval the monitor expects.
-    reportEverySec: agentSpec.reportEverySec,
-    heartbeatUrl,
-  };
-  writeFileSync(DEMO_FILE, `${JSON.stringify(demoFile, null, 2)}\n`);
+  if (includeLocalDemo) {
+    const agentSpec = MONITORS.find((spec) => typeOf(spec) === MONITOR_TYPES.AGENT);
+    const demoFile = {
+      agentKey: secrets.agentKey,
+      endpoint: API_URL,
+      // The demo-target's agent reports at the interval the monitor expects.
+      reportEverySec: agentSpec.reportEverySec,
+      heartbeatUrl,
+    };
+    writeFileSync(DEMO_FILE, `${JSON.stringify(demoFile, null, 2)}\n`);
+  }
 
   await closeAgenda();
   await disconnectMongo();
 
   const kept = (reused) => (reused ? ' (kept from the previous seed)' : '');
-  console.warn(`
-Seeded the demo account.
-  Login:          ${DEMO_EMAIL} / ${DEMO_PASSWORD}
-  Workspace:      ${workspace.name} (${monitors.length} monitors, ${channels.length} alert channel${channels.length === 1 ? '' : 's'}: ${channels.map((c) => c.type).join(', ')})
-  Status page:    /status/${statusPage.slug}
-  Demo target:    ${DEMO_TARGET_URL}  (control panel: ${DEMO_TARGET_URL.replace(/\/$/, '')}/admin)
+  const demoLines = includeLocalDemo
+    ? `  Demo target:    ${DEMO_TARGET_URL}  (control panel: ${DEMO_TARGET_URL.replace(/\/$/, '')}/admin)
   Agent key:      ${secrets.agentKey}${kept(secrets.reused.agentKey)}
   Agent endpoint: ${API_URL}
   Heartbeat URL:  ${heartbeatUrl}${kept(secrets.reused.heartbeatToken)}
   Written to:     ${DEMO_FILE} (git-ignored; the demo-target reads it)
 Start everything with: npm run dev
-Then start the heartbeat by hand: npm run heartbeat -w @pulseboard/demo-target
+Then start the heartbeat by hand: npm run heartbeat -w @pulseboard/demo-target`
+    : `  Skipped the demo target, heartbeat and agent monitors: they need a local demo-target.
+  Set SEED_LOCAL_DEMO=true to include them.`;
+  console.warn(`
+Seeded the demo account.
+  Login:          ${DEMO_EMAIL} / ${DEMO_PASSWORD}
+  Workspace:      ${workspace.name} (${monitors.length} monitors, ${channels.length} alert channel${channels.length === 1 ? '' : 's'}: ${channels.map((c) => c.type).join(', ')})
+  Status page:    /status/${statusPage.slug}
+${demoLines}
 `);
 }
 
