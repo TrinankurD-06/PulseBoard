@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://pulseboard-api.onrender.com/api/:path*"
+      "destination": "https://pulseboard-api-9ssi.onrender.com/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
