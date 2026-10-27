@@ -1397,3 +1397,36 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   list, so the list is kept intact and a `SEEDED` list of positions chooses what is created.
 - **Tested** against a throwaway replica set: original seed (6 monitors), `SEED_LOCAL_DEMO=false`
   (Example.com, GitHub, Google; status page of 3; no demo file) and the default local run (6 + file).
+
+### D100. Alert links, one layout per error page, and the dark alert email
+
+- **Test alerts no longer link to a monitor that does not exist.** "Send test alert" used a placeholder
+  monitor, so "Open dashboard" went to `/app/<workspace>/monitors/test` (a 404). A test now links to the
+  workspace's **Alert channels** page (`/app/<workspace>/alerts`) and its button says "Open alert
+  channels". Real alerts and notices still link to the real monitor page.
+- **One place builds every alert link** (`packages/shared/src/alerts/links.js`: `appBaseUrl`,
+  `workspaceLink`, `monitorLink`, `alertChannelsLink`), from the client's public URL, trimmed of
+  trailing slashes and whitespace. The variable is `DASHBOARD_URL` (the brief called it `CLIENT_URL`; the
+  project has never had a variable by that name, and adding an alias would give two sources of truth).
+  `DASHBOARD_URL` defaults to `http://localhost:5173`, so forgetting it on the host would send everyone to
+  their own machine: the API and worker now **log a warning at startup** when `NODE_ENV=production` and it
+  points at localhost, 127.0.0.1 or [::1] (or is not a URL). Locally it is correct in `.env.example`;
+  in production it is set in the host's environment (Render) to the Vercel URL.
+- **Every error screen gets exactly one layout** (`lib/errorLayout.js`, `components/ErrorPage.jsx`):
+  inside the app shell, only the message (a missing monitor); logged in, the app shell around it (header
+  line, nav, the workspace from the URL); logged out, the public header; while the session is still being
+  restored, a spinner rather than a flash of the wrong header. Before, `NotFound` always drew the public
+  header, so a missing monitor stacked it under the app header, and a mistyped URL showed a logged-in user
+  the logged-out header. 404, workspace-not-found, monitor-not-found and the missing status page all use it.
+  An error page restores the session itself (public routes deliberately never do, D57).
+- **A crash screen.** `AppErrorBoundary` catches a render error and shows a 500 page with only the
+  wordmark and a reload link, deliberately not the shell or the session, since either may be what failed;
+  it resets when the route changes.
+- **Alert email restyled to the dark theme.** `#0A0A09` page, `#ECEAD6` text, `#E3E8A8` button, Manrope
+  with a system fallback (web fonts load only in clients that allow them), and a status strip across the
+  card: red down, green recovered, amber notice, neutral test. Nested tables, inline styles and `bgcolor`
+  attributes only, solid hex (no `rgba()`, flexbox or `<style>`), because Gmail and Outlook ignore the rest;
+  a hidden preheader, a visible fallback URL under the button, and a plain-text alternative. The Discord and
+  Slack messages are unchanged apart from the corrected test link.
+- **Tests:** the link builders and the test-alert link (unit and through the API), the startup warning,
+  the email template's structure, colours, escaping and text version, and the layout rule.

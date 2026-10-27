@@ -5,9 +5,10 @@ import { useAuth } from '../../auth/AuthContext.js';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import CreateWorkspaceModal from './CreateWorkspaceModal.jsx';
 
-export default function WorkspaceSwitcher() {
+export default function WorkspaceSwitcher({ wid }) {
   const { workspaces } = useAuth();
-  const { workspace } = useCurrentWorkspace();
+  const { workspace: fromUrl } = useCurrentWorkspace();
+  const workspace = (wid && workspaces.find((w) => w.id === wid)) || fromUrl;
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const containerRef = useRef(null);

@@ -4,6 +4,7 @@ import { usePublicStatus } from '../api/statusPages.js';
 import UptimeBars from '../components/charts/UptimeBars.jsx';
 import UptimeLegend from '../components/charts/UptimeLegend.jsx';
 import TickGauge from '../components/gauge/TickGauge.jsx';
+import ErrorPage from '../components/ErrorPage.jsx';
 import PublicHeader from '../components/public/PublicHeader.jsx';
 import SignalFieldLazy from '../components/signal/SignalFieldLazy.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -121,27 +122,24 @@ export default function PublicStatus() {
   }
 
   if (error) {
-    const missing = error.response?.status === 404;
+    // The same error page as everywhere else: the app shell for a logged-in
+    // visitor, the public header otherwise.
+    if (error.response?.status === 404) {
+      return (
+        <ErrorPage
+          code="404"
+          title="Status page not found."
+          message="This page doesn't exist or isn't public."
+        />
+      );
+    }
     return (
-      <Shell>
-        <div className="py-16">
-          <h1
-            className="font-light tracking-[-0.03em] text-fg"
-            style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05 }}
-          >
-            {missing ? 'Status page not found.' : 'Status is temporarily unavailable.'}
-          </h1>
-          <p className="mt-4 max-w-[38ch] text-[15px] text-muted">
-            {missing ? "This page doesn't exist or isn't public." : 'Please try again in a moment.'}
-          </p>
-          <Link
-            to="/"
-            className="mt-8 inline-block text-sm text-fg underline-offset-4 hover:underline"
-          >
-            Go to PulseBoard
-          </Link>
-        </div>
-      </Shell>
+      <ErrorPage
+        code="503"
+        title="Status is temporarily unavailable."
+        message="Please try again in a moment."
+        action={{ label: 'Try again', onClick: () => window.location.reload() }}
+      />
     );
   }
 

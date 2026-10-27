@@ -90,7 +90,7 @@ export default function HeaderLine({ wid, connected }) {
   return (
     <header className="flex items-center gap-3 sm:gap-5">
       <Logo to={`/app/${wid}`} className="shrink-0" />
-      <WorkspaceSwitcher />
+      <WorkspaceSwitcher wid={wid} />
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
       <LiveStatus wid={wid} connected={connected} />
       <UserMenu />
