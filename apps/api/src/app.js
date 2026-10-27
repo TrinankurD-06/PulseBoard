@@ -22,6 +22,7 @@ import { metaRouter } from './modules/meta/meta.routes.js';
 import { monitorAnalyticsRouter } from './modules/monitors/analytics.routes.js';
 import { monitorsRouter } from './modules/monitors/monitors.routes.js';
 import { pingRouter } from './modules/ping/ping.routes.js';
+import { agentRouter } from './modules/agent/agent.routes.js';
 import { PUBLIC_CACHE_SECONDS, publicRouter } from './modules/public/public.routes.js';
 import { statusPagesRouter } from './modules/statusPages/statusPages.routes.js';
 import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
@@ -92,6 +93,8 @@ export function createApp({
   api.use('/public', publicRouter({ publicCache }));
   // Heartbeat pings: public, the token in the URL is the authentication.
   api.use('/ping', pingRouter({ processCheckResult }));
+  // Agent reports (U4): public, the Bearer agent key is the authentication.
+  api.use('/agent', agentRouter({ processCheckResult }));
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.

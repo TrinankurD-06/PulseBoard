@@ -9,6 +9,9 @@ import Button from '../ui/Button.jsx';
 import Field from '../ui/Field.jsx';
 import Switch from '../ui/Switch.jsx';
 
+// Push monitors have no URL to show next to their name.
+const TYPE_LABELS = { heartbeat: 'Heartbeat', agent: 'App agent' };
+
 /** "Acme Inc. Status" -> "acme-inc-status" (same rules as the API's slug check). */
 const slugify = (text) =>
   text
@@ -137,7 +140,7 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
                         <StatusDot status={monitor.status} />
                         <span className="min-w-0 flex-1 truncate text-sm">{monitor.name}</span>
                         <span className="truncate text-xs text-slate-500">
-                          {hostOf(monitor.url)}
+                          {monitor.url ? hostOf(monitor.url) : (TYPE_LABELS[monitor.type] ?? '')}
                         </span>
                       </label>
                     </li>

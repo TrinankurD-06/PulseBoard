@@ -23,7 +23,8 @@
     "./cost": "./src/cost/index.js",
     "./usage": "./src/usage/index.js",
     "./adaptive": "./src/adaptive/index.js",
-    "./budget": "./src/budget/index.js"
+    "./budget": "./src/budget/index.js",
+    "./agent": "./src/agent/index.js"
   },
   "scripts": {
     "test": "vitest run",

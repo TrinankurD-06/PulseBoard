@@ -2,6 +2,14 @@ import { ALERT_KIND, NOTICE_KIND } from '../constants.js';
 
 const formatNumber = (value) => Number(value).toLocaleString('en-US');
 
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'the endpoint';
+  }
+}
+
 /**
  * Builds a notice: an alert that isn't about an incident (budget warnings,
  * and from U4 "agent silent"). Same channel-agnostic shape as buildAlert(),
@@ -11,7 +19,28 @@ const formatNumber = (value) => Number(value).toLocaleString('en-US');
  */
 export function buildNotice({ noticeKind, monitor, details = {}, dashboardUrl }) {
   const link = `${dashboardUrl.replace(/\/$/, '')}/app/${monitor.workspaceId}/monitors/${monitor._id ?? monitor.id}`;
-  const base = { kind: ALERT_KIND.NOTICE, monitorName: monitor.name, url: monitor.url, link };
+  const base = {
+    kind: ALERT_KIND.NOTICE,
+    monitorName: monitor.name,
+    url: monitor.url ?? monitor.probeUrl ?? null,
+    link,
+  };
+
+  // details: { silentSec } — the agent stopped reporting but probeUrl answers.
+  if (noticeKind === NOTICE_KIND.AGENT_SILENT) {
+    const host = hostOf(monitor.probeUrl);
+    const since = details.silentSec != null ? ` (no report for ${details.silentSec} s)` : '';
+    return {
+      ...base,
+      title: `⚠️ ${monitor.name}: agent stopped reporting, but ${host} still answers`,
+      summary: `The PulseBoard agent in ${monitor.name} went silent${since}, but ${host} still responds, so this is not an incident. Check that the agent is running and its key is valid.`,
+      fields: [
+        ['Status', 'Degraded'],
+        ['Probe URL', monitor.probeUrl ?? '-'],
+      ],
+    };
+  }
+
   const used = `${formatNumber(details.requests)} of ${formatNumber(details.budget)} requests`;
   const atLimit =
     details.budgetAction === 'pause'

@@ -18,9 +18,7 @@ const TYPES = [
     value: 'agent',
     icon: Cpu,
     title: 'App agent',
-    text: 'An npm package reports from inside your app.',
-    disabled: true,
-    badge: 'Coming soon',
+    text: 'Your app reports to us via an npm package. Real traffic, near-zero requests.',
   },
 ];
 

@@ -31,18 +31,22 @@ export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
   }
 
   // Heartbeat monitors have no URL: the alert talks about pings instead.
+  // Agent monitors talk about their reports (and probes).
   const isHeartbeat = monitor.type === MONITOR_TYPES.HEARTBEAT;
+  const isAgent = monitor.type === MONITOR_TYPES.AGENT;
+  if (isAgent) base.url = monitor.probeUrl ?? null;
 
   if (kind === ALERT_KIND.DOWN) {
     const since = monitor.lastPingAt
       ? new Date(monitor.lastPingAt).toUTCString()
       : 'it was created';
+    let summary = `${monitor.url} has failed its last checks.`;
+    if (isHeartbeat) summary = `No ping from ${monitor.name} since ${since}.`;
+    if (isAgent) summary = `${monitor.name} is failing: its agent reports or probes failed.`;
     return {
       ...base,
       title: `🔴 ${monitor.name} is DOWN`,
-      summary: isHeartbeat
-        ? `No ping from ${monitor.name} since ${since}.`
-        : `${monitor.url} has failed its last checks.`,
+      summary,
       fields: [
         ['Cause', incident.cause || 'Unknown'],
         ['Down since', new Date(incident.startedAt).toUTCString()],
@@ -54,12 +58,13 @@ export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
     throw new Error('Use buildNotice() for notices');
   }
 
+  let summary = `${monitor.url} is responding normally again.`;
+  if (isHeartbeat) summary = `${monitor.name} is sending pings again.`;
+  if (isAgent) summary = `${monitor.name} is reporting healthy metrics again.`;
   return {
     ...base,
     title: `✅ ${monitor.name} is back UP`,
-    summary: isHeartbeat
-      ? `${monitor.name} is sending pings again.`
-      : `${monitor.url} is responding normally again.`,
+    summary,
     fields: [
       ['Downtime', humanDuration(incident.durationSec ?? 0)],
       ['Cause', incident.cause || 'Unknown'],

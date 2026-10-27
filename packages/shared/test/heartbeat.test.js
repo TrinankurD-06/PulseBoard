@@ -106,10 +106,11 @@ describe('heartbeat schemas', () => {
     expect(schemas.heartbeatUpdate.safeParse({}).success).toBe(false);
   });
 
-  it('the type defaults to http and only http/heartbeat are accepted for now', () => {
+  it('the type defaults to http; http, heartbeat and agent (U4) are accepted', () => {
     expect(monitorTypeSchema.parse(undefined)).toBe('http');
     expect(monitorTypeSchema.parse('heartbeat')).toBe('heartbeat');
-    expect(monitorTypeSchema.safeParse('agent').success).toBe(false);
+    expect(monitorTypeSchema.parse('agent')).toBe('agent');
+    expect(monitorTypeSchema.safeParse('ftp').success).toBe(false);
   });
 });
 

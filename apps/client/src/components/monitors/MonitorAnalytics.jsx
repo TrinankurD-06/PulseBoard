@@ -20,7 +20,7 @@ import UptimeStats from './UptimeStats.jsx';
 const RANGE_LABELS = { '1h': 'Last hour', '24h': 'Last 24 hours', '7d': 'Last 7 days' };
 const time = (t) => new Date(t).toLocaleString();
 
-function RangeFilter({ value, onChange }) {
+export function RangeFilter({ value, onChange, ranges = RANGES }) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-sm text-slate-500">Time range</span>
@@ -29,7 +29,7 @@ function RangeFilter({ value, onChange }) {
         aria-label="Time range"
         className="inline-flex rounded-lg border border-slate-200 p-1 dark:border-slate-800"
       >
-        {Object.keys(RANGES).map((range) => (
+        {Object.keys(ranges).map((range) => (
           <button
             key={range}
             type="button"

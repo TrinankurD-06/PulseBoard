@@ -936,3 +936,60 @@ now`), so even with several workers only one sends the warning and only one appl
   opened an incident 44 s later ("No ping received within 10s + 5s grace"); the next ping
   resolved it; `/fail?message=…` opened an incident with that cause; usage showed 0 requests
   sent and 6 pings received.
+
+## U4: `pulseboard-agent` + probe-on-silence
+
+### D81. Push-first with real traffic: the agent
+
+- An Express middleware in the customer's app measures **real requests** (status, duration,
+  route pattern) and sends one aggregated report per minute. PulseBoard learns error rate and
+  latency from actual users instead of synthetic pings, and sends **no** requests while the
+  agent reports.
+- Privacy by construction: only route **patterns** (`/orders/:id`), never full URLs, ids or
+  query strings; no headers, bodies or IPs. The README lists exactly what is sent.
+- The agent must never hurt the host: recording is O(1) and synchronous, memory is bounded
+  (reservoir of 5,000 samples, at most 50 routes per window), failures to report are dropped
+  with one warning (no retry queue that could grow), it never throws into the app and never
+  calls `process.exit`. Zero runtime dependencies.
+- A report is sent **even with zero traffic**: it doubles as a heartbeat, so silence means
+  the app (or its network) is down, not just quiet.
+
+### D82. Agent keys are hashed; heartbeat tokens aren't
+
+- The agent key authenticates writes of production metrics, so it's treated like a password:
+  shown **once**, stored only as SHA-256, regenerable. Heartbeat tokens (D77) must appear in
+  copy-paste snippets every time, so they're stored readable. Different exposure, different
+  storage.
+
+### D83. Probe-on-silence: pull only as a fallback
+
+- Silence (no report for 2 × the report interval) is ambiguous: the app may be down, or only
+  the agent/network path may be broken. So PulseBoard then **probes** the app's public URL (up to
+  3 HEAD requests, 10 s apart, with the normal check runner and SSRF guard). Each probe is a real
+  check fed to the incident engine: 3 failures meet the agent threshold (3/2) and open the
+  incident about 1.5–2 minutes after the last report, a probe success marks the monitor
+  `degraded` ("agent silent, endpoint reachable"), alerts once, and opens **no** incident.
+- `degraded` is shown as operational on public status pages: the customer's users are fine.
+- Without a probe URL, silence itself counts as one failure per detector cycle.
+- Probes and optional low-frequency external checks (900–1800 s suggested, for DNS/SSL/routing
+  issues the agent can't see from inside) are the only requests an agent monitor sends; they're
+  counted in `MonitorUsage` like everything else.
+
+### D84. U4 details and validation
+
+- Agent keys look like `pbk_…`, returned once as `data.agentKey`; only the SHA-256 hash is stored.
+- Robustness added during backend work: a report arriving mid-probe stops the probes; a
+  `probing` state left by a crashed worker resets after 10 minutes; silence is measured from
+  creation/resume (`watchSince`), so a resumed monitor isn't flagged silent at once;
+  `lastProbeAt` stops two workers probing the same monitor; reports from an agent whose clock is
+  more than 5 minutes off are placed on the server clock.
+- Known limitations: probes count only 200–399 as reachable (point the probe URL at a health
+  endpoint); a monitor that is silent **and down** recovers when its agent reports again (re-probing
+  only runs while degraded).
+- Dashboard summary counts `degraded` as Up (endpoint reachable), consistent with public pages.
+- Validated with a scratch Express app running the real SDK against the real API and worker:
+  route recorded only as `/api/orders/:id` (ids and query stripped); error-rate breach → incident
+  after 84 s (3 windows of 30 s), resolved after 90 s; agent stopped but app serving → `degraded`
+  after 66 s with one notice and **no** incident; process killed → 3 probes failed → incident after
+  108 s ("Connection refused"); restarted → resolved after 63 s; only 4 requests ever sent (probes),
+  12 reports received.

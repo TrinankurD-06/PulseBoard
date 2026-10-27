@@ -59,13 +59,16 @@ export function buildCheckUpdate(result, checkedAt) {
 function openedMessage(monitor, cause) {
   if (monitor.type === MONITOR_TYPES.HEARTBEAT) return `Heartbeat missing or failed: ${cause}`;
   const { failure } = thresholdsFor(monitor.type);
+  if (monitor.type === MONITOR_TYPES.AGENT) {
+    return `Down after ${failure} consecutive failed reports or probes: ${cause}`;
+  }
   return `Down after ${failure} consecutive failed checks: ${cause}`;
 }
 
 function recoveredMessage(monitor) {
-  return monitor.type === MONITOR_TYPES.HEARTBEAT
-    ? 'Recovered: pings are arriving again'
-    : 'Recovered: checks are passing again';
+  if (monitor.type === MONITOR_TYPES.HEARTBEAT) return 'Recovered: pings are arriving again';
+  if (monitor.type === MONITOR_TYPES.AGENT) return 'Recovered: agent reports are healthy again';
+  return 'Recovered: checks are passing again';
 }
 
 /**

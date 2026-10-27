@@ -122,6 +122,19 @@ describe('change streams -> socket events', () => {
     await stop();
   });
 
+  it('agent silence changes (U4) are pushed live with lastReportAt and silenceState', async () => {
+    const monitor = await createMonitor();
+    const lastReportAt = new Date();
+    await Monitor.updateOne({ _id: monitor._id }, { lastReportAt, silenceState: 'reporting' });
+    await Monitor.updateOne({ _id: monitor._id }, { silenceState: 'probing' });
+
+    await waitFor(() => io.emitted.filter((e) => e.event === 'check:result').length >= 2);
+    const [first, second] = io.emitted.filter((e) => e.event === 'check:result');
+    expect(new Date(first.payload.lastReportAt)).toEqual(lastReportAt);
+    expect(second.payload).toMatchObject({ silenceState: 'probing' });
+    await stop();
+  });
+
   it('inserting an incident emits incident:opened; resolving emits incident:resolved', async () => {
     const monitor = await createMonitor();
     const incident = await Incident.create({

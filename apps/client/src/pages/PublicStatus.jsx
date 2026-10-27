@@ -46,6 +46,12 @@ const OVERALL = {
 // Customer-facing wording for each monitor status.
 const COMPONENT_STATUS = {
   up: { label: 'Operational', dot: 'bg-status-up', text: 'text-emerald-700 dark:text-emerald-400' },
+  // Agent silent but the app answers: an internal concern, operational to visitors.
+  degraded: {
+    label: 'Operational',
+    dot: 'bg-status-up',
+    text: 'text-emerald-700 dark:text-emerald-400',
+  },
   down: { label: 'Outage', dot: 'bg-status-down', text: 'text-red-700 dark:text-red-400' },
   pending: {
     label: 'Checking',

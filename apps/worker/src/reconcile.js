@@ -2,6 +2,7 @@ import { JOB_NAMES } from '@pulseboard/shared/constants';
 import { Monitor } from '@pulseboard/shared/models';
 import {
   AGENDA_COLLECTION,
+  CHECK_JOB_FIELDS,
   CHECK_JOB_MONITOR_FILTER,
   repeatSecondsOf,
 } from '@pulseboard/shared/scheduling';
@@ -18,10 +19,11 @@ import {
  */
 export async function reconcileJobs({ db, scheduler, logger }) {
   const jobs = db.collection(AGENDA_COLLECTION);
-  // Only polled (http) monitors: leftover jobs of heartbeat monitors count as orphans.
+  // Only polled monitors (http, agent with an external check): leftover jobs of
+  // heartbeat / other agent monitors count as orphans.
   const activeMonitors = await Monitor.find(
     { isPaused: false, ...CHECK_JOB_MONITOR_FILTER },
-    { type: 1, intervalSec: 1, currentIntervalSec: 1 },
+    { ...CHECK_JOB_FIELDS },
   ).lean();
   const activeById = new Map(activeMonitors.map((monitor) => [String(monitor._id), monitor]));
 

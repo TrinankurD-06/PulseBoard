@@ -84,13 +84,18 @@ currency INR.
       detector (one failure per missed period, atomic), per-type thresholds (heartbeat 1/1),
       incident engine shared by API and worker, CheckResult.source, pings in usage, heartbeat
       form/detail page (ping URL, snippets, ping history), dashboard variant.
-- [ ] **U4. `pulseboard-agent` + probe-on-silence**
+- [x] **U4. `pulseboard-agent` + probe-on-silence**: zero-dependency Express SDK (route patterns
+      only, bounded memory, zero-traffic reports), hashed agent keys, report endpoint +
+      evaluation, AgentReport time-series, silence → 3 probes → incident or `degraded`, external
+      check, agent wizard/detail page with live metrics and requests-saved.
 - [ ] **U5. Cost & Usage page, cross-type tests, demo, docs**
 
 ## Resume note (upgrade)
 
-U1 `9fc020d`, U2 `256d24b`, U3 committed. U3 gate: 429/429 tests (shared 208, api 144,
-client 26, demo-target 5, worker 46), lint/Prettier clean, build OK; real run verified pings,
-missed period → incident in 44 s, recovery, /fail, regenerate, 0 requests sent.
-Next: U4 (agent package + probe-on-silence), contract already written in
-`docs/upgrade/U4-contract.md`: backend + frontend(+SDK) tracks.
+U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 committed. U4 gate: 522/522 tests (agent 24,
+shared 228, api 164, client 42, demo-target 5, worker 59); real SDK run: error-rate incident
+84 s, degraded 66 s (no incident), crash → probes → incident 108 s, resolved 63 s.
+Next: U5 (contract `docs/upgrade/U5-contract.md`): backend = workspace usage endpoint,
+cross-type tests, seed; frontend = Cost & Usage page, demo-target with agent + toggles +
+heartbeat cron, also fix clipped y-axis label in MetricLineChart; integration = docs. Run
+`npm install` so the pulseboard-agent workspace link exists for demo-target.

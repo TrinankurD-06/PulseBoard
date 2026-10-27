@@ -21,6 +21,9 @@ const LIVE_MONITOR_FIELDS = [
   // U3: heartbeat monitors ("last ping X ago", "next ping expected by").
   'lastPingAt',
   'nextDueAt',
+  // U4: agent monitors ("last report X ago", reporting / probing / silent).
+  'lastReportAt',
+  'silenceState',
 ];
 
 /** Change-stream filter for monitors: check results, status, interval and budget changes. */
@@ -38,6 +41,8 @@ export const MONITOR_PIPELINE = [
             { 'updateDescription.updatedFields.budgetExceededMonth': { $exists: true } },
             { 'updateDescription.updatedFields.lastPingAt': { $exists: true } },
             { 'updateDescription.updatedFields.nextDueAt': { $exists: true } },
+            { 'updateDescription.updatedFields.lastReportAt': { $exists: true } },
+            { 'updateDescription.updatedFields.silenceState': { $exists: true } },
           ],
         },
       ],

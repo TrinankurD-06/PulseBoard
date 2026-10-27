@@ -1,3 +1,4 @@
+import { AgentReport } from './AgentReport.js';
 import { AlertChannel } from './AlertChannel.js';
 import { CheckResult } from './CheckResult.js';
 import { DailyRollup } from './DailyRollup.js';
@@ -11,6 +12,7 @@ import { User } from './User.js';
 import { Workspace } from './Workspace.js';
 
 export {
+  AgentReport,
   AlertChannel,
   CheckResult,
   DailyRollup,
@@ -25,6 +27,7 @@ export {
 };
 
 export const allModels = [
+  AgentReport,
   AlertChannel,
   CheckResult,
   DailyRollup,

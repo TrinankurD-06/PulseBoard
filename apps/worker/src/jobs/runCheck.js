@@ -1,5 +1,5 @@
 import { runHttpCheck } from '@pulseboard/shared/check';
-import { CHECK_SOURCES } from '@pulseboard/shared/constants';
+import { AGENT_SILENCE_STATE, CHECK_SOURCES, MONITOR_TYPES } from '@pulseboard/shared/constants';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
 import { needsCheckJob } from '@pulseboard/shared/scheduling';
 import { recordUsage } from '@pulseboard/shared/usage';
@@ -27,7 +27,36 @@ export function createRunCheckJob({
   processCheckResult,
   enforceBudget = noopEnforceBudget,
   logger,
+  prober,
 }) {
+  /**
+   * External check of an agent monitor (U4): a HEAD to its probeUrl, stored
+   * as source 'external' and counted, but NOT fed to the engine on its own.
+   * A failure starts the 3-probe confirmation (which is), so a single network
+   * blip never opens an incident. 'probing' doubles as a lock against the
+   * silence detector probing the same monitor at the same time.
+   */
+  async function runExternalCheck(monitor, job) {
+    const { result } = await prober.probeOnce(monitor, CHECK_SOURCES.EXTERNAL);
+    if (result.ok) return;
+    const before = await Monitor.findOneAndUpdate(
+      { _id: monitor._id, isPaused: false, silenceState: { $ne: AGENT_SILENCE_STATE.PROBING } },
+      { $set: { silenceState: AGENT_SILENCE_STATE.PROBING, lastProbeAt: new Date() } },
+      { projection: { silenceState: 1 } },
+    ).lean();
+    if (!before) return; // already being probed
+    logger.warn({ monitorId: monitor._id, error: result.error }, 'External check failed, probing');
+    const outcome = await prober.confirm(monitor._id, { touch: () => job.touch?.() });
+    const previous = before.silenceState ?? AGENT_SILENCE_STATE.REPORTING;
+    await Monitor.updateOne(
+      { _id: monitor._id, silenceState: AGENT_SILENCE_STATE.PROBING },
+      { $set: { silenceState: previous } },
+    );
+    if (outcome === 'reachable' && previous === AGENT_SILENCE_STATE.SILENT) {
+      await prober.markReachable(monitor._id);
+    }
+  }
+
   return async function runCheckJob(job) {
     const { monitorId } = job.attrs.data;
     const monitor = await Monitor.findById(monitorId).lean();
@@ -38,6 +67,11 @@ export function createRunCheckJob({
     if (!monitor || monitor.isPaused || !needsCheckJob(monitor)) {
       logger.warn({ monitorId }, 'Removing check job for missing or paused monitor');
       await scheduler.cancelMonitor(monitorId);
+      return;
+    }
+
+    if (monitor.type === MONITOR_TYPES.AGENT) {
+      await runExternalCheck(monitor, job);
       return;
     }
 

@@ -74,6 +74,28 @@ export function useUsage(wid, mid) {
   });
 }
 
+// Agent metrics are kept 7 days and served for at most 24 hours at a time.
+export const AGENT_RANGES = {
+  '1h': 60 * 60 * 1000,
+  '6h': 6 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+};
+
+/**
+ * Agent reports over a range: { points, topRoutes, lastReport }. Keyed under
+ * the analytics prefix, so every live report (check:result) refreshes it.
+ */
+export function useAgentMetrics(wid, mid, range) {
+  return useQuery({
+    queryKey: analyticsKey(wid, mid, 'agent-metrics', range),
+    queryFn: () => {
+      const from = new Date(Date.now() - AGENT_RANGES[range]).toISOString();
+      return http.get(`/workspaces/${wid}/monitors/${mid}/agent-metrics?from=${from}`).then(unwrap);
+    },
+    ...shared,
+  });
+}
+
 /** { [monitorId]: [{ t, ms, ok }] } for the dashboard cards. Live updates append to it. */
 export function useSparklines(wid) {
   return useQuery({

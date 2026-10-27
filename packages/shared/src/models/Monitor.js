@@ -3,6 +3,7 @@ import {
   DEFAULT_EXPECTED_STATUS,
   DEFAULT_TIMEOUT_MS,
   ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC,
+  AGENT_SILENCE_STATE,
   BUDGET_ACTIONS,
   CURRENCIES,
   DEFAULT_CURRENCY,
@@ -83,6 +84,30 @@ const monitorSchema = new mongoose.Schema(
     // + expectedEverySec + graceSec. Advanced one period per missed period.
     nextDueAt: { type: Date, default: null },
 
+    // Agent monitors (U4): the customer's app reports metrics with a key.
+    // Only the SHA-256 of the key is stored (sparse unique: other types have none).
+    agentKeyHash: { type: String, default: undefined },
+    agentKeyPrefix: { type: String, default: undefined },
+    reportEverySec: { type: Number, default: undefined },
+    errorRateThreshold: { type: Number, default: undefined },
+    p95ThresholdMs: { type: Number, default: null },
+    // Optional URL probed when the agent goes silent (and by the external check).
+    probeUrl: { type: String, default: null, trim: true },
+    externalCheckEverySec: { type: Number, default: null },
+    lastReportAt: { type: Date, default: null },
+    // Silence is measured from lastReportAt, or from this (creation / resume)
+    // before the first report, so a resumed monitor isn't silent at once.
+    watchSince: { type: Date, default: null },
+    silenceState: {
+      type: String,
+      enum: [...Object.values(AGENT_SILENCE_STATE), null],
+      default: null,
+    },
+    // Last probe sequence, for "re-probe every 5 minutes while silent".
+    lastProbeAt: { type: Date, default: null },
+    // Once-per-silence marker for the "agent silent, endpoint reachable" notice.
+    silentNoticeAt: { type: Date, default: null },
+
     status: {
       type: String,
       enum: Object.values(MONITOR_STATUS),
@@ -121,5 +146,9 @@ monitorSchema.index({ isPaused: 1 });
 monitorSchema.index({ heartbeatToken: 1 }, { unique: true, sparse: true });
 // Overdue detector: "active heartbeats whose next ping is due".
 monitorSchema.index({ type: 1, isPaused: 1, nextDueAt: 1 });
+// Report lookup by key hash; sparse because only agent monitors have one.
+monitorSchema.index({ agentKeyHash: 1 }, { unique: true, sparse: true });
+// Silence detector: "active agents that are reporting / silent".
+monitorSchema.index({ type: 1, isPaused: 1, silenceState: 1 });
 
 export const Monitor = mongoose.models.Monitor || mongoose.model('Monitor', monitorSchema);

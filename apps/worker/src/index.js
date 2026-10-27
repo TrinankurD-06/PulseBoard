@@ -20,6 +20,8 @@ import { env } from './config/env.js';
 import { createBudgetEnforcer } from './budget.js';
 import { startHealthServer } from './healthServer.js';
 import { createIncidentEngine } from '@pulseboard/shared/incident';
+import { createAgentProber } from './agentProbes.js';
+import { createAgentSilenceJob } from './jobs/agentSilence.js';
 import { createBudgetResetJob } from './jobs/budgetReset.js';
 import { createHeartbeatOverdueJob } from './jobs/heartbeatOverdue.js';
 import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
@@ -52,6 +54,13 @@ async function main() {
   const processCheckResult = createIncidentEngine({ agenda, logger });
   const enforceBudget = createBudgetEnforcer({ agenda, db, scheduler, logger });
   const senders = createAlertSenders({ ...alertSenderConfig(env), logger });
+  const prober = createAgentProber({
+    allowPrivate: env.ALLOW_PRIVATE_TARGETS,
+    appUrl: appUrlOf(env),
+    agenda,
+    processCheckResult,
+    logger,
+  });
   agenda.define(
     JOB_NAMES.RUN_CHECK,
     createRunCheckJob({
@@ -62,6 +71,7 @@ async function main() {
       processCheckResult,
       enforceBudget,
       logger,
+      prober,
     }),
     { concurrency: env.AGENDA_MAX_CONCURRENCY },
   );
@@ -79,6 +89,10 @@ async function main() {
   agenda.define(JOB_NAMES.BUDGET_RESET, () => budgetReset(new Date()));
   const heartbeatOverdue = createHeartbeatOverdueJob({ processCheckResult, logger });
   agenda.define(JOB_NAMES.HEARTBEAT_OVERDUE, () => heartbeatOverdue(new Date()));
+  const agentSilence = createAgentSilenceJob({ prober, processCheckResult, logger });
+  agenda.define(JOB_NAMES.AGENT_SILENCE, (job) =>
+    agentSilence(new Date(), { touch: () => job.touch() }),
+  );
   agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
   agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
@@ -91,6 +105,7 @@ async function main() {
   // at once still end up with one rollup job and one nightly finalize job.
   await agenda.every('15 minutes', JOB_NAMES.ROLLUP);
   await agenda.every('30 seconds', JOB_NAMES.HEARTBEAT_OVERDUE);
+  await agenda.every('30 seconds', JOB_NAMES.AGENT_SILENCE);
   await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
   await agenda.every('0 0 1 * *', JOB_NAMES.BUDGET_RESET, undefined, { timezone: 'UTC' });
   let agendaRunning = true;

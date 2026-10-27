@@ -12,6 +12,7 @@ import Skeleton from '../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
 import { useNow } from '../hooks/useNow.js';
 import { formatMs } from '../lib/format.js';
+import { isOperational } from '../lib/status.js';
 
 const newMonitorButtonClasses =
   'inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500';
@@ -19,13 +20,19 @@ const newMonitorButtonClasses =
 function summarize(monitors) {
   const count = (status) => monitors.filter((m) => m.status === status).length;
   const responseTimes = monitors
-    // Heartbeat 'response' is a job's run duration, not an HTTP response time.
-    .filter((m) => !m.isPaused && m.type !== 'heartbeat' && m.lastResponseMs != null)
+    // Only checks we send: a heartbeat 'response' is a job's run duration and
+    // an agent's is its app-side p50, not a response time we measured.
+    .filter((m) => !m.isPaused && (m.type ?? 'http') === 'http' && m.lastResponseMs != null)
     .map((m) => m.lastResponseMs);
   const avgResponseMs = responseTimes.length
     ? responseTimes.reduce((sum, ms) => sum + ms, 0) / responseTimes.length
     : null;
-  return { up: count('up'), down: count('down'), total: monitors.length, avgResponseMs };
+  return {
+    up: monitors.filter((m) => isOperational(m.status)).length,
+    down: count('down'),
+    total: monitors.length,
+    avgResponseMs,
+  };
 }
 
 function SummaryCard({ label, value, accent }) {

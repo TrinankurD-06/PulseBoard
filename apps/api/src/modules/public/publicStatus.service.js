@@ -1,5 +1,5 @@
 import { DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
-import { overallStatus } from '@pulseboard/shared/statusPage';
+import { overallStatus, publicMonitorStatus } from '@pulseboard/shared/statusPage';
 import {
   addDays,
   combineRollups,
@@ -61,7 +61,7 @@ export async function buildPublicStatus(slug, now = new Date()) {
       const own = rollups.filter((rollup) => rollup.monitorId.equals(monitor._id));
       return {
         name: monitor.name,
-        status: monitor.status,
+        status: publicMonitorStatus(monitor.status),
         uptime90: combineRollups(own).uptime,
         days: fillDailySeries(own, { days: DAYS, today: now }).map(
           ({ date, uptime, downtimeSec, totalChecks }) => ({

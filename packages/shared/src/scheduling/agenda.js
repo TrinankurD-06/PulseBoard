@@ -70,19 +70,47 @@ export function countOverdueJobs(db) {
 }
 
 /**
- * Only monitors PulseBoard polls get a run-check job; push monitors
- * (heartbeat) are fed by pings. Missing type = http (older documents).
+ * Only monitors PulseBoard polls get a run-check job: http monitors, and
+ * agent monitors with an external check (U4, against their probeUrl). Push
+ * monitors are otherwise fed by pings/reports. Missing type = http (older documents).
  */
-export const needsCheckJob = (monitor) =>
-  (monitor.type ?? MONITOR_TYPES.HTTP) === MONITOR_TYPES.HTTP;
+export const needsCheckJob = (monitor) => {
+  const type = monitor.type ?? MONITOR_TYPES.HTTP;
+  if (type === MONITOR_TYPES.AGENT) {
+    return Boolean(monitor.externalCheckEverySec && monitor.probeUrl);
+  }
+  return type === MONITOR_TYPES.HTTP;
+};
 
 /** MongoDB filter for the monitors that get a run-check job (see needsCheckJob). */
 export const CHECK_JOB_MONITOR_FILTER = Object.freeze({
-  type: { $nin: [MONITOR_TYPES.HEARTBEAT, MONITOR_TYPES.AGENT] },
+  $or: [
+    { type: { $nin: [MONITOR_TYPES.HEARTBEAT, MONITOR_TYPES.AGENT] } },
+    {
+      type: MONITOR_TYPES.AGENT,
+      externalCheckEverySec: { $gt: 0 },
+      probeUrl: { $nin: [null, ''] },
+    },
+  ],
 });
 
-/** Seconds between checks the job should use: the current interval, else the base one. */
-export const repeatSecondsOf = (monitor) => monitor.currentIntervalSec ?? monitor.intervalSec;
+/** Fields needsCheckJob and repeatSecondsOf read (projection for reconcile). */
+export const CHECK_JOB_FIELDS = Object.freeze({
+  type: 1,
+  intervalSec: 1,
+  currentIntervalSec: 1,
+  externalCheckEverySec: 1,
+  probeUrl: 1,
+});
+
+/**
+ * Seconds between checks the job should use: the current interval, else the
+ * base one; for agent monitors the external check interval.
+ */
+export const repeatSecondsOf = (monitor) =>
+  monitor.type === MONITOR_TYPES.AGENT
+    ? monitor.externalCheckEverySec
+    : (monitor.currentIntervalSec ?? monitor.intervalSec);
 
 /**
  * Changes the interval of a run-check job FROM INSIDE its own run (adaptive

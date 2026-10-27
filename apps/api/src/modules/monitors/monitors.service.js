@@ -1,16 +1,33 @@
 import { randomBytes } from 'node:crypto';
+import { probeTargetOf } from '@pulseboard/shared/agent';
 import { assertSafeUrl, runHttpCheck, UnsafeTargetError } from '@pulseboard/shared/check';
 import { appUrlOf } from '@pulseboard/shared/env';
 import { budgetSlowIntervalSec, budgetState, isBudgetSlowed } from '@pulseboard/shared/adaptive';
 import { liftBudgetRestriction } from '@pulseboard/shared/budget';
-import { MONITOR_STATUS, MONITOR_TYPES, PAUSED_REASONS, ROLES } from '@pulseboard/shared/constants';
+import {
+  AGENT_SILENCE_STATE,
+  MONITOR_STATUS,
+  MONITOR_TYPES,
+  PAUSED_REASONS,
+  ROLES,
+} from '@pulseboard/shared/constants';
 import { monthKey } from '@pulseboard/shared/cost';
 import { resolveOpenIncident } from '@pulseboard/shared/incident';
-import { CheckResult, DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
+import {
+  AgentReport,
+  CheckResult,
+  DailyRollup,
+  Incident,
+  Monitor,
+  StatusPage,
+} from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
+import { agentCreateSchema, agentUpdateSchema } from '@pulseboard/shared/schemas';
+import { needsCheckJob } from '@pulseboard/shared/scheduling';
 import { clearUsageMarkers, recordUsage, requestsThisMonth } from '@pulseboard/shared/usage';
 import { AppError, badRequest, notFound } from '../../lib/errors.js';
 import { paginate } from '../../lib/pagination.js';
+import { agentKeyFields, generateAgentKey } from '../agent/agentKey.js';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
@@ -36,7 +53,18 @@ const EDITABLE_FIELDS = [
 // The fields a user can edit on a heartbeat monitor.
 const HEARTBEAT_EDITABLE_FIELDS = ['name', 'expectedEverySec', 'graceSec'];
 
+// The fields a user can edit on an agent monitor.
+const AGENT_EDITABLE_FIELDS = [
+  'name',
+  'reportEverySec',
+  'errorRateThreshold',
+  'p95ThresholdMs',
+  'probeUrl',
+  'externalCheckEverySec',
+];
+
 const isHeartbeat = (monitor) => monitor.type === MONITOR_TYPES.HEARTBEAT;
+const isAgent = (monitor) => monitor.type === MONITOR_TYPES.AGENT;
 
 /** 32 random bytes as base64url: 43 URL-safe characters, unguessable. */
 export function generateHeartbeatToken() {
@@ -66,6 +94,9 @@ function editableFields(monitor) {
  */
 export function toMonitorDto(monitor, role) {
   const json = monitor.toJSON();
+  // Nobody gets the agent key hash; the key itself is only in create/regenerate responses.
+  delete json.agentKeyHash;
+  if (monitor.$locals?.agentKey) json.agentKey = monitor.$locals.agentKey;
   if (hasRole(role, ROLES.MEMBER)) return json;
   if (json.headers) {
     json.headers = Object.fromEntries(Object.keys(json.headers).map((name) => [name, '••••••']));
@@ -75,16 +106,35 @@ export function toMonitorDto(monitor, role) {
 }
 
 export function createMonitorService({ env, scheduler, schemas }) {
-  async function assertTargetAllowed(url) {
+  async function assertTargetAllowed(url, path = 'url') {
     try {
       await assertSafeUrl(url, { allowPrivate: env.ALLOW_PRIVATE_TARGETS });
     } catch (err) {
       if (!(err instanceof UnsafeTargetError)) throw err;
       // Same details shape as validation errors, so the form can show it on the URL field.
-      throw new AppError(400, 'UNSAFE_TARGET', err.message, [
-        { path: 'url', message: err.message },
-      ]);
+      throw new AppError(400, 'UNSAFE_TARGET', err.message, [{ path, message: err.message }]);
     }
+  }
+
+  /** The run-check job of an agent monitor exists only while its external check is on. */
+  async function syncAgentJob(monitor) {
+    if (!monitor.isPaused && needsCheckJob(monitor)) await scheduler.scheduleMonitor(monitor);
+    else await scheduler.cancelMonitor(monitor._id);
+  }
+
+  /** PATCH for an agent monitor: merge, then re-validate with the create schema. */
+  async function updateAgent(monitor, body) {
+    const patch = agentUpdateSchema.parse(body ?? {});
+    const current = Object.fromEntries(AGENT_EDITABLE_FIELDS.map((f) => [f, monitor.get(f)]));
+    const merged = agentCreateSchema.parse({ ...current, ...patch, type: MONITOR_TYPES.AGENT });
+    if (merged.probeUrl && merged.probeUrl !== monitor.probeUrl) {
+      await assertTargetAllowed(merged.probeUrl, 'probeUrl');
+    }
+    const { type: _type, ...fields } = merged;
+    monitor.set(fields);
+    await monitor.save();
+    await syncAgentJob(monitor);
+    return monitor;
   }
 
   /**
@@ -160,6 +210,25 @@ export function createMonitorService({ env, scheduler, schemas }) {
           nextDueAt: heartbeatDueAt(input),
         });
       }
+      // Agent: the app reports to us with a key that is shown once (via
+      // $locals, never stored readable); the silence detector watches from now.
+      if (input.type === MONITOR_TYPES.AGENT) {
+        if (input.probeUrl) await assertTargetAllowed(input.probeUrl, 'probeUrl');
+        const agentKey = generateAgentKey();
+        const { type: _type, ...fields } = input;
+        const monitor = await Monitor.create({
+          ...fields,
+          ...agentKeyFields(agentKey),
+          type: MONITOR_TYPES.AGENT,
+          workspaceId,
+          status: MONITOR_STATUS.PENDING,
+          silenceState: AGENT_SILENCE_STATE.REPORTING,
+          watchSince: new Date(),
+        });
+        monitor.$locals.agentKey = agentKey;
+        if (needsCheckJob(monitor)) await scheduler.scheduleMonitor(monitor);
+        return monitor;
+      }
       await assertTargetAllowed(input.url);
       const monitor = await Monitor.create({
         ...input,
@@ -189,6 +258,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
         ]);
       }
       if (isHeartbeat(monitor)) return updateHeartbeat(monitor, body);
+      if (isAgent(monitor)) return updateAgent(monitor, body);
 
       const patch = schemas.update.parse(body ?? {});
       const merged = schemas.create.parse({ ...editableFields(monitor), ...patch });
@@ -253,6 +323,23 @@ export function createMonitorService({ env, scheduler, schemas }) {
         await monitor.save();
         return monitor;
       }
+      if (isAgent(monitor)) {
+        // Silence counts from now: the agent gets two report periods to report.
+        monitor.set({
+          isPaused: false,
+          status: MONITOR_STATUS.PENDING,
+          pausedReason: null,
+          consecutiveFailures: 0,
+          consecutiveSuccesses: 0,
+          silenceState: AGENT_SILENCE_STATE.REPORTING,
+          watchSince: now,
+          lastProbeAt: null,
+          silentNoticeAt: null,
+        });
+        await monitor.save();
+        await syncAgentJob(monitor);
+        return monitor;
+      }
       if (
         monitor.pausedReason === PAUSED_REASONS.BUDGET &&
         monitor.budgetExceededMonth === monthKey(now) &&
@@ -306,7 +393,15 @@ export function createMonitorService({ env, scheduler, schemas }) {
           'Heartbeat monitors are not checked by PulseBoard: your job pings them',
         );
       }
-      const result = await runHttpCheck(monitor, {
+      // Agent: the app reports by itself; only the probe URL can be checked.
+      if (isAgent(monitor) && !monitor.probeUrl) {
+        throw new AppError(
+          400,
+          'NOT_SUPPORTED',
+          'Set a probe URL to test this agent monitor: the app itself reports to PulseBoard',
+        );
+      }
+      const result = await runHttpCheck(isAgent(monitor) ? probeTargetOf(monitor) : monitor, {
         allowPrivate: env.ALLOW_PRIVATE_TARGETS,
         appUrl: appUrlOf(env),
       });
@@ -325,12 +420,26 @@ export function createMonitorService({ env, scheduler, schemas }) {
       return monitor;
     },
 
+    /** New agent key, returned once (via $locals): the old key gets 401 immediately. */
+    async regenerateAgentKey(workspaceId, monitorId) {
+      const monitor = await findInWorkspace(workspaceId, monitorId);
+      if (!isAgent(monitor)) {
+        throw new AppError(400, 'NOT_SUPPORTED', 'Only agent monitors have an agent key');
+      }
+      const agentKey = generateAgentKey();
+      monitor.set(agentKeyFields(agentKey));
+      await monitor.save();
+      monitor.$locals.agentKey = agentKey;
+      return monitor;
+    },
+
     /** Cancels the job first, so no check runs against a half-deleted monitor. */
     async remove(workspaceId, monitorId) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
       await scheduler.cancelMonitor(monitor._id);
       await Promise.all([
         CheckResult.deleteMany({ 'meta.monitorId': monitor._id }),
+        AgentReport.deleteMany({ 'meta.monitorId': monitor._id }),
         DailyRollup.deleteMany({ monitorId: monitor._id }),
         Incident.deleteMany({ monitorId: monitor._id }),
         StatusPage.updateMany({ monitorIds: monitor._id }, { $pull: { monitorIds: monitor._id } }),

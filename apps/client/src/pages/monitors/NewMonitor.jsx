@@ -4,17 +4,20 @@ import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
 import { useAppMeta } from '../../api/meta.js';
 import { useCreateMonitor } from '../../api/monitors.js';
+import AgentWizard from '../../components/monitors/AgentWizard.jsx';
 import HeartbeatForm from '../../components/monitors/HeartbeatForm.jsx';
 import MonitorForm from '../../components/monitors/MonitorForm.jsx';
 import TypeChooser from '../../components/monitors/TypeChooser.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
+import { AGENT_TYPE } from '../../lib/agent.js';
 import { HEARTBEAT_TYPE } from '../../lib/heartbeat.js';
 
 const DESCRIPTIONS = {
   http: 'PulseBoard will check this URL on a schedule.',
   heartbeat: 'Your job pings PulseBoard; we alert you when a ping is late.',
+  agent: 'Your app reports its real traffic to PulseBoard; we alert you on errors or silence.',
 };
 
 export default function NewMonitor() {
@@ -43,7 +46,9 @@ export default function NewMonitor() {
     <div className="max-w-3xl">
       <PageHeader title="New monitor" description={DESCRIPTIONS[type]} />
       <TypeChooser value={type} onChange={setType} />
-      {!meta && <Skeleton className="h-96 rounded-xl" />}
+      {/* The wizard creates the monitor itself: the key is shown once, then it waits for a report. */}
+      {type === AGENT_TYPE && <AgentWizard wid={wid} onCancel={cancel} />}
+      {!meta && type !== AGENT_TYPE && <Skeleton className="h-96 rounded-xl" />}
       {meta && type === HEARTBEAT_TYPE && (
         <HeartbeatForm
           minIntervalSec={meta.minIntervalSec}
@@ -52,7 +57,7 @@ export default function NewMonitor() {
           onCancel={cancel}
         />
       )}
-      {meta && type !== HEARTBEAT_TYPE && (
+      {meta && type === 'http' && (
         <MonitorForm
           wid={wid}
           minIntervalSec={meta.minIntervalSec}

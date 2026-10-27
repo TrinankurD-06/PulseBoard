@@ -3,11 +3,13 @@ import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
 import { useAppMeta } from '../../api/meta.js';
 import { useMonitor, useUpdateMonitor } from '../../api/monitors.js';
+import AgentForm from '../../components/monitors/AgentForm.jsx';
 import HeartbeatForm from '../../components/monitors/HeartbeatForm.jsx';
 import MonitorForm from '../../components/monitors/MonitorForm.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
+import { isAgent } from '../../lib/agent.js';
 import { isHeartbeat } from '../../lib/heartbeat.js';
 
 export default function EditMonitor() {
@@ -35,7 +37,14 @@ export default function EditMonitor() {
   return (
     <div className="max-w-3xl">
       <PageHeader title="Edit monitor" description={monitor?.name} />
-      {meta && monitor && isHeartbeat(monitor) ? (
+      {monitor && isAgent(monitor) ? (
+        <AgentForm
+          monitor={monitor}
+          submitLabel="Save changes"
+          onSubmit={onSubmit}
+          onCancel={() => navigate(detailPath)}
+        />
+      ) : meta && monitor && isHeartbeat(monitor) ? (
         // Type can't change after creation: a heartbeat is edited with its own form.
         <HeartbeatForm
           monitor={monitor}

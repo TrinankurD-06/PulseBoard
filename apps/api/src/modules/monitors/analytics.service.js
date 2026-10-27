@@ -1,16 +1,18 @@
 import { budgetState, effectiveIntervalSec, isBudgetSlowed } from '@pulseboard/shared/adaptive';
+import { errorRateOf } from '@pulseboard/shared/agent';
 import { DEFAULT_CURRENCY } from '@pulseboard/shared/constants';
 import {
   costOf,
   estimateMonthlyCost,
   estimateMonthlyRequests,
+  estimateRequestsSaved,
   estimateRequestsBetween,
   monthKey,
   monthStart,
 } from '@pulseboard/shared/cost';
 import { mongoose } from '@pulseboard/shared/db';
-import { CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
-import { pingsThisMonth, requestsThisMonth } from '@pulseboard/shared/usage';
+import { AgentReport, CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
+import { pingsThisMonth, reportsThisMonth, requestsThisMonth } from '@pulseboard/shared/usage';
 import {
   addDays,
   bucketSizeMs,
@@ -59,6 +61,10 @@ export async function getUsage(monitorId, now = new Date()) {
     },
     // Heartbeat pings received this month (requests that came to us, not from us).
     pings: await pingsThisMonth(monitor._id, now),
+    // Agent reports received this month (U4), and requests a month not sent
+    // compared with polling every minute.
+    reports: await reportsThisMonth(monitor._id, now),
+    requestsSaved: estimateRequestsSaved(monitor),
     interval: {
       adaptive: Boolean(monitor.adaptive),
       intervalSec: monitor.intervalSec,
@@ -207,4 +213,98 @@ export async function getSparklines(workspaceId, points, now = new Date()) {
     { $project: { recent: { $reverseArray: { $slice: ['$recent', points] } } } },
   ]);
   return Object.fromEntries(rows.map((row) => [String(row._id), row.recent]));
+}
+
+const AGENT_TOP_ROUTES = 10;
+
+/**
+ * Charts for an agent monitor (U4) between from and to: one point per report
+ * window, or time buckets when there would be more than MAX_CHART_POINTS
+ * (requests and errors summed; p50 averaged; p95/p99 the bucket's worst, so
+ * spikes stay visible). Plus the busiest routes of the range and the latest
+ * report's agent details.
+ */
+export async function getAgentMetrics(monitorId, from, to) {
+  const id = toObjectId(monitorId);
+  const match = { 'meta.monitorId': id, windowEnd: { $gte: from, $lt: to } };
+  const count = await AgentReport.countDocuments(match);
+  const round1 = (value) => (value == null ? null : Math.round(value * 10) / 10);
+  const toPoint = (p) => ({
+    t: p.t,
+    requests: p.requests,
+    errors5xx: p.errors5xx,
+    errors4xx: p.errors4xx,
+    errorRate: round1(errorRateOf(p)),
+    p50Ms: round1(p.p50Ms),
+    p95Ms: round1(p.p95Ms),
+    p99Ms: round1(p.p99Ms),
+  });
+
+  let points;
+  let bucketSec = null;
+  if (count <= MAX_CHART_POINTS) {
+    const reports = await AgentReport.find(match, { topRoutes: 0 }).sort({ windowEnd: 1 }).lean();
+    points = reports.map((r) => toPoint({ ...r, t: r.windowEnd }));
+  } else {
+    bucketSec = bucketSizeMs(to - from, MAX_CHART_POINTS) / 1000;
+    const buckets = await AgentReport.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $dateTrunc: { date: '$windowEnd', unit: 'second', binSize: bucketSec } },
+          requests: { $sum: '$requests' },
+          errors5xx: { $sum: '$errors5xx' },
+          errors4xx: { $sum: '$errors4xx' },
+          p50Ms: { $avg: '$p50Ms' },
+          p95Ms: { $max: '$p95Ms' },
+          p99Ms: { $max: '$p99Ms' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+    points = buckets.map((b) => toPoint({ ...b, t: b._id }));
+  }
+
+  const [routes, last] = await Promise.all([
+    AgentReport.aggregate([
+      { $match: match },
+      { $unwind: '$topRoutes' },
+      {
+        $group: {
+          _id: '$topRoutes.route',
+          requests: { $sum: '$topRoutes.requests' },
+          errors5xx: { $sum: '$topRoutes.errors5xx' },
+          p95Ms: { $max: '$topRoutes.p95Ms' },
+        },
+      },
+      { $sort: { requests: -1, _id: 1 } },
+      { $limit: AGENT_TOP_ROUTES },
+    ]),
+    AgentReport.findOne(
+      { 'meta.monitorId': id },
+      { hostname: 1, agentVersion: 1, uptimeSec: 1, windowEnd: 1 },
+    )
+      .sort({ windowEnd: -1 })
+      .lean(),
+  ]);
+
+  return {
+    points,
+    downsampled: bucketSec != null,
+    bucketSec,
+    topRoutes: routes.map((r) => ({
+      route: r._id,
+      requests: r.requests,
+      errors5xx: r.errors5xx,
+      p95Ms: round1(r.p95Ms),
+    })),
+    lastReport: last
+      ? {
+          hostname: last.hostname ?? null,
+          agentVersion: last.agentVersion ?? null,
+          uptimeSec: last.uptimeSec ?? null,
+          windowEnd: last.windowEnd,
+        }
+      : null,
+  };
 }

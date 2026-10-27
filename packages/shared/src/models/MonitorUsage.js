@@ -12,6 +12,8 @@ const monitorUsageSchema = new mongoose.Schema(
     requests: { type: Number, default: 0 },
     // Heartbeat pings received (requests that came TO us instead of FROM us).
     pings: { type: Number, default: 0 },
+    // Agent reports received (U4).
+    reports: { type: Number, default: 0 },
     // "Sent once per month" markers for budget notices, set atomically (only if null).
     warnedAt: { type: Date, default: null },
     exceededAt: { type: Date, default: null },

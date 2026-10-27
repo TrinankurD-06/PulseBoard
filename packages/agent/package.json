@@ -1,0 +1,29 @@
+{
+  "name": "pulseboard-agent",
+  "version": "1.0.0",
+  "description": "Express middleware that reports request rate, errors and latency to PulseBoard, so your app is monitored from the inside with near-zero extra requests.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "monitoring",
+    "uptime",
+    "express",
+    "middleware",
+    "apm",
+    "pulseboard"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run"
+  }
+}

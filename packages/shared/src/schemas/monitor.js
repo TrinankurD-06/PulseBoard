@@ -230,10 +230,10 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
 
 /**
  * The monitor type a create request asks for. Absent = 'http' (today's
- * behaviour); agent monitors arrive in U4.
+ * behaviour).
  */
 export const monitorTypeSchema = z
-  .enum([MONITOR_TYPES.HTTP, MONITOR_TYPES.HEARTBEAT], {
-    message: 'Type must be "http" or "heartbeat"',
+  .enum([MONITOR_TYPES.HTTP, MONITOR_TYPES.HEARTBEAT, MONITOR_TYPES.AGENT], {
+    message: 'Type must be "http", "heartbeat" or "agent"',
   })
   .default(MONITOR_TYPES.HTTP);

@@ -18,6 +18,8 @@
      categorical palette validated for colour-vision deficiency on these
      surfaces; dark mode below uses the same hues re-stepped for dark surfaces. */
   --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
   --color-timing-dns: #2a78d6;
   --color-timing-tcp: #eb6834;
   --color-timing-tls: #1baf7a;
@@ -32,6 +34,8 @@
 :root.dark {
   --color-status-none: #334155;
   --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
   --color-timing-dns: #3987e5;
   --color-timing-tcp: #d95926;
   --color-timing-tls: #199e70;

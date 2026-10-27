@@ -1,7 +1,7 @@
 // Cost estimator: how many requests a monitor sends to the customer's
 // endpoint, and what that costs at the customer's own price. Pure and
 // browser-safe, so the form can show the estimate live as you type.
-import { MONITOR_TYPES } from '../constants.js';
+import { MONITOR_TYPES, POLLING_BASELINE_MONTHLY_REQUESTS } from '../constants.js';
 
 // A "month" for estimates is 30 days, so 1 check per minute = 43,200 requests.
 export const SECONDS_PER_MONTH = 30 * 24 * 60 * 60;
@@ -15,9 +15,19 @@ export function monthStart(date = new Date()) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 }
 
-/** Requests per second this monitor sends to the customer (0 for push monitors). */
+/**
+ * Requests per second this monitor sends to the customer: http checks, or an
+ * agent monitor's optional external check (probe-on-silence requests are rare
+ * and not estimated). Heartbeats send nothing.
+ */
 function requestRate(monitor) {
-  if ((monitor.type ?? MONITOR_TYPES.HTTP) !== MONITOR_TYPES.HTTP) return 0;
+  const type = monitor.type ?? MONITOR_TYPES.HTTP;
+  if (type === MONITOR_TYPES.AGENT) {
+    const everySec = Number(monitor.externalCheckEverySec);
+    if (!monitor.probeUrl || !Number.isFinite(everySec) || everySec <= 0) return 0;
+    return 1 / everySec;
+  }
+  if (type !== MONITOR_TYPES.HTTP) return 0;
   const intervalSec = Number(monitor.intervalSec);
   if (!Number.isFinite(intervalSec) || intervalSec <= 0) return 0;
   // With adaptive intervals the real interval only grows from the base one
@@ -28,6 +38,14 @@ function requestRate(monitor) {
 /** Estimated requests in a 30-day month. */
 export function estimateMonthlyRequests(monitor) {
   return Math.round(requestRate(monitor) * SECONDS_PER_MONTH);
+}
+
+/**
+ * Requests a month saved compared with polling the endpoint every minute
+ * (43,200 in 30 days), never negative. Push monitors save almost all of them.
+ */
+export function estimateRequestsSaved(monitor) {
+  return Math.max(0, POLLING_BASELINE_MONTHLY_REQUESTS - estimateMonthlyRequests(monitor));
 }
 
 /** Estimated requests between two dates (e.g. "so far this month"). */

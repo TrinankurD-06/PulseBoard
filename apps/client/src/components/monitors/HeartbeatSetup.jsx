@@ -1,4 +1,4 @@
-import { Check, Copy, KeyRound, RefreshCw } from 'lucide-react';
+import { KeyRound, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { errorMessage } from '../../api/http.js';
@@ -7,6 +7,7 @@ import { cn } from '../../lib/cn.js';
 import { heartbeatSnippets, pingUrl, SNIPPET_TABS } from '../../lib/heartbeat.js';
 import Button from '../ui/Button.jsx';
 import Card, { CardHeader } from '../ui/Card.jsx';
+import CodeBlock, { CopyButton } from '../ui/CodeBlock.jsx';
 import Modal from '../ui/Modal.jsx';
 
 const MASK = '••••••';
@@ -18,38 +19,6 @@ const SNIPPET_HELP = {
   startFail:
     'Optional: /start before the job measures its run time; /fail reports an error immediately (opens an incident at once).',
 };
-
-function CopyButton({ text, label }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error('Could not copy. Select the text and copy it manually.');
-    }
-  }
-  return (
-    <Button variant="secondary" size="sm" onClick={copy} aria-label={label}>
-      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-      {copied ? 'Copied' : 'Copy'}
-    </Button>
-  );
-}
-
-function CodeBlock({ code, label }) {
-  return (
-    <div className="relative">
-      <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 pr-24 text-xs leading-relaxed text-slate-100 dark:bg-black/40">
-        <code>{code}</code>
-      </pre>
-      <div className="absolute top-2 right-2">
-        <CopyButton text={code} label={`Copy ${label}`} />
-      </div>
-    </div>
-  );
-}
 
 function RegenerateToken({ wid, monitor }) {
   const [open, setOpen] = useState(false);

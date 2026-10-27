@@ -61,3 +61,18 @@ export async function requestsThisMonth(monitorId, at = new Date()) {
   const usage = await MonitorUsage.findOne({ monitorId, month: monthKey(at) }).lean();
   return usage?.requests ?? 0;
 }
+
+/** Counts one agent report received for the month of `at` (upsert $inc, like recordPing). */
+export async function recordReport(monitor, at = new Date()) {
+  await MonitorUsage.updateOne(
+    { monitorId: monitor._id, month: monthKey(at) },
+    { $inc: { reports: 1 }, $setOnInsert: { workspaceId: monitor.workspaceId } },
+    { upsert: true },
+  );
+}
+
+/** Agent reports received this month. */
+export async function reportsThisMonth(monitorId, at = new Date()) {
+  const usage = await MonitorUsage.findOne({ monitorId, month: monthKey(at) }).lean();
+  return usage?.reports ?? 0;
+}

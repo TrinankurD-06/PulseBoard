@@ -2,6 +2,7 @@ import { ROLES } from '@pulseboard/shared/constants';
 import {
   Activity,
   ArrowLeft,
+  Cpu,
   ExternalLink,
   FlaskConical,
   Pause,
@@ -22,6 +23,9 @@ import {
   useTestSavedMonitor,
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
+import AgentAnalytics from '../../components/monitors/AgentAnalytics.jsx';
+import AgentBanner from '../../components/monitors/AgentBanner.jsx';
+import AgentSetup from '../../components/monitors/AgentSetup.jsx';
 import BudgetBanner from '../../components/monitors/BudgetBanner.jsx';
 import HeartbeatAnalytics from '../../components/monitors/HeartbeatAnalytics.jsx';
 import HeartbeatSetup from '../../components/monitors/HeartbeatSetup.jsx';
@@ -40,6 +44,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
 import { intervalDescription, isPausedByBudget } from '../../lib/budget.js';
 import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
+import { isAgent } from '../../lib/agent.js';
 import { isHeartbeat } from '../../lib/heartbeat.js';
 import NotFound from '../NotFound.jsx';
 
@@ -219,6 +224,57 @@ function HeartbeatDetail({ monitor, wid, canEdit, now }) {
   );
 }
 
+/**
+ * Agent monitors: the customer's app reports aggregated metrics to us. Live
+ * reporting state, charts from the reports, top routes, the key/snippets and
+ * the usual uptime, 90-day bars and incidents. "Test now" probes the probe URL,
+ * so it's only offered when one is set.
+ */
+function AgentDetail({ monitor, wid, canEdit, now }) {
+  const [testResult, setTestResult] = useState(null);
+  return (
+    <div className="space-y-6">
+      <Link
+        to={`/app/${wid}`}
+        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+      >
+        <ArrowLeft className="h-4 w-4" /> All monitors
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
+            <StatusBadge status={monitor.status} />
+          </div>
+          <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
+            <Cpu className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            App agent · reports every {formatDuration(monitor.reportEverySec)}
+          </p>
+        </div>
+        {canEdit && (
+          <Actions
+            monitor={monitor}
+            wid={wid}
+            onTestResult={setTestResult}
+            canTest={Boolean(monitor.probeUrl)}
+          />
+        )}
+      </div>
+
+      <AgentBanner monitor={monitor} now={now} />
+
+      {testResult && <TestResult result={testResult} />}
+
+      <AgentAnalytics wid={wid} monitor={monitor} now={now} />
+
+      <AgentSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+
+      <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
+    </div>
+  );
+}
+
 export default function MonitorDetail() {
   const { wid, can } = useCurrentWorkspace();
   const { mid } = useParams();
@@ -240,6 +296,9 @@ export default function MonitorDetail() {
 
   if (isHeartbeat(monitor)) {
     return <HeartbeatDetail monitor={monitor} wid={wid} canEdit={can(ROLES.MEMBER)} now={now} />;
+  }
+  if (isAgent(monitor)) {
+    return <AgentDetail monitor={monitor} wid={wid} canEdit={can(ROLES.MEMBER)} now={now} />;
   }
 
   const headerNames = Object.keys(monitor.headers ?? {});

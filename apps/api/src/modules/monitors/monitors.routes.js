@@ -1,5 +1,5 @@
 import { MONITOR_STATUS, MONITOR_TYPES, ROLES } from '@pulseboard/shared/constants';
-import { monitorTypeSchema, paginationSchema } from '@pulseboard/shared/schemas';
+import { agentCreateSchema, monitorTypeSchema, paginationSchema } from '@pulseboard/shared/schemas';
 import { Router } from 'express';
 import { z } from 'zod';
 import { AppError } from '../../lib/errors.js';
@@ -26,7 +26,11 @@ export function monitorsRouter({ env, scheduler, schemas }) {
   // The body schema depends on the requested type (absent = http, as before).
   const validateCreate = (req, res, next) => {
     const type = monitorTypeSchema.parse(req.body?.type);
-    const body = type === MONITOR_TYPES.HEARTBEAT ? schemas.heartbeatCreate : schemas.create;
+    const bodies = {
+      [MONITOR_TYPES.HEARTBEAT]: schemas.heartbeatCreate,
+      [MONITOR_TYPES.AGENT]: agentCreateSchema,
+    };
+    const body = bodies[type] ?? schemas.create;
     validate({ body })(req, res, next);
   };
 
@@ -44,6 +48,13 @@ export function monitorsRouter({ env, scheduler, schemas }) {
         400,
         'NOT_SUPPORTED',
         'Heartbeat monitors are not checked by PulseBoard: your job pings them',
+      );
+    }
+    if (req.body?.type === MONITOR_TYPES.AGENT) {
+      throw new AppError(
+        400,
+        'NOT_SUPPORTED',
+        'Agent monitors report by themselves: save the monitor, then test its probe URL',
       );
     }
     next();
@@ -79,6 +90,12 @@ export function monitorsRouter({ env, scheduler, schemas }) {
 
   router.post('/:mid/heartbeat-token', requireRole(ROLES.MEMBER), async (req, res) => {
     const monitor = await monitors.regenerateHeartbeatToken(req.params.wid, req.params.mid);
+    res.json({ data: dto(req, monitor) });
+  });
+
+  // The response carries the new key (data.agentKey) once; the old key stops working.
+  router.post('/:mid/agent-key', requireRole(ROLES.MEMBER), async (req, res) => {
+    const monitor = await monitors.regenerateAgentKey(req.params.wid, req.params.mid);
     res.json({ data: dto(req, monitor) });
   });
 

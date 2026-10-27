@@ -62,6 +62,26 @@ export const useRegenerateHeartbeatToken = (wid, mid) =>
     http.post(`/workspaces/${wid}/monitors/${mid}/heartbeat-token`).then(unwrap),
   );
 
+/**
+ * Agent: new agent key, returned once in `agentKey`; the old key is rejected
+ * immediately. Resolves `{ agentKey, monitor }`. The key is never cached: only
+ * the caller (which shows it once) gets it.
+ */
+export function useRegenerateAgentKey(wid, mid) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      http.post(`/workspaces/${wid}/monitors/${mid}/agent-key`).then((res) => {
+        const { agentKey, ...rest } = unwrap(res) ?? {};
+        return { agentKey, monitor: rest.id ? rest : null };
+      }),
+    onSuccess: ({ monitor }) => {
+      if (monitor) queryClient.setQueryData(monitorKeys.detail(wid, mid), monitor);
+      return queryClient.invalidateQueries({ queryKey: monitorKeys.detail(wid, mid), exact: true });
+    },
+  });
+}
+
 /** "Test now" for an unsaved configuration (the form). Result isn't stored. */
 export const useTestMonitorConfig = (wid) =>
   useMutation({

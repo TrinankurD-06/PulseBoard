@@ -106,7 +106,7 @@ describe('creating a heartbeat monitor', () => {
     const unknown = await request(app)
       .post(monitorsUrl())
       .set(owner.auth)
-      .send({ type: 'agent', name: 'Job' });
+      .send({ type: 'ftp', name: 'Job' }); // 'agent' became valid in U4
     expect(unknown.status).toBe(400);
   });
 

@@ -11,6 +11,9 @@ export const MONITOR_STATUS = Object.freeze({
   DOWN: 'down',
   PENDING: 'pending',
   PAUSED: 'paused',
+  // Agent monitors (U4): the agent stopped reporting but the endpoint still
+  // answers. Not an incident; public status pages show it as operational.
+  DEGRADED: 'degraded',
 });
 
 export const HTTP_METHODS = Object.freeze(['GET', 'HEAD', 'POST']);
@@ -53,6 +56,31 @@ export const HEARTBEAT_MAX_EXPECTED_SEC = 30 * 24 * 60 * 60;
 // catches up on the next runs), so one long-dead minutely job can't stall it.
 export const HEARTBEAT_MAX_MISSED_PER_RUN = 50;
 
+// Agent monitors (U4): the customer's app reports aggregated metrics to us.
+export const AGENT_DEFAULT_REPORT_EVERY_SEC = 60;
+export const AGENT_MIN_REPORT_EVERY_SEC = 30;
+export const AGENT_MAX_REPORT_EVERY_SEC = 300;
+export const AGENT_DEFAULT_ERROR_RATE_THRESHOLD = 5;
+export const AGENT_MIN_EXTERNAL_CHECK_SEC = 300;
+export const AGENT_MAX_EXTERNAL_CHECK_SEC = 24 * 60 * 60;
+// Silence = no report for this many report periods.
+export const AGENT_SILENCE_PERIODS = 2;
+// Probe-on-silence: up to this many HEAD probes, this far apart.
+export const AGENT_PROBE_COUNT = 3;
+export const AGENT_PROBE_SPACING_MS = 10_000;
+// While silent but reachable (degraded), probe again this often.
+export const AGENT_REPROBE_EVERY_SEC = 300;
+// Reports accepted per key per minute.
+export const AGENT_REPORT_RATE_LIMIT = 30;
+export const AGENT_KEY_PREFIX = 'pbk_';
+export const AGENT_SILENCE_STATE = Object.freeze({
+  REPORTING: 'reporting',
+  PROBING: 'probing',
+  SILENT: 'silent',
+});
+// Baseline for "requests saved": polling every minute for 30 days.
+export const POLLING_BASELINE_MONTHLY_REQUESTS = 43_200;
+
 // Where a check result came from (CheckResult.source; missing = 'http').
 export const CHECK_SOURCES = Object.freeze({
   HTTP: 'http',
@@ -80,6 +108,7 @@ export const JOB_NAMES = Object.freeze({
   SEND_NOTICE: 'send-notice',
   BUDGET_RESET: 'budget-reset',
   HEARTBEAT_OVERDUE: 'heartbeat-overdue',
+  AGENT_SILENCE: 'agent-silence',
 });
 
 // Adaptive intervals (U2): each run of this many consecutive successes while up
@@ -97,6 +126,7 @@ export const PAUSED_REASONS = Object.freeze({ USER: 'user', BUDGET: 'budget_exce
 export const NOTICE_KIND = Object.freeze({
   BUDGET_WARNING: 'budget_warning',
   BUDGET_EXCEEDED: 'budget_exceeded',
+  AGENT_SILENT: 'agent_silent',
 });
 
 // send-alert retries after a failed delivery: 30s, then 2m, then 8m, then give up.

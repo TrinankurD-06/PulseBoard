@@ -6,6 +6,7 @@ import { badRequest, notFound } from '../../lib/errors.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import {
+  getAgentMetrics,
   getChecksInRange,
   getDailySeries,
   getRecentChecks,
@@ -22,6 +23,10 @@ const checksQuery = z.object({
   to: z.coerce.date().optional(),
   // Alternative to a range: the latest N checks (timing breakdown chart).
   limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+const rangeQuery = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
 });
 const dailyQuery = z.object({ days: z.coerce.number().int().min(1).max(90).default(90) });
 const sparklineQuery = z.object({ points: z.coerce.number().int().min(2).max(60).default(30) });
@@ -74,6 +79,22 @@ export function monitorAnalyticsRouter() {
         throw badRequest('Range can be at most 7 days. Use /daily for longer periods.');
       }
       res.json({ data: await getChecksInRange(req.params.mid, start, end) });
+    },
+  );
+
+  // Agent monitors (U4): request rate, error rate, latency percentiles, top routes.
+  router.get(
+    '/:mid/agent-metrics',
+    viewer,
+    assertMonitorInWorkspace,
+    validate({ query: rangeQuery }),
+    async (req, res) => {
+      const { from, to } = req.valid.query;
+      const end = to ?? new Date();
+      const start = from ?? new Date(end - HOUR_MS);
+      if (start >= end) throw badRequest('"from" must be before "to"');
+      if (end - start > 24 * HOUR_MS) throw badRequest('Range can be at most 24 hours');
+      res.json({ data: await getAgentMetrics(req.params.mid, start, end) });
     },
   );
 
