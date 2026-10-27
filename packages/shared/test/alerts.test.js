@@ -72,7 +72,7 @@ describe('channel payloads', () => {
     const { html, text, subject } = renderEmail(evil);
     expect(html).not.toContain('<script>x</script>');
     expect(html).toContain('&lt;script&gt;');
-    expect(text).toContain('Dashboard: https://app.pulseboard.dev/app/w1/monitors/m1');
+    expect(text).toContain('Open dashboard: https://app.pulseboard.dev/app/w1/monitors/m1');
     expect(subject).toContain('is DOWN');
   });
 });

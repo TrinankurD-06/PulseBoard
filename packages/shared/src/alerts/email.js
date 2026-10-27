@@ -6,54 +6,124 @@ const escapeHtml = (value) =>
     (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
   );
 
-const ACCENT = { down: '#ef4444', up: '#22c55e', test: '#38bdf8', notice: '#f59e0b' };
+// Email clients cannot read CSS variables, so the dark theme's tokens are repeated
+// here as hex (see apps/client/src/styles/tokens.css). Solid hex only: Outlook
+// ignores rgba() and most modern CSS.
+const THEME = {
+  bg: '#0A0A09',
+  card: '#111110',
+  border: '#2A2A25',
+  text: '#ECEAD6',
+  muted: '#A3A193',
+  faint: '#7C7B71',
+  accent: '#E3E8A8',
+  accentInk: '#0A0A09',
+};
 
-/** Simple, inline-styled HTML (email clients ignore <style> blocks and most CSS). */
+// The strip across the top of the card: red for down, green for recovered,
+// amber for a notice and neutral for a test.
+const STRIP = { down: '#FF6A5A', up: '#B9DD8E', notice: '#E9B44C', test: '#A3A193' };
+const STATUS_LABEL = { down: 'Down', up: 'Recovered', notice: 'Notice', test: 'Test alert' };
+
+// Manrope only renders where the client loads web fonts (Apple Mail, some
+// webmail); everyone else gets the system stack.
+const FONT = "'Manrope', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const MONO = "'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace";
+
+const buttonLabel = (alert) => (alert.kind === 'test' ? 'Open alert channels' : 'Open dashboard');
+
+/**
+ * The alert as an email: a dark card on a dark page with a status strip, in the
+ * app's theme. Built from nested tables with inline styles and bgcolor
+ * attributes, the one layout Gmail, Outlook and Apple Mail all render alike
+ * (they strip or ignore <style> blocks, flexbox and most CSS). Returns the
+ * subject, the HTML and a plain-text alternative.
+ */
 export function renderEmail(alert) {
-  const rows = alert.fields
+  const strip = STRIP[alert.kind] ?? STRIP.test;
+  const label = STATUS_LABEL[alert.kind] ?? STATUS_LABEL.test;
+  const link = escapeHtml(alert.link);
+  const fields = [['Monitor', alert.monitorName], ...alert.fields].filter(([, value]) => value);
+
+  const rows = fields
     .map(
       ([name, value]) => `
-        <tr>
-          <td style="padding:6px 0;color:#64748b;width:120px">${escapeHtml(name)}</td>
-          <td style="padding:6px 0;color:#0f172a">${escapeHtml(value)}</td>
-        </tr>`,
+              <tr>
+                <td valign="top" width="120" style="padding:10px 16px 10px 0;border-top:1px solid ${THEME.border};font-family:${FONT};font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${THEME.faint}">${escapeHtml(name)}</td>
+                <td valign="top" style="padding:9px 0;border-top:1px solid ${THEME.border};font-family:${FONT};font-size:14px;line-height:1.5;color:${THEME.text};word-break:break-word">${escapeHtml(value)}</td>
+              </tr>`,
     )
     .join('');
 
   const html = `<!doctype html>
-<html><body style="margin:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-        style="max-width:560px;background:#ffffff;border-radius:12px;border-top:4px solid ${ACCENT[alert.kind]}">
-        <tr><td style="padding:24px">
-          <h1 style="margin:0 0 8px;font-size:20px;color:#0f172a">${escapeHtml(alert.title)}</h1>
-          <p style="margin:0 0 16px;color:#334155">${escapeHtml(alert.summary)}</p>
-          <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px">
-            <tr>
-              <td style="padding:6px 0;color:#64748b;width:120px">Monitor</td>
-              <td style="padding:6px 0;color:#0f172a">${escapeHtml(alert.monitorName)}</td>
-            </tr>${rows}
-          </table>
-          <p style="margin:24px 0 0">
-            <a href="${escapeHtml(alert.link)}"
-              style="background:#059669;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:bold">
-              Open dashboard
-            </a>
-          </p>
-        </td></tr>
-      </table>
-      <p style="color:#94a3b8;font-size:12px">Sent by PulseBoard uptime monitoring</p>
-    </td></tr>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+  <title>${escapeHtml(alert.title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600&amp;display=swap" rel="stylesheet">
+</head>
+<body bgcolor="${THEME.bg}" style="margin:0;padding:0;background-color:${THEME.bg};color:${THEME.text}">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:${THEME.bg}">${escapeHtml(alert.summary)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${THEME.bg}" style="background-color:${THEME.bg}">
+    <tr>
+      <td align="center" style="padding:32px 12px">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px">
+          <tr>
+            <td style="padding:0 4px 18px;font-family:${FONT};font-size:15px;font-weight:600;letter-spacing:-0.2px;color:${THEME.text}">PulseBoard</td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${THEME.card}" style="background-color:${THEME.card};border:1px solid ${THEME.border};border-radius:16px">
+                <tr>
+                  <td height="4" bgcolor="${strip}" style="height:4px;line-height:4px;font-size:0;background-color:${strip};border-radius:16px 16px 0 0">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding:28px 28px 8px">
+                    <p style="margin:0 0 12px;font-family:${FONT};font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:${THEME.faint}">${escapeHtml(label)}</p>
+                    <h1 style="margin:0 0 12px;font-family:${FONT};font-size:26px;line-height:1.2;font-weight:300;letter-spacing:-0.5px;color:${THEME.text}">${escapeHtml(alert.title)}</h1>
+                    <p style="margin:0 0 24px;font-family:${FONT};font-size:15px;line-height:1.6;color:${THEME.muted}">${escapeHtml(alert.summary)}</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 28px 32px">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td bgcolor="${THEME.accent}" style="background-color:${THEME.accent};border-radius:999px">
+                          <a href="${link}" target="_blank" style="display:inline-block;padding:13px 26px;font-family:${FONT};font-size:14px;font-weight:600;line-height:1;color:${THEME.accentInk};text-decoration:none;border-radius:999px">${escapeHtml(buttonLabel(alert))}</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:18px 0 0;font-family:${MONO};font-size:11px;line-height:1.5;color:${THEME.faint};word-break:break-all"><a href="${link}" target="_blank" style="color:${THEME.faint};text-decoration:underline">${link}</a></p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 4px 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${THEME.faint}">Sent by PulseBoard uptime monitoring because this address is an alert channel in your workspace.</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
-</body></html>`;
+</body>
+</html>`;
 
   const text = [
     alert.title,
+    '',
     alert.summary,
-    `Monitor: ${alert.monitorName}`,
-    ...alert.fields.map(([name, value]) => `${name}: ${value}`),
-    `Dashboard: ${alert.link}`,
+    '',
+    ...fields.map(([name, value]) => `${name}: ${value}`),
+    '',
+    `${buttonLabel(alert)}: ${alert.link}`,
+    '',
+    '-- Sent by PulseBoard uptime monitoring because this address is an alert channel in your workspace.',
   ].join('\n');
 
   return { subject: alert.title, html, text };
