@@ -8,9 +8,14 @@ const booleanString = z
   .default('false')
   .transform((value) => value === 'true');
 
-const envSchema = z.object({
+export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().default(4000),
+  // "api": serve the API only (a separate worker process runs the checks).
+  // "combined": this process also runs the worker, for one-service deployments.
+  RUN_MODE: z.enum(['api', 'combined']).default('api'),
+  // Checks running at once; only used when RUN_MODE=combined.
+  AGENDA_MAX_CONCURRENCY: z.coerce.number().int().positive().default(20),
   MONGODB_URI: z.string().min(1),
   CLIENT_ORIGIN: z.string().url(),
   JWT_ACCESS_SECRET: z.string().min(32),

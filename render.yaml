@@ -1,6 +1,12 @@
-# Render Blueprint: API (web service), worker (background worker) and the
-# demo-target (web service, for live demos). The client is deployed to Vercel
-# (see apps/client/vercel.json). MongoDB is MongoDB Atlas.
+# Render Blueprint: one free web service. RUN_MODE=combined makes the API process
+# also run the worker (checks, heartbeats, alerts, rollups), so no separate
+# background worker is needed (Render has no free plan for those). The client is
+# deployed to Vercel (see apps/client/vercel.json). MongoDB is MongoDB Atlas.
+#
+# Free web services spin down after about 15 minutes without HTTP traffic, and
+# no checks run while the service is asleep. Keep it awake by pinging /health
+# every 10 minutes from an external scheduler (cron-job.org, UptimeRobot...),
+# or switch `plan` to starter. See docs/DECISIONS.md (D96).
 #
 # After the first deploy, fill in the "sync: false" values in the Render
 # dashboard (Atlas connection string, client URL, alert settings).
@@ -8,7 +14,7 @@ services:
   - type: web
     name: pulseboard-api
     runtime: node
-    plan: starter
+    plan: free
     buildCommand: npm ci
     startCommand: npm start -w @pulseboard/api
     healthCheckPath: /health
@@ -17,6 +23,10 @@ services:
         value: 22
       - key: NODE_ENV
         value: production
+      - key: RUN_MODE
+        value: combined # API + worker in one process
+      - key: AGENDA_MAX_CONCURRENCY
+        value: 5 # checks at once; the free plan has 512 MB of memory
       - key: MONGODB_URI
         sync: false # Atlas SRV string; Atlas clusters are replica sets, so change streams work
       - key: CLIENT_ORIGIN
@@ -53,49 +63,3 @@ services:
         sync: false
       - key: GITHUB_CLIENT_SECRET
         sync: false
-
-  - type: worker
-    name: pulseboard-worker
-    runtime: node
-    plan: starter # background workers have no free plan on Render
-    buildCommand: npm ci
-    startCommand: npm start -w @pulseboard/worker
-    envVars:
-      - key: NODE_VERSION
-        value: 22
-      - key: NODE_ENV
-        value: production
-      - key: MONGODB_URI
-        sync: false
-      - key: DASHBOARD_URL
-        sync: false
-      - key: DEMO_MODE
-        value: 'true'
-      - key: ALLOW_PRIVATE_TARGETS
-        value: 'false'
-      - key: AGENDA_MAX_CONCURRENCY
-        value: 20
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: 587
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: ALERT_FROM_EMAIL
-        sync: false
-
-  # The demo target is a separate public site so the deployed worker can reach
-  # it without ALLOW_PRIVATE_TARGETS. Free plan is fine (it sleeps when idle;
-  # open its /admin page a minute before a demo to wake it up).
-  - type: web
-    name: pulseboard-demo-target
-    runtime: node
-    plan: free
-    buildCommand: npm ci --omit=dev
-    startCommand: npm start -w @pulseboard/demo-target
-    healthCheckPath: /admin/mode
-    envVars:
-      - key: NODE_VERSION
-        value: 22

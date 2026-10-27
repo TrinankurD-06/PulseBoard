@@ -78,6 +78,11 @@ flowchart LR
 The worker never calls the API and the API never runs checks; they only share the
 database. Either side can be restarted, scaled or crash without taking the other down.
 
+**Combined mode.** With `RUN_MODE=combined` the API process also starts the worker (the same
+`startWorker()` the standalone worker calls), so one web service does both jobs. The two still
+only share the database, through two separate Agenda instances: the API's unstarted one writes
+jobs, the worker's started one runs them. The trade-off is that a crash takes both down. See D96.
+
 ## Push vs pull: three monitor types
 
 Polling costs the customer money: every check is a request their server (and often their

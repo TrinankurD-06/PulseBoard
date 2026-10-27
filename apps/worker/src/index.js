@@ -1,6 +1,3 @@
-import os from 'node:os';
-import { createAlertSenders } from '@pulseboard/shared/alerts';
-import { JOB_NAMES, MAX_TIMEOUT_MS } from '@pulseboard/shared/constants';
 import {
   connectMongo,
   disconnectMongo,
@@ -8,114 +5,27 @@ import {
   mongoose,
   mongoState,
 } from '@pulseboard/shared/db';
-import { alertSenderConfig, appUrlOf } from '@pulseboard/shared/env';
 import { createLogger } from '@pulseboard/shared/logger';
-import {
-  countOverdueJobs,
-  createAgenda,
-  createAgendaScheduler,
-  ensureAgendaIndexes,
-} from '@pulseboard/shared/scheduling';
+import { countOverdueJobs } from '@pulseboard/shared/scheduling';
 import { env } from './config/env.js';
-import { createBudgetEnforcer } from './budget.js';
 import { startHealthServer } from './healthServer.js';
-import { createIncidentEngine } from '@pulseboard/shared/incident';
-import { createAgentProber } from './agentProbes.js';
-import { createAgentSilenceJob } from './jobs/agentSilence.js';
-import { createBudgetResetJob } from './jobs/budgetReset.js';
-import { createHeartbeatOverdueJob } from './jobs/heartbeatOverdue.js';
-import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
-import { createRunCheckJob } from './jobs/runCheck.js';
-import { createSendAlertJob } from './jobs/sendAlert.js';
-import { createSendNoticeJob } from './jobs/sendNotice.js';
-import { reconcileJobs } from './reconcile.js';
+import { startWorker } from './worker.js';
 
 const logger = createLogger({ name: 'worker' });
 
+// The standalone worker process. The same runner can also live inside the API
+// (RUN_MODE=combined, see apps/api/src/combined.js).
 async function main() {
   await connectMongo(env.MONGODB_URI, logger);
   await ensureCollections();
-
-  const { agenda, close: closeAgenda } = createAgenda({
-    mongoUri: env.MONGODB_URI,
-    name: `worker-${os.hostname()}-${process.pid}`,
-    maxConcurrency: env.AGENDA_MAX_CONCURRENCY,
-    // Comfortably above the longest possible check, so a slow check is never
-    // mistaken for a dead worker and handed to someone else.
-    defaultLockLifetime: MAX_TIMEOUT_MS * 2,
-    // One-off jobs (alerts) are deleted once done, so agendaJobs doesn't grow forever.
-    removeOnComplete: true,
-  });
-  await agenda.ready;
-  await ensureAgendaIndexes(mongoose.connection.db);
-  const scheduler = createAgendaScheduler(agenda);
-
-  const db = mongoose.connection.db;
-  const processCheckResult = createIncidentEngine({ agenda, logger });
-  const enforceBudget = createBudgetEnforcer({ agenda, db, scheduler, logger });
-  const senders = createAlertSenders({ ...alertSenderConfig(env), logger });
-  const prober = createAgentProber({
-    allowPrivate: env.ALLOW_PRIVATE_TARGETS,
-    appUrl: appUrlOf(env),
-    agenda,
-    processCheckResult,
-    logger,
-  });
-  agenda.define(
-    JOB_NAMES.RUN_CHECK,
-    createRunCheckJob({
-      allowPrivate: env.ALLOW_PRIVATE_TARGETS,
-      appUrl: appUrlOf(env),
-      db,
-      scheduler,
-      processCheckResult,
-      enforceBudget,
-      logger,
-      prober,
-    }),
-    { concurrency: env.AGENDA_MAX_CONCURRENCY },
-  );
-  agenda.define(
-    JOB_NAMES.SEND_ALERT,
-    createSendAlertJob({ agenda, senders, dashboardUrl: env.DASHBOARD_URL, logger }),
-    { concurrency: 5 },
-  );
-  agenda.define(
-    JOB_NAMES.SEND_NOTICE,
-    createSendNoticeJob({ agenda, senders, dashboardUrl: env.DASHBOARD_URL, logger }),
-    { concurrency: 5 },
-  );
-  const budgetReset = createBudgetResetJob({ scheduler, logger });
-  agenda.define(JOB_NAMES.BUDGET_RESET, () => budgetReset(new Date()));
-  const heartbeatOverdue = createHeartbeatOverdueJob({ processCheckResult, logger });
-  agenda.define(JOB_NAMES.HEARTBEAT_OVERDUE, () => heartbeatOverdue(new Date()));
-  const agentSilence = createAgentSilenceJob({ prober, processCheckResult, logger });
-  agenda.define(JOB_NAMES.AGENT_SILENCE, (job) =>
-    agentSilence(new Date(), { touch: () => job.touch() }),
-  );
-  agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
-  agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
-  agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
-
-  // Catch up on a missed monthly reset first, so reconcile sees the restored intervals.
-  await budgetReset(new Date());
-  await reconcileJobs({ db, scheduler, logger });
-  await agenda.start();
-  // every() creates a single job per name (upsert), so several workers booting
-  // at once still end up with one rollup job and one nightly finalize job.
-  await agenda.every('15 minutes', JOB_NAMES.ROLLUP);
-  await agenda.every('30 seconds', JOB_NAMES.HEARTBEAT_OVERDUE);
-  await agenda.every('30 seconds', JOB_NAMES.AGENT_SILENCE);
-  await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
-  await agenda.every('0 0 1 * *', JOB_NAMES.BUDGET_RESET, undefined, { timezone: 'UTC' });
-  let agendaRunning = true;
-  logger.info('Agenda started, processing jobs');
+  const worker = await startWorker({ env, logger });
 
   const healthServer = startHealthServer({
     port: env.WORKER_HEALTH_PORT,
     logger,
     getStatus: async () => {
       const mongo = mongoState();
+      const agendaRunning = worker.isRunning();
       const healthy = mongo === 'connected' && agendaRunning;
       const overdueJobs = healthy ? await countOverdueJobs(mongoose.connection.db) : null;
       return { healthy, mongo, agenda: agendaRunning ? 'running' : 'stopped', overdueJobs };
@@ -130,8 +40,7 @@ async function main() {
     healthServer.close();
     // Unlocks jobs this worker holds, so another worker can pick them up immediately
     // instead of waiting for the lock to expire.
-    agendaRunning = false;
-    await closeAgenda();
+    await worker.stop();
     await disconnectMongo();
     logger.info('Shutdown complete');
     process.exit(0);

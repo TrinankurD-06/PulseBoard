@@ -1302,3 +1302,35 @@ series would not line up between cards.
   `text-status-*`.
 - **Bridge.** The heat and timing bridge tokens are removed. `--color-series-*` stays because the agent
   analytics page still uses it.
+
+### D96. `RUN_MODE=combined`: one process, one free web service
+
+- **Why.** Render has no free plan for background workers, so the original blueprint (API + worker +
+  demo-target) could not run for free. The worker is only a set of Agenda handlers plus a few
+  recurring jobs, so it can live in the API process.
+- **How.** The worker's startup moved out of `apps/worker/src/index.js` into `startWorker({ env, logger,
+agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/start`). The standalone
+  worker calls it, then adds its health server and signal handling, exactly as before. The API calls it
+  from `startCombinedWorker` (`apps/api/src/combined.js`) when `RUN_MODE=combined`; in the default `api`
+  mode the worker code is never imported.
+- **Order.** Started after `server.listen`, so the port is bound for the platform's health check while
+  the worker catches up (monthly budget reset, job reconciliation). A start failure is fatal, like a
+  standalone worker. On shutdown the worker stops first, releasing the jobs it holds.
+- **Two Agenda instances.** The API keeps its unstarted instance (it only writes jobs); the worker
+  creates its own started one. They share the database exactly as two processes would, so scheduling
+  behaves the same (D71, D75) and a standalone worker can still run beside a combined API: Agenda's
+  locking prevents double runs and the recurring jobs are upserted, one per name (tested with two
+  runners).
+- **Not started in combined mode:** the worker's own `/health` server (one port per web service).
+  The API's `/health` gains `worker: "off" | "running" | "stopped"`; a stopped combined worker makes it
+  `degraded`.
+- **Concurrency.** `AGENDA_MAX_CONCURRENCY` (default 20) now also applies to the API; the blueprint sets
+  5 because the free plan has 512 MB of memory.
+- **Trade-offs, stated plainly.** One crash takes checks and API down together, and the worker cannot
+  scale separately; a free web service **sleeps after about 15 minutes without HTTP traffic and no
+  checks run while it sleeps**. Mitigation: ping `/health` every 10 minutes from an external scheduler,
+  or use the `starter` plan. Splitting back out is a config change (`RUN_MODE=api` plus a worker).
+- **Blueprint.** `render.yaml` is a single `plan: free` web service with `RUN_MODE=combined`. The
+  worker service is removed, and so is the demo-target service: a blueprint with "a single free web
+  service" has no room for it, and the seed's `localhost:4011` demo monitor is refused by a deployed API
+  anyway (README says how to drop or re-point it).

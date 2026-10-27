@@ -12,5 +12,9 @@
   "dependencies": {
     "@pulseboard/shared": "^0.1.0",
     "zod": "^4.6.7"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./start": "./src/worker.js"
   }
 }

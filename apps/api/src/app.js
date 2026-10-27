@@ -41,6 +41,7 @@ export function createApp({
   agenda = null,
   alertSenders = createAlertSenders({ ...alertSenderConfig(env), logger }),
   getRealtimeStatus,
+  getWorkerStatus,
   // fetch used to talk to OAuth providers (tests pass a fake).
   oauthFetch = globalThis.fetch,
 }) {
@@ -78,7 +79,7 @@ export function createApp({
   app.use(cookieParser());
   app.use(sanitizeBody);
 
-  app.use('/health', healthRouter({ getRealtimeStatus }));
+  app.use('/health', healthRouter({ getRealtimeStatus, getWorkerStatus }));
 
   const tokens = createTokenService(env);
   const requireAuth = authenticate(tokens);
