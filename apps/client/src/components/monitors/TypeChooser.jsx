@@ -40,7 +40,7 @@ export default function TypeChooser({ value, onChange }) {
             className={cn(
               'flex flex-col items-start gap-1 rounded-xl border p-4 text-left transition-colors',
               selected
-                ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 dark:bg-emerald-500/10'
+                ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500 dark:bg-brand-500/10'
                 : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700',
               disabled &&
                 'cursor-not-allowed opacity-60 hover:border-slate-200 dark:hover:border-slate-800',
@@ -50,7 +50,7 @@ export default function TypeChooser({ value, onChange }) {
               <Icon
                 className={cn(
                   'h-4 w-4',
-                  selected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500',
+                  selected ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500',
                 )}
                 aria-hidden="true"
               />

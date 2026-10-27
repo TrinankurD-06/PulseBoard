@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound.jsx';
 const AlertChannels = lazy(() => import('./pages/AlertChannels.jsx'));
 const AppIndex = lazy(() => import('./pages/AppIndex.jsx'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout.jsx'));
+const AuthCallback = lazy(() => import('./pages/auth/AuthCallback.jsx'));
 const Bot = lazy(() => import('./pages/Bot.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const EditMonitor = lazy(() => import('./pages/monitors/EditMonitor.jsx'));
@@ -31,6 +32,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/status/:slug" element={<PublicStatus />} />
         <Route path="/bot" element={<Bot />} />
+        {/* Outside GuestRoute: it restores the session itself, then honours ?next. */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<Login />} />

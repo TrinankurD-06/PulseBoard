@@ -6,6 +6,7 @@ import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
 import MonitorCard from '../components/monitors/MonitorCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import { primaryButtonClasses } from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -14,8 +15,7 @@ import { useNow } from '../hooks/useNow.js';
 import { formatMs } from '../lib/format.js';
 import { isOperational } from '../lib/status.js';
 
-const newMonitorButtonClasses =
-  'inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-500';
+const newMonitorButtonClasses = `inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-medium ${primaryButtonClasses}`;
 
 function summarize(monitors) {
   const count = (status) => monitors.filter((m) => m.status === status).length;
@@ -90,7 +90,7 @@ export default function Dashboard() {
                 />
                 <Link
                   to={`/app/${wid}/incidents`}
-                  className="rounded-xl focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                  className="rounded-xl focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
                 >
                   <SummaryCard
                     label="Open incidents"

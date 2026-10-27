@@ -113,7 +113,10 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
             {monitors.length === 0 ? (
               <p className="text-sm text-slate-500">
                 No monitors yet.{' '}
-                <Link to={`/app/${wid}/monitors/new`} className="text-emerald-600 hover:underline">
+                <Link
+                  to={`/app/${wid}/monitors/new`}
+                  className="text-brand-600 hover:underline dark:text-brand-400"
+                >
                   Create one first
                 </Link>
                 .
@@ -135,7 +138,7 @@ export default function StatusPageForm({ page, monitors, wid, submitLabel, onSub
                                 : [...field.value, monitor.id],
                             )
                           }
-                          className="h-4 w-4 accent-emerald-600"
+                          className="h-4 w-4 accent-brand-600"
                         />
                         <StatusDot status={monitor.status} />
                         <span className="min-w-0 flex-1 truncate text-sm">{monitor.name}</span>

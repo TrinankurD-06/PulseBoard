@@ -44,7 +44,7 @@ export default function UptimeBars({ days }) {
             >
               <span
                 className={cn(
-                  'w-full rounded-[2px] transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-emerald-500',
+                  'w-full rounded-[2px] transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-brand-500',
                   level.bar,
                 )}
               />

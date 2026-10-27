@@ -113,3 +113,26 @@ currency INR.
 
 Upgrade complete: U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 `086c3f4`, U5 `b9146d7`. Committed after
 this note. Nothing pushed yet.
+
+---
+
+# Theme + OAuth preparation (27 Oct)
+
+User request: light mode in peach / very pale orange with pops of green, blue and red; dark mode
+black with pale-orange accents; 3D effects here and there; prepare for OAuth. Dev now runs
+against the user's MongoDB Atlas (`MONGODB_URI` in `.env`), no Docker needed.
+
+- [x] **T1. Warm theme + 3D**: slate remapped to a warm scale, `brand` palette that flips by mode
+      (green light / pale orange dark), emerald split into brand vs status, chart tokens
+      re-validated (CVD pass both modes), 3D buttons/cards/landing preview with reduced-motion
+      fallback (D88).
+- [x] **T2. OAuth prepared**: Google + GitHub enabled only when credentials are set, HMAC-signed
+      state cookie + PKCE S256, link by verified email only, `identities` on User + migration 003,
+      client buttons (hidden until a provider is configured) and `/auth/callback` page (D89).
+- [x] Gate: 618/618 tests (agent 24, shared 230, api 222, client 61, demo-target 22, worker 59),
+      ESLint and Prettier clean, client build OK; live API on Atlas healthy, providers `[]`.
+
+## Resume note (theme + OAuth)
+
+Done and committed locally (two commits: OAuth server, then theme + OAuth client). Nothing pushed.
+To go live with OAuth: README → "Sign in with Google/GitHub".

@@ -7,7 +7,7 @@ import { errorMessage } from '../../api/http.js';
 import { monitorKeys, useCreateMonitor, useMonitor } from '../../api/monitors.js';
 import { AGENT_TYPE } from '../../lib/agent.js';
 import { cn } from '../../lib/cn.js';
-import Button from '../ui/Button.jsx';
+import Button, { primaryButtonClasses } from '../ui/Button.jsx';
 import Card, { CardHeader } from '../ui/Card.jsx';
 import AgentForm from './AgentForm.jsx';
 import { AgentSnippets, KeyReveal } from './AgentSetup.jsx';
@@ -29,9 +29,8 @@ function Stepper({ step }) {
             <span
               className={cn(
                 'inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold',
-                current && 'bg-emerald-600 text-white',
-                done &&
-                  'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
+                current && 'bg-brand-600 text-on-brand',
+                done && 'bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-400',
                 !current && !done && 'bg-slate-100 text-slate-500 dark:bg-slate-800',
               )}
             >
@@ -88,7 +87,7 @@ function WaitForReport({ wid, monitorId }) {
             className={cn(
               'inline-flex h-10 items-center rounded-lg px-4 text-sm font-medium',
               connected
-                ? 'bg-emerald-600 text-white hover:bg-emerald-500'
+                ? primaryButtonClasses
                 : 'border border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800',
             )}
           >

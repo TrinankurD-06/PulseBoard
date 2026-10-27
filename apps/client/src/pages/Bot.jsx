@@ -7,7 +7,7 @@ function Section({ icon: Icon, title, children }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900/60">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+        <Icon className="h-5 w-5 text-brand-600 dark:text-brand-400" aria-hidden="true" />
         {title}
       </h2>
       <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
@@ -34,7 +34,7 @@ export default function Bot() {
   const botUrl = `${window.location.origin}/bot`;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-black">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="flex items-center justify-between gap-4">
           <Logo />

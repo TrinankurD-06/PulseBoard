@@ -51,7 +51,7 @@ function PageCard({ page, canEdit, onEdit, onDelete }) {
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="mt-3 inline-flex items-center gap-1 text-sm break-all text-emerald-700 hover:underline dark:text-emerald-400"
+        className="mt-3 inline-flex items-center gap-1 text-sm break-all text-brand-700 hover:underline dark:text-brand-400"
       >
         /status/{page.slug} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
       </a>

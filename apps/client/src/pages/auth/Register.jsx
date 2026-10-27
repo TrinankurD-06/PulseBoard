@@ -8,6 +8,7 @@ import { useAuth } from '../../auth/AuthContext.js';
 import Button from '../../components/ui/Button.jsx';
 import Field from '../../components/ui/Field.jsx';
 import AuthLayout from './AuthLayout.jsx';
+import OAuthButtons from './OAuthButtons.jsx';
 
 export default function Register() {
   const { register: registerAccount } = useAuth();
@@ -40,13 +41,14 @@ export default function Register() {
           Already have an account?{' '}
           <Link
             to="/login"
-            className="font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
           >
             Log in
           </Link>
         </>
       }
     >
+      <OAuthButtons />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <Field
           label="Name"

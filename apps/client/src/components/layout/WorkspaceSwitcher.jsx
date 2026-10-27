@@ -58,7 +58,7 @@ export default function WorkspaceSwitcher() {
                   className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <span className="truncate">{item.name}</span>
-                  {item.id === workspace?.id && <Check className="h-4 w-4 text-emerald-500" />}
+                  {item.id === workspace?.id && <Check className="h-4 w-4 text-brand-500" />}
                 </Link>
               </li>
             ))}
@@ -69,7 +69,7 @@ export default function WorkspaceSwitcher() {
               setOpen(false);
               setCreating(true);
             }}
-            className="flex w-full items-center gap-2 border-t border-slate-200 px-3 py-2 text-sm text-emerald-700 hover:bg-slate-100 dark:border-slate-800 dark:text-emerald-400 dark:hover:bg-slate-800"
+            className="flex w-full items-center gap-2 border-t border-slate-200 px-3 py-2 text-sm text-brand-700 hover:bg-slate-100 dark:border-slate-800 dark:text-brand-400 dark:hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> New workspace
           </button>

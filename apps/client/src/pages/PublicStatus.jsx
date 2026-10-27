@@ -63,7 +63,7 @@ const COMPONENT_STATUS = {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-black">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         {children}
         <footer className="mt-12 flex items-center justify-center gap-2 text-xs text-slate-500">
@@ -157,7 +157,10 @@ export default function PublicStatus() {
           <p className="mt-2 text-slate-500">
             {missing ? "This page doesn't exist or isn't public." : 'Please try again in a moment.'}
           </p>
-          <Link to="/" className="mt-6 inline-block text-emerald-600 hover:underline">
+          <Link
+            to="/"
+            className="mt-6 inline-block text-brand-600 hover:underline dark:text-brand-400"
+          >
             Go to PulseBoard
           </Link>
         </div>
@@ -182,7 +185,7 @@ export default function PublicStatus() {
 
       <section
         className={cn(
-          'mt-8 flex items-center gap-3 rounded-xl border px-5 py-5 sm:px-6',
+          'surface-3d mt-8 flex items-center gap-3 rounded-xl border px-5 py-5 sm:px-6',
           overall.classes,
         )}
         role="status"
@@ -199,7 +202,7 @@ export default function PublicStatus() {
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">
             Services
           </h2>
-          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="surface-3d rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
             <ul className="divide-y divide-slate-200 dark:divide-slate-800">
               {data.monitors.map((monitor, i) => (
                 <ComponentRow key={`${monitor.name}-${i}`} monitor={monitor} />
@@ -216,7 +219,7 @@ export default function PublicStatus() {
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-500 uppercase">
           Past 30 days
         </h2>
-        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="surface-3d rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60">
           {data.incidents.length === 0 ? (
             <p className="px-5 py-6 text-sm text-slate-500 sm:px-6">No incidents reported. 🎉</p>
           ) : (

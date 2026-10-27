@@ -52,12 +52,12 @@ export default function MonitorCard({ monitor, wid, now, sparkline }) {
   return (
     <Link
       to={`/app/${wid}/monitors/${monitor.id}`}
-      className="group block rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-emerald-500/60 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-emerald-500/50"
+      className="group surface-3d lift-3d block rounded-xl border border-slate-200 bg-white p-5 hover:border-brand-500/60 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-brand-500/50"
     >
       <div className="flex items-start gap-3">
         <StatusDot status={monitor.status} className="mt-1.5" />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-medium group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
+          <h3 className="truncate font-medium group-hover:text-brand-700 dark:group-hover:text-brand-400">
             {monitor.name}
           </h3>
           <p className="truncate text-sm text-slate-500">{variant.subtitle(monitor)}</p>

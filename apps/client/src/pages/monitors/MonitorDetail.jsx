@@ -68,7 +68,7 @@ function MonitorIncidents({ wid, monitorId, now }) {
           data?.pagination.total > 5 && (
             <Link
               to={`/app/${wid}/incidents?status=all`}
-              className="text-sm text-emerald-600 hover:underline"
+              className="text-sm text-brand-600 hover:underline dark:text-brand-400"
             >
               View all
             </Link>
@@ -323,7 +323,7 @@ export default function MonitorDetail() {
             href={monitor.url}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-flex max-w-full items-center gap-1 text-sm break-all text-slate-500 hover:text-emerald-600"
+            className="mt-1 inline-flex max-w-full items-center gap-1 text-sm break-all text-slate-500 hover:text-brand-600 dark:hover:text-brand-400"
           >
             {monitor.method} {monitor.url} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
           </a>

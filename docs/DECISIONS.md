@@ -1042,3 +1042,86 @@ exactly the wiring that differs between types.
   has no random single failures, because one missed period opens a heartbeat incident.
 - Seed values go through the API's own Zod schemas, so seeded monitors get the same defaults
   (HEAD, adaptive, thresholds) as monitors created in the UI.
+
+### D88. Warm theme: peach light, black and pale-orange dark
+
+- **Slate is remapped, not replaced.** About 464 `slate-*` classes carry the neutral. Rather than
+  edit every call site, `index.css` overrides `--color-slate-50 … 950` in `@theme` with a warm
+  scale: `#fff7f0` (pale peach) through `#17110d` / `#0a0706` (warm near-black). The light body is
+  `slate-50` (peach), so white cards sit on it; the dark body is `#000`. The catch is that the name
+  "slate" no longer describes the colour. We accept that because a rename would touch almost every
+  component for no visual gain.
+- **A `brand` palette that flips by mode.** `--color-brand-50 … 950` is a green pop in light mode
+  (button fill `brand-600` `#0a7d48`, white text 5.2:1) and is redefined under `:root.dark` as pale
+  orange (`brand-600` `#f9a05a`, `brand-400` `#ffbd7f` for links). `--color-on-brand` flips with it
+  (white on green, `#120b06` on orange, 9.5:1), so one class list (`bg-brand-600 text-on-brand`)
+  works in both modes. `primaryButtonClasses` (exported from `Button.jsx`) is reused by links
+  styled as buttons (Dashboard, Landing, agent wizard).
+- **How emerald was split.** Emerald now means state only. It became `brand` wherever it meant
+  primary, focus, active, link or selection: buttons, focus rings, inputs, switch, active nav,
+  links, wizard steps, type chooser, spinner, logo and Landing CTAs. It stayed emerald wherever it
+  reflects a monitor or incident: `STATUS_STYLES.up`, "Up"/"Operational" text, the green badge
+  tone, uptime bars (`--color-status-up`), test results, incident "resolved", agent/heartbeat
+  "reporting", and the "requests saved" note. Rule of thumb: if it would turn red when something
+  breaks, it is status. Small-text "Up" moved from emerald-600 (3.8:1 on white) to emerald-700
+  (5.5:1).
+- **Status tokens retuned, meanings unchanged.** Light: up `#16a34a`, down `#e5484d`, pending
+  `#f59e0b`, paused `#a8a29e`, none `#ead8c8`. Dark: up `#22c55e`, down `#f05252`, pending
+  `#fbbf24`. The dark pending is yellower on purpose, so on black it never reads as the
+  pale-orange brand.
+- **Contrast.** Muted text (`slate-500` `#856d5c`) is at least as strong as the old slate in every
+  place it appears: 4.84:1 on white (was 4.76), 4.57:1 on peach (was 4.55 on slate-50), 4.34:1 on
+  black (was 4.24 on slate-950) and 3.87:1 on dark cards (was 3.75). `slate-400` on dark cards is
+  6.26:1, and brand links in dark are 12:1.
+- **Charts.** Series and timing hues are unchanged. Chart surfaces follow the cards: white in
+  light mode, `#0e0a08` in dark (slate-900/60 over black). Grid and axis tokens use the new
+  slate. The dataviz validator passes every check on both surfaces, including CVD separation
+  (worst adjacent ΔE 9.1 light, 8.4 dark). As before, three light slots are under 3:1 against
+  the surface (warning only, not a failure); charts relieve this with legends and labels.
+- **Depth, here and there.** Four `@utility` classes in `index.css`: `press-3d` (primary buttons
+  have a bottom edge and an inner highlight, and sink 2px on press), `surface-3d` (cards have
+  layered warm shadows), `lift-3d` (monitor cards rise 2px on hover) and `tilt-3d` (the Landing
+  preview is tilted back in perspective and settles flat on hover). The logo is a top-lit tile
+  with a highlight edge. On a black page a shadow is invisible, so dark mode replaces shadows with a
+  faint top highlight and a soft pale-orange glow. With `prefers-reduced-motion: reduce`, all
+  transforms and transitions are removed and only the static depth remains. No new dependencies.
+
+### D89. OAuth sign-in prepared: Google and GitHub, enabled by credentials
+
+- **Enabled by credentials.** A provider is on only when both `*_CLIENT_ID` and
+  `*_CLIENT_SECRET` are set; `GET /auth/oauth/providers` lists the enabled ones and the client
+  shows buttons only for those. Going live is a `.env` change and a restart, no code change.
+- **State and PKCE live in a cookie, not the database.** `start` writes the state, the PKCE
+  verifier (S256) and the sanitised `next` into `pb_oauth`: httpOnly, SameSite=Lax, path
+  `/api/v1/auth/oauth`, 10 minutes, HMAC-SHA256 signed with a key derived from
+  `JWT_REFRESH_SECRET`, and cleared on the callback whatever the outcome. Abandoned sign-ins
+  cost no writes and need no cleanup, and the state is bound to the browser that started it
+  (login CSRF). A TTL collection would have worked too, but adds a write per click for no gain.
+  Two tabs starting sign-in at once: the later one wins.
+- **Linking rule: verified email only.** An already linked provider account wins; otherwise the
+  account is linked to the user with the same email **only** if the provider marks it verified
+  (Google `email_verified`; GitHub: the primary email, and only if verified). Unverified emails
+  never link or create anything (`OAUTH_EMAIL_UNVERIFIED`), since anyone can type someone
+  else's address into a provider account. A unique partial index on
+  `(identities.provider, identities.providerId)` (migration 003) keeps one provider account on
+  one user.
+- **No provider tokens are stored.** The access token is used once to read the profile and then
+  dropped. We only need identity, never to act on the user's behalf, so there is nothing to leak.
+  `identities` holds provider, provider id, email and `linkedAt`.
+- **OAuth-only users have no password.** `passwordHash` is optional. Password login for such a
+  user is compared against the dummy hash and returns the same `INVALID_CREDENTIALS` as an
+  unknown email (no enumeration). `/auth/me` exposes `providers` (names only) and
+  `hasPassword`, never provider ids.
+- **Same session as login.** The callback reuses the auth service's token issuance and the same
+  `pb_refresh` cookie, then redirects to `/auth/callback?status=ok&next=…`; the client calls
+  `/auth/refresh`. No token is ever put in a URL, and the request logger drops the callback's
+  query string (it carries the one-time code).
+- **Callback via the client origin.** The redirect URI is
+  `${APP_URL}/api/v1/auth/oauth/:provider/callback` (`APP_URL` defaults to `DASHBOARD_URL`).
+  The browser lands on the client origin, which proxies `/api` to the API (Vite in dev, Vercel
+  rewrite in prod), so both cookies stay first-party and SameSite=Lax is enough.
+- **`next` is a same-origin relative path** (one leading `/`, no `//`, no backslash, no scheme,
+  no control characters, at most 512 chars), otherwise `/app`. It is checked at `start` and
+  again when read back from the cookie.
+- **Failures are redirects, not JSON**, because start and callback are browser navigations. That
+  includes the rate limit (twice the login budget per IP, since one sign-in is two requests).

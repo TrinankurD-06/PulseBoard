@@ -30,7 +30,7 @@ export default function IncidentCard({ incident, wid, now, showMonitor = true })
             {showMonitor && incident.monitor && (
               <Link
                 to={`/app/${wid}/monitors/${incident.monitor.id}`}
-                className="font-medium hover:text-emerald-600 dark:hover:text-emerald-400"
+                className="font-medium hover:text-brand-600 dark:hover:text-brand-400"
               >
                 {incident.monitor.name}
               </Link>

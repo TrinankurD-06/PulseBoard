@@ -85,7 +85,7 @@ function SortHeader({ label, column, sort, onSort, align = 'left' }) {
         type="button"
         onClick={() => onSort(column)}
         className={cn(
-          'inline-flex items-center gap-1 rounded hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none dark:hover:text-slate-100',
+          'inline-flex items-center gap-1 rounded hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none dark:hover:text-slate-100',
           active && 'text-slate-900 dark:text-slate-100',
         )}
       >
@@ -122,7 +122,7 @@ function UsageRow({ row, wid, isCurrentMonth }) {
       <th scope="row" className="px-4 py-3 text-left font-normal">
         <Link
           to={`/app/${wid}/monitors/${row.id}`}
-          className="font-medium hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+          className="font-medium hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
         >
           {row.name}
         </Link>
@@ -282,7 +282,7 @@ export default function Usage() {
             {/* Wide table: it scrolls inside the card on small screens, never the page. */}
             {/* Focusable so keyboard users can scroll it too. */}
             <div
-              className="overflow-x-auto focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none focus-visible:ring-inset"
+              className="overflow-x-auto focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none focus-visible:ring-inset"
               role="region"
               aria-label="Usage per monitor"
               tabIndex={0}

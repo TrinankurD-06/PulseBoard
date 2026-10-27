@@ -201,7 +201,7 @@ export default function MonitorForm({
               <Link
                 to="/bot"
                 target="_blank"
-                className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                className="font-medium text-brand-700 hover:underline dark:text-brand-400"
               >
                 here&apos;s how to recognise them
               </Link>

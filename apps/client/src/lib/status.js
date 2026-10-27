@@ -5,7 +5,7 @@ export const STATUS_STYLES = {
   up: {
     label: 'Up',
     dot: 'bg-status-up',
-    text: 'text-emerald-600 dark:text-emerald-400',
+    text: 'text-emerald-700 dark:text-emerald-400',
     tone: 'green',
   },
   down: {

@@ -18,7 +18,7 @@ function Linkified({ text }) {
         href={part}
         target="_blank"
         rel="noreferrer"
-        className="text-emerald-600 underline dark:text-emerald-400"
+        className="text-brand-600 underline dark:text-brand-400"
       >
         {part}
       </a>
