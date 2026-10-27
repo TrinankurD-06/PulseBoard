@@ -165,7 +165,14 @@ export default function HealthDeck({ wid, monitorId }) {
             ))}
           </div>
           {metric && (
-            <DetailPanel deckId={deckId} metric={metric} timings={data.timings} range={range} />
+            <DetailPanel
+              deckId={deckId}
+              metric={metric}
+              timings={data.timings}
+              failures={data.failures}
+              sample={data.includesSampleData}
+              range={range}
+            />
           )}
         </div>
       )}

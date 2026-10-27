@@ -1,6 +1,6 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import { Link } from 'react-router-dom';
-import { useSparklines } from '../api/analytics.js';
+import { useSparklines, useUptimeSummary } from '../api/analytics.js';
 import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
 import { useAmbientAlertSignal } from '../components/ambient/ambientStore.js';
@@ -42,26 +42,6 @@ function summarize(monitors) {
   };
 }
 
-/**
- * Average uptime across the monitors from the recent checks the page already
- * loads for the sparklines (the share that passed). Falls back to the share of
- * monitors that are up while there is no check history yet.
- */
-function averageUptime(monitors, sparklines, summary) {
-  let passed = 0;
-  let total = 0;
-  for (const monitor of monitors) {
-    for (const point of sparklines?.[monitor.id] ?? []) {
-      total += 1;
-      if (point.ok) passed += 1;
-    }
-  }
-  if (total > 0) {
-    return { value: (passed / total) * 100, caption: 'Share of recent checks that passed' };
-  }
-  return { value: (summary.up / summary.total) * 100, caption: 'Share of monitors that are up' };
-}
-
 function headline(summary) {
   if (!summary) return 'Overview.';
   if (summary.down === 0) return 'All quiet.';
@@ -74,6 +54,8 @@ export default function Dashboard() {
   const { data: openIncidents } = useIncidents(wid, { status: 'open', limit: 1 });
   const openCount = openIncidents?.pagination.total;
   const { data: sparklines } = useSparklines(wid);
+  // Confirmed-downtime uptime from the API; never derived from passed checks here.
+  const { data: uptimeSummary, isPending: summaryPending } = useUptimeSummary(wid, 30);
   const signal = useSignalFeed(wid);
   const now = useNow();
   const canEdit = can(ROLES.MEMBER);
@@ -82,7 +64,7 @@ export default function Dashboard() {
   useAmbientAlertSignal((summary?.down ?? 0) > 0);
 
   const newButton = canEdit && <RingDotCta to={`/app/${wid}/monitors/new`}>New monitor</RingDotCta>;
-  const uptime = summary && averageUptime(monitors, sparklines, summary);
+  const uptime = uptimeSummary?.uptime ?? null;
   const side = monitors
     ? `${workspace.name} · ${monitors.length} monitor${monitors.length === 1 ? '' : 's'}`
     : workspace.name;
@@ -116,11 +98,14 @@ export default function Dashboard() {
         <>
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-12">
             <TickGauge
-              value={uptime.value}
+              value={uptime}
               target={UPTIME_TARGET}
-              label="Average uptime"
-              caption={uptime.caption}
-              decimals={uptime.value >= 99.95 || uptime.value < 99 ? 1 : 2}
+              label="Uptime"
+              caption={
+                uptime == null ? 'Nothing has been covered yet' : 'Last 30 days, all monitors'
+              }
+              decimals={uptime != null && (uptime >= 99.95 || uptime < 99) ? 1 : 2}
+              emptyText={summaryPending ? '…' : 'No data yet'}
               size={300}
             />
             <div>

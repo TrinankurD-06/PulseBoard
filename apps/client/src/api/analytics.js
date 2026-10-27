@@ -15,6 +15,10 @@ export const analyticsKey = (wid, mid, ...rest) => [
   ...rest,
 ];
 export const sparklinesKey = (wid) => ['workspaces', wid, 'sparklines'];
+// Workspace-wide uptime: deliberately NOT under analyticsKey(...), so a single
+// check result does not refetch it. It refreshes on incident events (the only
+// thing that changes uptime) and on a 60 s interval.
+export const uptimeSummaryKey = (wid, days = 30) => ['workspaces', wid, 'uptime-summary', days];
 
 export const RANGES = {
   '1h': 60 * 60 * 1000,
@@ -102,5 +106,21 @@ export function useSparklines(wid) {
     queryKey: sparklinesKey(wid),
     queryFn: () => http.get(`/workspaces/${wid}/monitors/sparklines?points=30`).then(unwrap),
     refetchInterval: fallbackPollMs,
+  });
+}
+
+const SUMMARY_MS = 60_000;
+const summaryInterval = () => {
+  const fallback = fallbackPollMs();
+  return fallback === false ? SUMMARY_MS : Math.min(SUMMARY_MS, fallback);
+};
+
+/** { days, uptime, monitors: [{ id, uptime }] }; uptime is null while nothing is covered. */
+export function useUptimeSummary(wid, days = 30) {
+  return useQuery({
+    queryKey: uptimeSummaryKey(wid, days),
+    queryFn: () => http.get(`/workspaces/${wid}/monitors/uptime-summary?days=${days}`).then(unwrap),
+    placeholderData: keepPreviousData,
+    refetchInterval: summaryInterval,
   });
 }

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { toast } from 'sonner';
-import { analyticsKey, sparklinesKey } from '../api/analytics.js';
+import { analyticsKey, sparklinesKey, uptimeSummaryKey } from '../api/analytics.js';
 import { refreshAccessToken } from '../api/http.js';
 import { monitorKeys } from '../api/monitors.js';
 import { setRealtimeConnected } from '../api/realtimeState.js';
@@ -15,6 +15,12 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const SPARKLINE_POINTS = 30;
 
 const incidentsKey = (wid) => ['workspaces', wid, 'incidents'];
+
+/** An incident opening, resolving or changing is what moves uptime. */
+function refreshIncidents(queryClient, wid) {
+  queryClient.invalidateQueries({ queryKey: incidentsKey(wid) });
+  queryClient.invalidateQueries({ queryKey: uptimeSummaryKey(wid).slice(0, 3) });
+}
 
 /** Patches cached monitor data in place: no refetch, so the UI updates instantly. */
 function applyCheckResult(queryClient, { monitorId, workspaceId: wid, ...fields }) {
@@ -99,20 +105,20 @@ export function useRealtime() {
 
     socket.on('incident:opened', (incident) => {
       publishCheckEvent('incident:opened', incident);
-      queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
+      refreshIncidents(queryClient, incident.workspaceId);
       toast.error(`${monitorName(queryClient, incident.workspaceId, incident.monitorId)} is down`, {
         description: incident.cause,
       });
     });
     socket.on('incident:resolved', (incident) => {
       publishCheckEvent('incident:resolved', incident);
-      queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
+      refreshIncidents(queryClient, incident.workspaceId);
       toast.success(
         `${monitorName(queryClient, incident.workspaceId, incident.monitorId)} is back up`,
       );
     });
     socket.on('incident:updated', (incident) => {
-      queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
+      refreshIncidents(queryClient, incident.workspaceId);
     });
 
     return () => {

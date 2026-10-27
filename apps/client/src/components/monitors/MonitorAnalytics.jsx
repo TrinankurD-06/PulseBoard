@@ -6,6 +6,7 @@ import {
   useResponseTimes,
   useUptime,
 } from '../../api/analytics.js';
+import { failureCode, resultText } from '../../lib/checks.js';
 import { formatDuration, formatMs } from '../../lib/format.js';
 import { TIMING_PHASES } from '../../lib/timings.js';
 import ChartCard from '../charts/ChartCard.jsx';
@@ -61,21 +62,20 @@ export default function MonitorAnalytics({ wid, monitorId, latestCheckCard }) {
             : `${RANGE_LABELS[range]} · red dots are failed checks`
         }
         isRefreshing={responses.isPlaceholderData}
+        sample={points.some((p) => p.sample)}
         table={{
           columns: [
             { key: 'time', label: 'Time' },
             { key: 'ms', label: 'Response', align: 'right' },
             { key: 'result', label: 'Result' },
+            { key: 'code', label: 'Code', mono: true },
           ],
           rows: [...points].reverse().map((p) => ({
             key: p.t,
             time: time(p.t),
             ms: formatMs(p.totalMs),
-            result: p.count
-              ? `${Math.round(p.upRatio * 100)}% of ${p.count} passed`
-              : p.ok
-                ? 'Passed'
-                : 'Failed',
+            result: resultText(p),
+            code: failureCode(p) ?? '—',
           })),
         }}
       >
@@ -123,6 +123,7 @@ export default function MonitorAnalytics({ wid, monitorId, latestCheckCard }) {
 
       <ChartCard
         title="Uptime, last 90 days"
+        sample={days.some((d) => d.sample)}
         description="Each bar is one day (UTC). Hover or focus a bar for details."
         table={{
           columns: [

@@ -3,6 +3,7 @@ import {
   formatChange,
   formatMetricText,
   formatMetricValue,
+  healthRows,
   nextIndex,
   resolveSelection,
   seriesDomain,
@@ -93,5 +94,20 @@ describe('seriesDomain', () => {
     expect(seriesDomain([10, 200], 'ms')[0]).toBe(0);
     expect(seriesDomain([null], 'ms')).toEqual([0, 1]);
     expect(seriesDomain([0, 0], 'pings')).toEqual([0, 1]);
+  });
+});
+
+describe('healthRows', () => {
+  it('adds a timestamp and a boolean offline flag', () => {
+    const rows = healthRows([{ t: '2026-10-27T12:00:00.000Z', v: 3 }]);
+    expect(rows).toEqual([
+      { t: '2026-10-27T12:00:00.000Z', ts: 1793102400000, v: 3, offline: false },
+    ]);
+  });
+
+  it('an offline bucket never carries a value', () => {
+    const [row] = healthRows([{ t: '2026-10-27T12:00:00.000Z', v: 0, offline: true }]);
+    expect(row.offline).toBe(true);
+    expect(row.v).toBeNull();
   });
 });

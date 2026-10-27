@@ -5,6 +5,7 @@ import UptimeBars from '../components/charts/UptimeBars.jsx';
 import UptimeLegend from '../components/charts/UptimeLegend.jsx';
 import TickGauge from '../components/gauge/TickGauge.jsx';
 import ErrorPage from '../components/ErrorPage.jsx';
+import SampleBadge from '../components/ui/SampleBadge.jsx';
 import PublicHeader from '../components/public/PublicHeader.jsx';
 import SignalFieldLazy from '../components/signal/SignalFieldLazy.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -79,6 +80,7 @@ function IncidentRow({ incident, now }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-fg">
           {incident.monitorName} {ongoing ? 'is unavailable' : 'was unavailable'}
+          {incident.sample && <SampleBadge className="ml-3" />}
         </p>
         <span className="text-xs text-muted">{ongoing ? 'Investigating' : 'Resolved'}</span>
       </div>
@@ -180,8 +182,9 @@ export default function PublicStatus() {
           {data.description && (
             <p className="mt-5 max-w-[46ch] text-[15px] text-muted">{data.description}</p>
           )}
-          <p className="mt-6 text-[11px] text-faint">
-            Updated {timeAgo(dataUpdatedAt, now)} · refreshes every 30 seconds
+          <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-faint">
+            <span>Updated {timeAgo(dataUpdatedAt, now)} · refreshes every 30 seconds</span>
+            {data.includesSampleData && <SampleBadge />}
           </p>
         </div>
         {uptime != null && (

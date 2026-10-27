@@ -66,6 +66,7 @@ export default function HeartbeatAnalytics({ wid, monitorId, side }) {
 
       <ChartCard
         title="Uptime, last 90 days"
+        sample={days.some((d) => d.sample)}
         description="Each bar is one day (UTC): the share of expected pings that arrived."
         table={{
           columns: [

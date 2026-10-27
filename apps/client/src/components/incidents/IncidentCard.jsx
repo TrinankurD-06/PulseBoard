@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { cn } from '../../lib/cn.js';
 import { formatDuration, timeAgo } from '../../lib/format.js';
 import Badge from '../ui/Badge.jsx';
+import CodeChip from '../ui/CodeChip.jsx';
+import SampleBadge from '../ui/SampleBadge.jsx';
 import IncidentTimeline from './IncidentTimeline.jsx';
 
 // A soft red light on the left edge of an open incident (no hard border).
@@ -33,6 +35,7 @@ export default function IncidentCard({ incident, wid, now, showMonitor = true })
         <div className="min-w-0 flex-1 basis-64">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {isOpen ? <Badge tone="red">Ongoing</Badge> : <Badge>Resolved</Badge>}
+            {incident.isSeed && <SampleBadge />}
             {showMonitor && incident.monitor && (
               <Link
                 to={`/app/${wid}/monitors/${incident.monitor.id}`}
@@ -51,6 +54,7 @@ export default function IncidentCard({ incident, wid, now, showMonitor = true })
               isOpen ? 'text-muted' : 'text-faint',
             )}
           >
+            {incident.causeCode && <CodeChip className="mr-2">{incident.causeCode}</CodeChip>}
             {incident.cause}
           </p>
         </div>

@@ -1,4 +1,5 @@
 import { Fragment } from 'react';
+import CodeChip from '../ui/CodeChip.jsx';
 import RingDot from '../ui/RingDot.jsx';
 
 // Event types differ by the colour of the ring only where it carries meaning.
@@ -39,6 +40,7 @@ export default function IncidentTimeline({ events }) {
             <RingDot size={16} className={EVENT_TONE[event.type] ?? EVENT_TONE.opened} />
           </span>
           <p className="text-sm break-words text-fg">
+            {event.code && <CodeChip className="mr-2">{event.code}</CodeChip>}
             <Linkified text={event.message ?? event.type} />
           </p>
           <time className="font-mono text-[11px] text-faint" dateTime={event.at}>

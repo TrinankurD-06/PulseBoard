@@ -32,6 +32,7 @@ import TickGauge from '../../components/gauge/TickGauge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
 import RingDotCta from '../../components/ui/RingDotCta.jsx';
+import SampleBadge from '../../components/ui/SampleBadge.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
@@ -45,7 +46,8 @@ import NotFound from '../NotFound.jsx';
 /** Back link, the monitor name as a display headline (URL or summary as the muted phrase), uptime gauge, actions. */
 function MonitorHero({ wid, monitor, phrase, badges, actions }) {
   const { data: uptime } = useUptime(wid, monitor.id);
-  const value = uptime ? (uptime.d30 ?? uptime.d7 ?? uptime.h24) : null;
+  // The 30-day figure from the API (confirmed downtime); no fallback to shorter windows.
+  const value = uptime?.d30 ?? null;
   return (
     <>
       <Link
@@ -64,15 +66,22 @@ function MonitorHero({ wid, monitor, phrase, badges, actions }) {
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">{badges}</div>
           {actions && <div className="mt-8">{actions}</div>}
         </div>
-        {value != null ? (
-          <TickGauge
-            value={value}
-            target={99.9}
-            label="Uptime"
-            caption="Last 30 days"
-            decimals={value >= 99.95 || value < 99 ? 1 : 2}
-            size={272}
-          />
+        {uptime ? (
+          <div className="min-w-0">
+            <TickGauge
+              value={value}
+              target={99.9}
+              label="Uptime"
+              caption="Last 30 days"
+              decimals={value != null && (value >= 99.95 || value < 99) ? 1 : 2}
+              size={272}
+            />
+            {uptime.includesSampleData && (
+              <div className="mt-3 flex justify-center">
+                <SampleBadge />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="mx-auto aspect-square w-full max-w-60" aria-hidden="true" />
         )}

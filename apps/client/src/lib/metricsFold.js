@@ -1,10 +1,13 @@
 // Folds one live check result into a cached metrics response (see the Health
 // deck contract). Pure: returns a new object, or the same one when the check
 // is ignored. Only metrics that can be recomputed from the live accumulators
-// are touched (uptime, failed, avgResponse for http, duration for heartbeat);
-// the rest keep their values until the next refetch.
+// are touched (failed, avgResponse for http, duration for heartbeat); the rest
+// keep their values until the next refetch. Uptime is computed by the API from
+// confirmed incidents, so it is never folded from live checks. Series points may
+// carry `offline: true` (checker offline); they pass through untouched, and a
+// check the checker could not judge ('unknown') is ignored.
 
-const FOLDABLE = new Set(['uptime', 'failed', 'avgResponse', 'duration']);
+const FOLDABLE = new Set(['failed', 'avgResponse', 'duration']);
 
 const round = (value, digits) => {
   const f = 10 ** digits;
@@ -31,7 +34,6 @@ const EMPTY = { n: 0, ok: 0, sumMs: 0, nMs: 0 };
 
 // The value of a foldable metric from an accumulator, or null without data.
 function fromAccumulator(key, acc) {
-  if (key === 'uptime') return acc.n ? (acc.ok / acc.n) * 100 : null;
   if (key === 'failed') return acc.n ? ((acc.n - acc.ok) / acc.n) * 100 : null;
   // avgResponse, duration
   return acc.nMs ? acc.sumMs / acc.nMs : null;
@@ -64,7 +66,10 @@ function shiftTimings(timings, shift, bucketMs, lastStart) {
 function recomputeMetric(metric, last, range) {
   const series = metric.series.slice();
   const lastV = roundFor(fromAccumulator(metric.key, last), metric.unit);
-  series[series.length - 1] = { ...series[series.length - 1], v: lastV };
+  const tail = { ...series[series.length - 1], v: lastV };
+  // A live result in the bucket means the checker is back.
+  if (lastV != null) delete tail.offline;
+  series[series.length - 1] = tail;
   const present = series.filter((p) => p.v != null).map((p) => p.v);
   const value = roundFor(fromAccumulator(metric.key, range), metric.unit);
   const previous = metric.previous;
@@ -87,12 +92,13 @@ function recomputeMetric(metric, last, range) {
 
 /**
  * @param data   the cached metrics response (or undefined)
- * @param check  { lastCheckedAt, lastOk, lastResponseMs } from a check:result event
+ * @param check  { lastCheckedAt, lastOk, lastResponseMs, lastState? } from a check:result event
  */
 export function foldCheck(data, check) {
   if (!data?.live?.last || !data.metrics?.length || !check?.lastCheckedAt) return data;
   const at = Date.parse(check.lastCheckedAt);
   if (Number.isNaN(at)) return data;
+  if (check.lastState === 'unknown') return data;
   if (data.live.lastAt && at <= Date.parse(data.live.lastAt)) return data;
   // Folding into an empty response would invent a grid; the next refetch fills it.
   if (data.empty) return data;
@@ -125,11 +131,7 @@ export function foldCheck(data, check) {
   const last = { ...lastAcc, ...add(lastAcc, ok, ms) };
   const range = add(rangeAcc, ok, ms);
 
-  metrics = metrics.map((m) =>
-    FOLDABLE.has(m.key) && !(m.key === 'uptime' && data.type === 'agent')
-      ? recomputeMetric(m, last, range)
-      : m,
-  );
+  metrics = metrics.map((m) => (FOLDABLE.has(m.key) ? recomputeMetric(m, last, range) : m));
 
   return {
     ...data,

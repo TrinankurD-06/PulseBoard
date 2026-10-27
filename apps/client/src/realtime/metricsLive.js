@@ -30,11 +30,11 @@ export function createMetricsFolder(queryClient) {
   }
 
   return {
-    push({ monitorId, workspaceId, lastCheckedAt, lastOk, lastResponseMs }) {
+    push({ monitorId, workspaceId, lastCheckedAt, lastOk, lastResponseMs, lastState }) {
       if (!lastCheckedAt) return;
       const key = `${workspaceId}:${monitorId}`;
       const entry = buffer.get(key) ?? { wid: workspaceId, mid: monitorId, events: [] };
-      entry.events.push({ lastCheckedAt, lastOk, lastResponseMs });
+      entry.events.push({ lastCheckedAt, lastOk, lastResponseMs, lastState });
       buffer.set(key, entry);
       if (!timer) timer = setTimeout(flush, FLUSH_MS);
     },

@@ -28,6 +28,8 @@ const TICKS = Array.from({ length: TICK_COUNT }, (_, i) => {
  * --line. With a `target` on the wrong side the lit part turns --status-down.
  * The number in the middle counts up as the ticks light, once, on mount.
  * `size` is the maximum width: the gauge shrinks with its container.
+ * A null `value` is the empty state: no lit ticks and `emptyText` ("No data yet")
+ * in the middle instead of a number.
  */
 export default function TickGauge({
   value,
@@ -40,9 +42,11 @@ export default function TickGauge({
   size = 240,
   decimals,
   ariaLabel,
+  emptyText = 'No data yet',
   className,
 }) {
   const progress = useEnterProgress(800);
+  const empty = value == null;
   const filled = filledTickCount(value, max);
   const lit = Math.round(filled * progress);
   const down = gaugeState({ value, target, direction: thresholdDirection }) === 'down';
@@ -53,6 +57,7 @@ export default function TickGauge({
   const number = formatGaugeNumber(safeValue * (progress >= 1 ? 1 : progress), { decimals });
   const summary =
     ariaLabel ??
+    (empty ? `${label ?? 'Value'}: ${emptyText}` : null) ??
     gaugeSummary({ label, value, unit, target, direction: thresholdDirection, decimals, max });
 
   return (
@@ -87,8 +92,14 @@ export default function TickGauge({
           className="font-light leading-none tracking-[-0.03em] text-fg tabular-nums"
           style={{ fontSize: 'clamp(26px, 23cqw, 64px)' }}
         >
-          {number}
-          {unit && (
+          {empty ? (
+            <span className="text-muted" style={{ fontSize: '0.5em' }}>
+              {emptyText}
+            </span>
+          ) : (
+            number
+          )}
+          {!empty && unit && (
             <span className="ml-[0.06em] align-baseline text-muted" style={{ fontSize: '0.45em' }}>
               {unit}
             </span>

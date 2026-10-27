@@ -102,3 +102,17 @@ export function seriesDomain(values, unit) {
   }
   return [0, hi > 0 ? hi * 1.12 : 1];
 }
+
+export const OFFLINE_LABEL = 'Checker offline';
+
+/**
+ * Series points ready for a time-axis chart: `ts` (ms) for the x axis and a
+ * boolean `offline`. An offline bucket never carries a value, so it can only
+ * ever be a gap (and a band), never a drop to zero.
+ */
+export function healthRows(series) {
+  return series.map((p) => {
+    const offline = p.offline === true;
+    return { ...p, ts: Date.parse(p.t), offline, v: offline ? null : p.v };
+  });
+}

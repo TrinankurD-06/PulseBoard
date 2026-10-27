@@ -1,8 +1,8 @@
 import { useId } from 'react';
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatMetricText, seriesDomain } from '../../lib/health.js';
+import { AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { OFFLINE_LABEL, formatMetricText, seriesDomain } from '../../lib/health.js';
 import { svgId } from '../charts/chartTheme.js';
-import { isolatedDot } from './isolatedDot.jsx';
+import { offlineBandLayers, segmentLayers, useGapSeries } from './gapLayers.jsx';
 import { tooltipBox } from './tooltipStyles.js';
 
 function RingMarker({ cx, cy }) {
@@ -18,13 +18,15 @@ function RingMarker({ cx, cy }) {
 function SparkTooltip({ active, payload, unit }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
-  if (point.v == null) return null;
+  if (point.v == null && !point.offline) return null;
   return (
     <div className={`${tooltipBox} font-mono text-[11px] whitespace-nowrap`}>
       <span className="text-muted">
         {new Date(point.t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
       </span>{' '}
-      <span className="text-fg">{formatMetricText(point.v, unit)}</span>
+      <span className={point.offline ? 'text-muted' : 'text-fg'}>
+        {point.offline ? OFFLINE_LABEL : formatMetricText(point.v, unit)}
+      </span>
     </div>
   );
 }
@@ -37,6 +39,7 @@ function SparkTooltip({ active, payload, unit }) {
  */
 export default function HealthSparkline({ series, unit }) {
   const id = svgId(useId(), 'spark');
+  const gaps = useGapSeries(series);
   const domain = seriesDomain(
     series.map((p) => p.v),
     unit,
@@ -49,7 +52,7 @@ export default function HealthSparkline({ series, unit }) {
     <div aria-hidden="true" className="absolute inset-0">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
-          data={series}
+          data={gaps.rows}
           margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
           accessibilityLayer={false}
         >
@@ -59,7 +62,7 @@ export default function HealthSparkline({ series, unit }) {
               <stop offset="100%" stopColor="var(--text)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <XAxis dataKey="t" hide />
+          <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} hide />
           <YAxis hide domain={yDomain} />
           <Tooltip
             content={<SparkTooltip unit={unit} />}
@@ -67,17 +70,12 @@ export default function HealthSparkline({ series, unit }) {
             position={{ y: 2 }}
             isAnimationActive={false}
           />
-          <Area
-            type="monotone"
-            dataKey="v"
-            stroke="var(--text)"
-            strokeWidth={1.25}
-            fill={`url(#${id})`}
-            connectNulls={false}
-            dot={isolatedDot(series)}
-            activeDot={<RingMarker />}
-            isAnimationActive={false}
-          />
+          {offlineBandLayers(gaps.bands)}
+          {segmentLayers({
+            ...gaps,
+            gradientId: id,
+            activeDot: <RingMarker />,
+          })}
         </AreaChart>
       </ResponsiveContainer>
     </div>

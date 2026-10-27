@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { cn } from '../../lib/cn.js';
 import { RANGE_TEXT, formatMetricText, formatMetricValue } from '../../lib/health.js';
+import SampleBadge from '../ui/SampleBadge.jsx';
+import FailuresList from './FailuresList.jsx';
 import HealthAreaChart from './HealthAreaChart.jsx';
 import TimingChart from './TimingChart.jsx';
 import { onGroupKeyDown } from './groupKeys.js';
@@ -8,6 +10,8 @@ import { cardLabelId } from './ids.js';
 
 // Response-time cards that can show where the time went.
 const TIMING_KEYS = new Set(['p95', 'avgResponse']);
+// Cards whose detail lists the individual failed checks.
+const FAILURE_KEYS = new Set(['failed', 'missed']);
 
 function Stat({ label, value, unit }) {
   return (
@@ -19,7 +23,7 @@ function Stat({ label, value, unit }) {
 }
 
 /** Full-width detail for the selected card: chart (or timing breakdown), current value, stats. */
-export default function DetailPanel({ deckId, metric, timings, range }) {
+export default function DetailPanel({ deckId, metric, timings, failures, sample, range }) {
   const [view, setView] = useState('chart');
   const hasTimings = TIMING_KEYS.has(metric.key) && Boolean(timings?.length);
   const activeView = hasTimings ? view : 'chart';
@@ -32,7 +36,10 @@ export default function DetailPanel({ deckId, metric, timings, range }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm text-fg">{metric.label}</h3>
+          <h3 className="flex flex-wrap items-center gap-2 text-sm text-fg">
+            {metric.label}
+            {sample && <SampleBadge />}
+          </h3>
           <p className="mt-0.5 text-xs text-muted">{RANGE_TEXT[range]}</p>
         </div>
         <p
@@ -94,6 +101,8 @@ export default function DetailPanel({ deckId, metric, timings, range }) {
           <Stat label="Low" value={metric.low} unit={metric.unit} />
         </dl>
       </div>
+
+      {FAILURE_KEYS.has(metric.key) && <FailuresList failures={failures ?? []} />}
     </section>
   );
 }

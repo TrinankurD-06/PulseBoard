@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -8,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { segmentSeries } from '../../lib/segments.js';
 import {
   axisProps,
   cursorProps,
@@ -64,7 +66,8 @@ function Legend({ series }) {
 /**
  * Time-series line chart for agent metrics. Series: [{ key, label, color,
  * dash? }]; thresholds: [{ value, label }] drawn as labelled dashed reference
- * lines (text, not only colour). Null values leave a gap (no traffic).
+ * lines (text, not only colour). Null values leave a gap (no traffic): each
+ * contiguous run is its own line and a lone point is a small dot.
  */
 export default function MetricLineChart({
   data,
@@ -74,6 +77,23 @@ export default function MetricLineChart({
   thresholds = [],
   emptyText = 'No reports in this range yet.',
 }) {
+  // One key per contiguous run of each series, so no line crosses a gap.
+  const chart = useMemo(
+    () =>
+      series.reduce(
+        (acc, s) => {
+          // Each series adds its segment columns to the rows built so far.
+          const out = segmentSeries(acc.rows, s.key, `${s.key}__`);
+          return {
+            rows: out.rows,
+            layers: [...acc.layers, { series: s, lineKeys: out.lineKeys, dotKey: out.dotKey }],
+          };
+        },
+        { rows: data, layers: [] },
+      ),
+    [data, series],
+  );
+
   if (data.length === 0) {
     return <p className="py-16 text-center text-sm text-muted">{emptyText}</p>;
   }
@@ -92,7 +112,7 @@ export default function MetricLineChart({
       {series.length > 1 && <Legend series={series} />}
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <LineChart data={chart.rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis
               dataKey="t"
@@ -131,22 +151,38 @@ export default function MetricLineChart({
                 ifOverflow="extendDomain"
               />
             ))}
-            {series.map((s) => (
-              <Line
-                key={s.key}
-                type="monotone"
-                dataKey={s.key}
-                name={s.label}
-                stroke={s.color}
-                strokeWidth={LINE_WIDTH}
-                strokeDasharray={s.dash}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                dot={false}
-                activeDot={{ r: 3.5, stroke: 'var(--bg)', strokeWidth: 2 }}
-                isAnimationActive={false}
-              />
-            ))}
+            {chart.layers.flatMap(({ series: s, lineKeys, dotKey }) => [
+              ...lineKeys.map((key) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  name={s.label}
+                  stroke={s.color}
+                  strokeWidth={LINE_WIDTH}
+                  strokeDasharray={s.dash}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  connectNulls={false}
+                  dot={false}
+                  activeDot={{ r: 3.5, stroke: 'var(--bg)', strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              )),
+              ...(dotKey
+                ? [
+                    <Line
+                      key={dotKey}
+                      dataKey={dotKey}
+                      name={s.label}
+                      stroke="none"
+                      dot={{ r: 2.5, fill: s.color, stroke: 'none' }}
+                      activeDot={{ r: 3.5, stroke: 'var(--bg)', strokeWidth: 2 }}
+                      isAnimationActive={false}
+                    />,
+                  ]
+                : []),
+            ])}
           </LineChart>
         </ResponsiveContainer>
       </div>

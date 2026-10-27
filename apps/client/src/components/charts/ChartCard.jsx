@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { cn } from '../../lib/cn.js';
 import Card from '../ui/Card.jsx';
+import SampleBadge from '../ui/SampleBadge.jsx';
 import { PillGroup } from '../ui/Pill.jsx';
 
 /**
@@ -8,16 +9,20 @@ import { PillGroup } from '../ui/Pill.jsx';
  * accessible twin of the chart: every value is readable without hovering and
  * without relying on colour.
  *
+ * sample: the chart includes demo-seed data, so the title carries a "Sample data" badge.
  * table: { columns: [{ key, label, align? }], rows: [{ key, ...cells }] }
  */
-export default function ChartCard({ title, description, table, isRefreshing, children }) {
+export default function ChartCard({ title, description, table, isRefreshing, sample, children }) {
   const [view, setView] = useState('chart');
 
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
         <div>
-          <h2 className="text-lg font-light tracking-[-0.02em] text-fg">{title}</h2>
+          <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-lg font-light tracking-[-0.02em] text-fg">
+            {title}
+            {sample && <SampleBadge />}
+          </h2>
           {description && <p className="mt-1 max-w-[38ch] text-sm text-muted">{description}</p>}
         </div>
         {table && (
@@ -68,6 +73,7 @@ function DataTable({ columns, rows }) {
                   className={cn(
                     'py-1.5 pr-4 text-muted',
                     column.align === 'right' && 'text-right font-mono tabular-nums',
+                    column.mono && 'font-mono text-xs',
                   )}
                 >
                   {row[column.key]}

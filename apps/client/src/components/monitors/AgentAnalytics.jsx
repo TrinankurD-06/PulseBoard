@@ -114,6 +114,7 @@ export default function AgentAnalytics({ wid, monitor, now }) {
         />
         <ChartCard
           title="Uptime, last 90 days"
+          sample={days.some((d) => d.sample)}
           description="Each bar is one day (UTC): the share of reports (and probes) that passed."
           table={{
             columns: [
