@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ROLES } from '@pulseboard/shared/constants';
 import { alertChannelSchema } from '@pulseboard/shared/schemas';
 import { Hash, Mail, MessageSquare, Plus, Send, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
@@ -114,9 +115,19 @@ function ChannelRow({ channel, wid, canEdit }) {
     }
   }
 
+  // The outcome of the last test stays on the row until the next one: a toast alone
+  // appears at the window's bottom edge and is gone in seconds, easy to miss.
+  const [testResult, setTestResult] = useState(null);
+
   async function onTest() {
+    setTestResult(null);
     try {
       const result = await testChannel.mutateAsync(channel.id);
+      setTestResult({
+        ok: true,
+        message: `Test alert sent to ${channel.target}.`,
+        previewUrl: result.previewUrl,
+      });
       toast.success('Test alert sent', {
         description: result.previewUrl ? `Preview: ${result.previewUrl}` : undefined,
         action: result.previewUrl
@@ -124,7 +135,8 @@ function ChannelRow({ channel, wid, canEdit }) {
           : undefined,
       });
     } catch (error) {
-      toast.error(errorMessage(error));
+      setTestResult({ ok: false, message: errorMessage(error) });
+      toast.error(errorMessage(error), { duration: 12_000 });
     }
   }
 
@@ -170,6 +182,34 @@ function ChannelRow({ channel, wid, canEdit }) {
             {!deleteChannel.isPending && <Trash2 className="h-4 w-4" />}
           </Button>
         </>
+      )}
+      {testResult && (
+        <p
+          role="status"
+          className="flex basis-full items-start gap-2 pl-[3.25rem] text-[13px] leading-relaxed break-words text-muted"
+        >
+          <span
+            aria-hidden="true"
+            className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-pill ${testResult.ok ? 'bg-status-up' : 'bg-status-down'}`}
+          />
+          <span>
+            <span className="text-fg">{testResult.ok ? 'Sent.' : 'Failed.'}</span>{' '}
+            {testResult.message}
+            {testResult.previewUrl && (
+              <>
+                {' '}
+                <a
+                  href={testResult.previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-fg underline underline-offset-4"
+                >
+                  Open the test inbox
+                </a>
+              </>
+            )}
+          </span>
+        </p>
       )}
     </li>
   );
