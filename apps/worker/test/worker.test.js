@@ -11,7 +11,7 @@ import {
 } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createIncidentEngine } from '../src/incidents/engine.js';
+import { createIncidentEngine } from '@pulseboard/shared/incident';
 import { createRunCheckJob } from '../src/jobs/runCheck.js';
 import { reconcileJobs } from '../src/reconcile.js';
 

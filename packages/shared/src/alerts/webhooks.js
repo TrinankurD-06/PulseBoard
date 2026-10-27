@@ -32,7 +32,10 @@ export function discordPayload(alert) {
         description: alert.summary,
         color: COLORS[alert.kind],
         fields: [
-          ...(alert.kind === ALERT_KIND.TEST ? [] : [{ name: 'URL', value: alert.url }]),
+          // No URL field for tests and heartbeat monitors (Discord rejects empty values).
+          ...(alert.kind === ALERT_KIND.TEST || !alert.url
+            ? []
+            : [{ name: 'URL', value: alert.url }]),
           ...alert.fields.map(([name, value]) => ({ name, value: String(value), inline: true })),
         ],
         footer: { text: 'PulseBoard uptime monitoring' },

@@ -6,11 +6,15 @@ import {
   DEFAULT_CURRENCY,
   DEFAULT_EXPECTED_STATUS,
   DEFAULT_TIMEOUT_MS,
+  HEARTBEAT_DEFAULT_GRACE_SEC,
+  HEARTBEAT_MAX_EXPECTED_SEC,
+  HEARTBEAT_MAX_GRACE_SEC,
   HTTP_METHODS,
   MAX_INTERVAL_SEC,
   MAX_TIMEOUT_MS,
   MIN_INTERVAL_SEC,
   MIN_INTERVAL_SEC_DEMO,
+  MONITOR_TYPES,
 } from '../constants.js';
 
 // Headers the HTTP client must control itself; letting users set them could
@@ -193,10 +197,43 @@ export function buildMonitorSchemas({ demoMode = false } = {}) {
     monthlyRequestBudget: monitor.monthlyRequestBudget ?? null,
   });
 
+  // Heartbeat monitors (U3): no URL, no interval of ours; the customer's job
+  // pings us every expectedEverySec, and graceSec absorbs a late run.
+  const heartbeatFields = z.object({
+    name: fields.shape.name,
+    expectedEverySec: z.coerce
+      .number()
+      .int()
+      .min(minIntervalSec, `Expected interval must be at least ${minIntervalSec} seconds`)
+      .max(HEARTBEAT_MAX_EXPECTED_SEC, 'Expected interval must be at most 30 days'),
+    graceSec: z.coerce
+      .number()
+      .int()
+      .min(0, 'Grace period cannot be negative')
+      .max(HEARTBEAT_MAX_GRACE_SEC, 'Grace period must be at most 1 day'),
+  });
+
   return {
     minIntervalSec,
     create: withDefaults.superRefine(crossFieldRules).transform(defaultMethod),
     // PATCH bodies are partial; the service re-validates the merged result with `create`.
     update: fields.partial().refine((patch) => Object.keys(patch).length > 0, 'Nothing to update'),
+    heartbeatCreate: heartbeatFields.extend({
+      type: z.literal(MONITOR_TYPES.HEARTBEAT),
+      graceSec: heartbeatFields.shape.graceSec.default(HEARTBEAT_DEFAULT_GRACE_SEC),
+    }),
+    heartbeatUpdate: heartbeatFields
+      .partial()
+      .refine((patch) => Object.keys(patch).length > 0, 'Nothing to update'),
   };
 }
+
+/**
+ * The monitor type a create request asks for. Absent = 'http' (today's
+ * behaviour); agent monitors arrive in U4.
+ */
+export const monitorTypeSchema = z
+  .enum([MONITOR_TYPES.HTTP, MONITOR_TYPES.HEARTBEAT], {
+    message: 'Type must be "http" or "heartbeat"',
+  })
+  .default(MONITOR_TYPES.HTTP);

@@ -5,6 +5,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { createAlertSenders } from '@pulseboard/shared/alerts';
 import { alertSenderConfig } from '@pulseboard/shared/env';
+import { createIncidentEngine } from '@pulseboard/shared/incident';
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
 import { pinoHttp } from 'pino-http';
 import { createTokenService } from './lib/tokens.js';
@@ -20,6 +21,7 @@ import { membersRouter } from './modules/members/members.routes.js';
 import { metaRouter } from './modules/meta/meta.routes.js';
 import { monitorAnalyticsRouter } from './modules/monitors/analytics.routes.js';
 import { monitorsRouter } from './modules/monitors/monitors.routes.js';
+import { pingRouter } from './modules/ping/ping.routes.js';
 import { PUBLIC_CACHE_SECONDS, publicRouter } from './modules/public/public.routes.js';
 import { statusPagesRouter } from './modules/statusPages/statusPages.routes.js';
 import { workspacesRouter } from './modules/workspaces/workspaces.routes.js';
@@ -33,6 +35,9 @@ export function createApp({
   env,
   logger,
   scheduler = noopScheduler,
+  // Agenda instance (never started) used to queue alert jobs when a heartbeat
+  // ping opens or resolves an incident. Without one, alerts from pings are skipped.
+  agenda = null,
   alertSenders = createAlertSenders({ ...alertSenderConfig(env), logger }),
   getRealtimeStatus,
 }) {
@@ -74,10 +79,19 @@ export function createApp({
   // Shared by the public endpoint (reads) and status page CRUD (invalidates).
   const publicCache = createTtlCache({ ttlMs: PUBLIC_CACHE_SECONDS * 1000 });
 
+  const processCheckResult = createIncidentEngine({
+    agenda: agenda ?? {
+      now: async (name) => logger.warn({ job: name }, 'No Agenda instance: alert job not queued'),
+    },
+    logger,
+  });
+
   const api = express.Router();
   api.use('/meta', metaRouter({ env, schemas: monitorSchemas }));
   api.use('/auth', authRouter({ env, tokens, logger }));
   api.use('/public', publicRouter({ publicCache }));
+  // Heartbeat pings: public, the token in the URL is the authentication.
+  api.use('/ping', pingRouter({ processCheckResult }));
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.

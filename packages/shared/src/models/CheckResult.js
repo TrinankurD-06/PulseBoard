@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { CHECK_RESULT_TTL_SEC } from '../constants.js';
+import { CHECK_RESULT_TTL_SEC, CHECK_SOURCES } from '../constants.js';
 import { timingsSchema } from './Monitor.js';
 
 // Stored in a MongoDB time-series collection: documents are bucketed by
@@ -17,6 +17,9 @@ const checkResultSchema = new mongoose.Schema(
     error: { type: String, default: null },
     totalMs: { type: Number, default: null },
     timings: { type: timingsSchema, default: null },
+    // Where it came from: a scheduled check, a heartbeat ping, an agent report...
+    // Older results have no source and are http checks.
+    source: { type: String, enum: Object.values(CHECK_SOURCES), default: CHECK_SOURCES.HTTP },
   },
   {
     versionKey: false,

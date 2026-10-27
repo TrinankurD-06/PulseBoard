@@ -1,5 +1,7 @@
 import { runHttpCheck } from '@pulseboard/shared/check';
+import { CHECK_SOURCES } from '@pulseboard/shared/constants';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
+import { needsCheckJob } from '@pulseboard/shared/scheduling';
 import { recordUsage } from '@pulseboard/shared/usage';
 import { applyAdaptiveInterval } from '../adaptive.js';
 
@@ -30,9 +32,10 @@ export function createRunCheckJob({
     const { monitorId } = job.attrs.data;
     const monitor = await Monitor.findById(monitorId).lean();
 
-    // A job without an active monitor is an orphan (deleted or paused while
-    // the job was in flight): remove it instead of checking.
-    if (!monitor || monitor.isPaused) {
+    // A job without an active polled monitor is an orphan (deleted or paused
+    // while the job was in flight, or a heartbeat monitor, which is never
+    // polled): remove it instead of checking.
+    if (!monitor || monitor.isPaused || !needsCheckJob(monitor)) {
       logger.warn({ monitorId }, 'Removing check job for missing or paused monitor');
       await scheduler.cancelMonitor(monitorId);
       return;
@@ -57,6 +60,7 @@ export function createRunCheckJob({
       error: result.error,
       totalMs: result.totalMs,
       timings: result.timings,
+      source: CHECK_SOURCES.HTTP,
     });
     const { monitor: counted } = await processCheckResult(monitor._id, result, checkedAt);
 

@@ -36,9 +36,31 @@ export const INCIDENT_EVENT = Object.freeze({
   RESOLVED: 'resolved',
 });
 
-// Incident state machine thresholds.
+// Incident state machine thresholds (http and agent monitors).
 export const FAILURE_THRESHOLD = 3;
 export const RECOVERY_THRESHOLD = 2;
+
+// Heartbeat monitors confirm with 1/1: the grace period already is the
+// confirmation, and a daily job can't wait 3 days to be reported missing.
+export const HEARTBEAT_FAILURE_THRESHOLD = 1;
+export const HEARTBEAT_RECOVERY_THRESHOLD = 1;
+
+// Heartbeat monitors (U3): the customer's job pings us; we send no requests.
+export const HEARTBEAT_DEFAULT_GRACE_SEC = 60;
+export const HEARTBEAT_MAX_GRACE_SEC = 24 * 60 * 60;
+export const HEARTBEAT_MAX_EXPECTED_SEC = 30 * 24 * 60 * 60;
+// Max missed periods the overdue detector records per monitor per run (it
+// catches up on the next runs), so one long-dead minutely job can't stall it.
+export const HEARTBEAT_MAX_MISSED_PER_RUN = 50;
+
+// Where a check result came from (CheckResult.source; missing = 'http').
+export const CHECK_SOURCES = Object.freeze({
+  HTTP: 'http',
+  HEARTBEAT: 'heartbeat',
+  AGENT: 'agent',
+  PROBE: 'probe',
+  EXTERNAL: 'external',
+});
 
 export const MIN_INTERVAL_SEC = 30;
 export const MIN_INTERVAL_SEC_DEMO = 10;
@@ -57,6 +79,7 @@ export const JOB_NAMES = Object.freeze({
   FINALIZE_ROLLUP: 'finalize-rollup',
   SEND_NOTICE: 'send-notice',
   BUDGET_RESET: 'budget-reset',
+  HEARTBEAT_OVERDUE: 'heartbeat-overdue',
 });
 
 // Adaptive intervals (U2): each run of this many consecutive successes while up

@@ -19,8 +19,9 @@ import {
 import { env } from './config/env.js';
 import { createBudgetEnforcer } from './budget.js';
 import { startHealthServer } from './healthServer.js';
-import { createIncidentEngine } from './incidents/engine.js';
+import { createIncidentEngine } from '@pulseboard/shared/incident';
 import { createBudgetResetJob } from './jobs/budgetReset.js';
+import { createHeartbeatOverdueJob } from './jobs/heartbeatOverdue.js';
 import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
 import { createRunCheckJob } from './jobs/runCheck.js';
 import { createSendAlertJob } from './jobs/sendAlert.js';
@@ -76,6 +77,8 @@ async function main() {
   );
   const budgetReset = createBudgetResetJob({ scheduler, logger });
   agenda.define(JOB_NAMES.BUDGET_RESET, () => budgetReset(new Date()));
+  const heartbeatOverdue = createHeartbeatOverdueJob({ processCheckResult, logger });
+  agenda.define(JOB_NAMES.HEARTBEAT_OVERDUE, () => heartbeatOverdue(new Date()));
   agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
   agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
@@ -87,6 +90,7 @@ async function main() {
   // every() creates a single job per name (upsert), so several workers booting
   // at once still end up with one rollup job and one nightly finalize job.
   await agenda.every('15 minutes', JOB_NAMES.ROLLUP);
+  await agenda.every('30 seconds', JOB_NAMES.HEARTBEAT_OVERDUE);
   await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
   await agenda.every('0 0 1 * *', JOB_NAMES.BUDGET_RESET, undefined, { timezone: 'UTC' });
   let agendaRunning = true;

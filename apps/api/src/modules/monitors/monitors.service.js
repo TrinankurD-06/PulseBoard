@@ -1,14 +1,15 @@
+import { randomBytes } from 'node:crypto';
 import { assertSafeUrl, runHttpCheck, UnsafeTargetError } from '@pulseboard/shared/check';
 import { appUrlOf } from '@pulseboard/shared/env';
 import { budgetSlowIntervalSec, budgetState, isBudgetSlowed } from '@pulseboard/shared/adaptive';
 import { liftBudgetRestriction } from '@pulseboard/shared/budget';
-import { MONITOR_STATUS, PAUSED_REASONS, ROLES } from '@pulseboard/shared/constants';
+import { MONITOR_STATUS, MONITOR_TYPES, PAUSED_REASONS, ROLES } from '@pulseboard/shared/constants';
 import { monthKey } from '@pulseboard/shared/cost';
 import { resolveOpenIncident } from '@pulseboard/shared/incident';
 import { CheckResult, DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
 import { clearUsageMarkers, recordUsage, requestsThisMonth } from '@pulseboard/shared/usage';
-import { AppError, notFound } from '../../lib/errors.js';
+import { AppError, badRequest, notFound } from '../../lib/errors.js';
 import { paginate } from '../../lib/pagination.js';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -32,6 +33,22 @@ const EDITABLE_FIELDS = [
   'budgetAction',
 ];
 
+// The fields a user can edit on a heartbeat monitor.
+const HEARTBEAT_EDITABLE_FIELDS = ['name', 'expectedEverySec', 'graceSec'];
+
+const isHeartbeat = (monitor) => monitor.type === MONITOR_TYPES.HEARTBEAT;
+
+/** 32 random bytes as base64url: 43 URL-safe characters, unguessable. */
+export function generateHeartbeatToken() {
+  return randomBytes(32).toString('base64url');
+}
+
+/** When a heartbeat that last pinged (or was created/resumed) at `from` becomes overdue. */
+export function heartbeatDueAt(monitor, from = new Date()) {
+  const periodMs = (monitor.expectedEverySec + monitor.graceSec) * 1000;
+  return new Date(new Date(from).getTime() + periodMs);
+}
+
 function editableFields(monitor) {
   const fields = {};
   for (const field of EDITABLE_FIELDS) {
@@ -44,14 +61,16 @@ function editableFields(monitor) {
 }
 
 /**
- * Custom headers often carry API keys. Viewers can see which headers are sent,
- * but not their values.
+ * Custom headers often carry API keys, and a heartbeat token lets anyone report
+ * pings. Viewers can see that they exist, but not their values.
  */
 export function toMonitorDto(monitor, role) {
   const json = monitor.toJSON();
-  if (json.headers && !hasRole(role, ROLES.MEMBER)) {
+  if (hasRole(role, ROLES.MEMBER)) return json;
+  if (json.headers) {
     json.headers = Object.fromEntries(Object.keys(json.headers).map((name) => [name, '••••••']));
   }
+  if (json.heartbeatToken) json.heartbeatToken = '••••••';
   return json;
 }
 
@@ -95,6 +114,30 @@ export function createMonitorService({ env, scheduler, schemas }) {
     return monitor;
   }
 
+  /** PATCH for a heartbeat: the same merge-then-validate pattern as http monitors. */
+  async function updateHeartbeat(monitor, body) {
+    const patch = schemas.heartbeatUpdate.parse(body ?? {});
+    const current = Object.fromEntries(HEARTBEAT_EDITABLE_FIELDS.map((f) => [f, monitor.get(f)]));
+    const merged = schemas.heartbeatCreate.parse({
+      ...current,
+      ...patch,
+      type: MONITOR_TYPES.HEARTBEAT,
+    });
+    const timingChanged =
+      merged.expectedEverySec !== monitor.expectedEverySec || merged.graceSec !== monitor.graceSec;
+    monitor.set({
+      name: merged.name,
+      expectedEverySec: merged.expectedEverySec,
+      graceSec: merged.graceSec,
+    });
+    // New timing applies from the last ping (or from now, if there was none yet).
+    if (timingChanged && !monitor.isPaused) {
+      monitor.nextDueAt = heartbeatDueAt(merged, monitor.lastPingAt ?? new Date());
+    }
+    await monitor.save();
+    return monitor;
+  }
+
   return {
     findInWorkspace,
 
@@ -104,6 +147,19 @@ export function createMonitorService({ env, scheduler, schemas }) {
     },
 
     async create(workspaceId, input) {
+      // Heartbeat: nothing to check or schedule; the first ping is due after one period.
+      if (input.type === MONITOR_TYPES.HEARTBEAT) {
+        return Monitor.create({
+          type: MONITOR_TYPES.HEARTBEAT,
+          name: input.name,
+          expectedEverySec: input.expectedEverySec,
+          graceSec: input.graceSec,
+          heartbeatToken: generateHeartbeatToken(),
+          workspaceId,
+          status: MONITOR_STATUS.PENDING,
+          nextDueAt: heartbeatDueAt(input),
+        });
+      }
       await assertTargetAllowed(input.url);
       const monitor = await Monitor.create({
         ...input,
@@ -120,8 +176,21 @@ export function createMonitorService({ env, scheduler, schemas }) {
      * Applies a partial update, then re-validates the merged monitor with the
      * full create schema, so cross-field rules (timeout <= interval) still hold.
      */
-    async update(workspaceId, monitorId, patch) {
+    /**
+     * `body` is the raw PATCH body: which schema applies depends on the stored
+     * monitor's type, so it is validated here rather than in the route.
+     */
+    async update(workspaceId, monitorId, body) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
+      // The type is fixed at creation: an http monitor can't become a heartbeat.
+      if (body?.type !== undefined && body.type !== (monitor.type ?? MONITOR_TYPES.HTTP)) {
+        throw badRequest('The monitor type cannot be changed', [
+          { path: 'type', message: 'The monitor type cannot be changed' },
+        ]);
+      }
+      if (isHeartbeat(monitor)) return updateHeartbeat(monitor, body);
+
+      const patch = schemas.update.parse(body ?? {});
       const merged = schemas.create.parse({ ...editableFields(monitor), ...patch });
       if (merged.url !== monitor.url) await assertTargetAllowed(merged.url);
 
@@ -171,6 +240,19 @@ export function createMonitorService({ env, scheduler, schemas }) {
     async resume(workspaceId, monitorId) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
       const now = new Date();
+      if (isHeartbeat(monitor)) {
+        // A full period (plus grace) from now before a missing ping counts.
+        monitor.set({
+          isPaused: false,
+          status: MONITOR_STATUS.PENDING,
+          pausedReason: null,
+          consecutiveFailures: 0,
+          consecutiveSuccesses: 0,
+          nextDueAt: heartbeatDueAt(monitor, now),
+        });
+        await monitor.save();
+        return monitor;
+      }
       if (
         monitor.pausedReason === PAUSED_REASONS.BUDGET &&
         monitor.budgetExceededMonth === monthKey(now) &&
@@ -217,12 +299,30 @@ export function createMonitorService({ env, scheduler, schemas }) {
     /** Counted in MonitorUsage: it is a real request to the customer's endpoint. */
     async testExisting(workspaceId, monitorId) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
+      if (isHeartbeat(monitor)) {
+        throw new AppError(
+          400,
+          'NOT_SUPPORTED',
+          'Heartbeat monitors are not checked by PulseBoard: your job pings them',
+        );
+      }
       const result = await runHttpCheck(monitor, {
         allowPrivate: env.ALLOW_PRIVATE_TARGETS,
         appUrl: appUrlOf(env),
       });
       await recordUsage(monitor, result.requestsSent);
       return result;
+    },
+
+    /** New heartbeat token: the old ping URL stops working immediately. */
+    async regenerateHeartbeatToken(workspaceId, monitorId) {
+      const monitor = await findInWorkspace(workspaceId, monitorId);
+      if (!isHeartbeat(monitor)) {
+        throw new AppError(400, 'NOT_SUPPORTED', 'Only heartbeat monitors have a ping token');
+      }
+      monitor.heartbeatToken = generateHeartbeatToken();
+      await monitor.save();
+      return monitor;
     },
 
     /** Cancels the job first, so no check runs against a half-deleted monitor. */

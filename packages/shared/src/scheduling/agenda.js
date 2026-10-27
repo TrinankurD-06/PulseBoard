@@ -4,7 +4,7 @@
 import { MongoBackend } from '@agendajs/mongo-backend';
 import { Agenda } from 'agenda';
 import mongoose from 'mongoose';
-import { JOB_NAMES } from '../constants.js';
+import { JOB_NAMES, MONITOR_TYPES } from '../constants.js';
 
 export const AGENDA_COLLECTION = 'agendaJobs';
 
@@ -69,6 +69,18 @@ export function countOverdueJobs(db) {
   });
 }
 
+/**
+ * Only monitors PulseBoard polls get a run-check job; push monitors
+ * (heartbeat) are fed by pings. Missing type = http (older documents).
+ */
+export const needsCheckJob = (monitor) =>
+  (monitor.type ?? MONITOR_TYPES.HTTP) === MONITOR_TYPES.HTTP;
+
+/** MongoDB filter for the monitors that get a run-check job (see needsCheckJob). */
+export const CHECK_JOB_MONITOR_FILTER = Object.freeze({
+  type: { $nin: [MONITOR_TYPES.HEARTBEAT, MONITOR_TYPES.AGENT] },
+});
+
 /** Seconds between checks the job should use: the current interval, else the base one. */
 export const repeatSecondsOf = (monitor) => monitor.currentIntervalSec ?? monitor.intervalSec;
 
@@ -121,6 +133,7 @@ export function createAgendaScheduler(agenda) {
      * falling back to the base interval, so rescheduling never undoes adaptation.
      */
     async scheduleMonitor(monitor) {
+      if (!needsCheckJob(monitor)) return; // heartbeat monitors are never polled
       const monitorId = String(monitor._id);
       await agenda
         .create(JOB_NAMES.RUN_CHECK, { monitorId })

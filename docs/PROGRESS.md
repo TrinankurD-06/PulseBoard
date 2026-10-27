@@ -66,7 +66,9 @@ All eight phases are complete. Nothing is in progress.
 # Upgrade: cost-aware, push-first monitoring
 
 Spec: reduce requests sent to customers' endpoints (push-first, pull as fallback).
-Decisions start at D62 in DECISIONS.md. Agreed defaults: per-type incident thresholds
+Decisions start at D62 in DECISIONS.md.
+
+Working rules: commit after each validated phase. Agreed defaults: per-type incident thresholds
 (heartbeat 1/1, http and agent 3/2), `degraded` shows as operational on public pages,
 currency INR.
 
@@ -78,14 +80,17 @@ currency INR.
       running Agenda job and persisted, budget warning at 80 % / slow or pause at 100 % (exactly
       once), notices, monthly reset with boot catch-up, raise-budget, 409 on resume over budget,
       migration 002, UI (adaptive label, budget banner, raise-budget modal, budget bar).
-- [ ] **U3. Heartbeat monitors**
+- [x] **U3. Heartbeat monitors**: ping/fail/start endpoints (per-token rate limit), overdue
+      detector (one failure per missed period, atomic), per-type thresholds (heartbeat 1/1),
+      incident engine shared by API and worker, CheckResult.source, pings in usage, heartbeat
+      form/detail page (ping URL, snippets, ping history), dashboard variant.
 - [ ] **U4. `pulseboard-agent` + probe-on-silence**
 - [ ] **U5. Cost & Usage page, cross-type tests, demo, docs**
 
 ## Resume note (upgrade)
 
-U1 `9fc020d`, U2 committed. U2 validation found and fixed a real bug unit tests missed
-(Agenda job ids are hex strings, D75): verified on real processes that the adaptive job now
-runs every 20 s and a budget-slowed job every 900 s. Gate: 381/381 tests (shared 195, api
-128, client 17, demo-target 5, worker 36), lint and Prettier clean, build OK.
-Next: U3 (heartbeat monitors), starting with `docs/upgrade/U3-contract.md`.
+U1 `9fc020d`, U2 `256d24b`, U3 committed. U3 gate: 429/429 tests (shared 208, api 144,
+client 26, demo-target 5, worker 46), lint/Prettier clean, build OK; real run verified pings,
+missed period → incident in 44 s, recovery, /fail, regenerate, 0 requests sent.
+Next: U4 (agent package + probe-on-silence), contract already written in
+`docs/upgrade/U4-contract.md`: backend + frontend(+SDK) tracks.

@@ -1,5 +1,14 @@
 import { ROLES } from '@pulseboard/shared/constants';
-import { ArrowLeft, ExternalLink, FlaskConical, Pause, Pencil, Play, Trash2 } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  ExternalLink,
+  FlaskConical,
+  Pause,
+  Pencil,
+  Play,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -14,6 +23,9 @@ import {
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
 import BudgetBanner from '../../components/monitors/BudgetBanner.jsx';
+import HeartbeatAnalytics from '../../components/monitors/HeartbeatAnalytics.jsx';
+import HeartbeatSetup from '../../components/monitors/HeartbeatSetup.jsx';
+import HeartbeatStatusCard from '../../components/monitors/HeartbeatStatusCard.jsx';
 import MonitorAnalytics from '../../components/monitors/MonitorAnalytics.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
@@ -27,7 +39,8 @@ import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
 import { intervalDescription, isPausedByBudget } from '../../lib/budget.js';
-import { formatMs, timeAgo } from '../../lib/format.js';
+import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
+import { isHeartbeat } from '../../lib/heartbeat.js';
 import NotFound from '../NotFound.jsx';
 
 function Detail({ label, children }) {
@@ -77,7 +90,7 @@ function MonitorIncidents({ wid, monitorId, now }) {
   );
 }
 
-function Actions({ monitor, wid, onTestResult }) {
+function Actions({ monitor, wid, onTestResult, canTest = true }) {
   const navigate = useNavigate();
   const testNow = useTestSavedMonitor(wid, monitor.id);
   const pause = usePauseMonitor(wid, monitor.id);
@@ -115,9 +128,11 @@ function Actions({ monitor, wid, onTestResult }) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" loading={testNow.isPending} onClick={onTest}>
-        {!testNow.isPending && <FlaskConical className="h-4 w-4" />} Test now
-      </Button>
+      {canTest && (
+        <Button variant="secondary" loading={testNow.isPending} onClick={onTest}>
+          {!testNow.isPending && <FlaskConical className="h-4 w-4" />} Test now
+        </Button>
+      )}
       {monitor.isPaused && isPausedByBudget(monitor) ? (
         // The API refuses (409 BUDGET_EXCEEDED) until the budget is raised.
         <Button
@@ -161,6 +176,49 @@ function Actions({ monitor, wid, onTestResult }) {
   );
 }
 
+/**
+ * Heartbeat monitors: the customer's job pings us, so there is no URL to
+ * check, no response-time/timing charts and no cost or budget. Instead: the
+ * ping URL with snippets, live "last ping / next expected", ping history.
+ */
+function HeartbeatDetail({ monitor, wid, canEdit, now }) {
+  return (
+    <div className="space-y-6">
+      <Link
+        to={`/app/${wid}`}
+        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+      >
+        <ArrowLeft className="h-4 w-4" /> All monitors
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
+            <StatusBadge status={monitor.status} />
+          </div>
+          <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500">
+            <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Heartbeat · expects a ping every {formatDuration(monitor.expectedEverySec)}
+            {monitor.graceSec ? ` (+${formatDuration(monitor.graceSec)} grace)` : ''}
+          </p>
+        </div>
+        {canEdit && <Actions monitor={monitor} wid={wid} canTest={false} />}
+      </div>
+
+      <HeartbeatAnalytics
+        wid={wid}
+        monitorId={monitor.id}
+        side={<HeartbeatStatusCard wid={wid} monitor={monitor} now={now} />}
+      />
+
+      <HeartbeatSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+
+      <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
+    </div>
+  );
+}
+
 export default function MonitorDetail() {
   const { wid, can } = useCurrentWorkspace();
   const { mid } = useParams();
@@ -178,6 +236,10 @@ export default function MonitorDetail() {
         <Skeleton className="h-48 rounded-xl" />
       </div>
     );
+  }
+
+  if (isHeartbeat(monitor)) {
+    return <HeartbeatDetail monitor={monitor} wid={wid} canEdit={can(ROLES.MEMBER)} now={now} />;
   }
 
   const headerNames = Object.keys(monitor.headers ?? {});

@@ -18,6 +18,9 @@ const LIVE_MONITOR_FIELDS = [
   'currentIntervalSec',
   'pausedReason',
   'budgetExceededMonth',
+  // U3: heartbeat monitors ("last ping X ago", "next ping expected by").
+  'lastPingAt',
+  'nextDueAt',
 ];
 
 /** Change-stream filter for monitors: check results, status, interval and budget changes. */
@@ -33,6 +36,8 @@ export const MONITOR_PIPELINE = [
             { 'updateDescription.updatedFields.status': { $exists: true } },
             { 'updateDescription.updatedFields.currentIntervalSec': { $exists: true } },
             { 'updateDescription.updatedFields.budgetExceededMonth': { $exists: true } },
+            { 'updateDescription.updatedFields.lastPingAt': { $exists: true } },
+            { 'updateDescription.updatedFields.nextDueAt': { $exists: true } },
           ],
         },
       ],

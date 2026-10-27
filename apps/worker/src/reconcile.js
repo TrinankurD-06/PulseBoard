@@ -1,12 +1,16 @@
 import { JOB_NAMES } from '@pulseboard/shared/constants';
 import { Monitor } from '@pulseboard/shared/models';
-import { AGENDA_COLLECTION, repeatSecondsOf } from '@pulseboard/shared/scheduling';
+import {
+  AGENDA_COLLECTION,
+  CHECK_JOB_MONITOR_FILTER,
+  repeatSecondsOf,
+} from '@pulseboard/shared/scheduling';
 
 /**
  * Makes the job table match the monitors table, run once on worker boot:
- *   - every active monitor has exactly one run-check job with its CURRENT
+ *   - every active http monitor has exactly one run-check job with its CURRENT
  *     interval (adaptive/budget-slowed intervals are kept, not reset to the base)
- *   - jobs for deleted/paused monitors (orphans) and duplicates are removed
+ *   - jobs for deleted/paused/heartbeat monitors (orphans) and duplicates are removed
  *
  * Normally the API keeps both in sync, but a crash between "save monitor" and
  * "save job", a manual DB edit, or a restore from backup could leave them
@@ -14,9 +18,10 @@ import { AGENDA_COLLECTION, repeatSecondsOf } from '@pulseboard/shared/schedulin
  */
 export async function reconcileJobs({ db, scheduler, logger }) {
   const jobs = db.collection(AGENDA_COLLECTION);
+  // Only polled (http) monitors: leftover jobs of heartbeat monitors count as orphans.
   const activeMonitors = await Monitor.find(
-    { isPaused: false },
-    { intervalSec: 1, currentIntervalSec: 1 },
+    { isPaused: false, ...CHECK_JOB_MONITOR_FILTER },
+    { type: 1, intervalSec: 1, currentIntervalSec: 1 },
   ).lean();
   const activeById = new Map(activeMonitors.map((monitor) => [String(monitor._id), monitor]));
 

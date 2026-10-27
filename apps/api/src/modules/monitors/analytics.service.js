@@ -10,7 +10,7 @@ import {
 } from '@pulseboard/shared/cost';
 import { mongoose } from '@pulseboard/shared/db';
 import { CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
-import { requestsThisMonth } from '@pulseboard/shared/usage';
+import { pingsThisMonth, requestsThisMonth } from '@pulseboard/shared/usage';
 import {
   addDays,
   bucketSizeMs,
@@ -57,6 +57,8 @@ export async function getUsage(monitorId, now = new Date()) {
       state: budgetState(requests, monitor.monthlyRequestBudget),
       exceededThisMonth: monitor.budgetExceededMonth === monthKey(now),
     },
+    // Heartbeat pings received this month (requests that came to us, not from us).
+    pings: await pingsThisMonth(monitor._id, now),
     interval: {
       adaptive: Boolean(monitor.adaptive),
       intervalSec: monitor.intervalSec,

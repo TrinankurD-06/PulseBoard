@@ -14,6 +14,12 @@ import {
 } from '../constants.js';
 import { baseOptions } from './_options.js';
 
+// url and intervalSec only make sense for monitors PulseBoard polls; push
+// monitors (heartbeat) have neither. Missing type = http (older documents).
+function isPolled() {
+  return (this.type ?? MONITOR_TYPES.HTTP) === MONITOR_TYPES.HTTP;
+}
+
 export const timingsSchema = new mongoose.Schema(
   {
     dnsMs: Number,
@@ -30,10 +36,10 @@ const monitorSchema = new mongoose.Schema(
     workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
     type: { type: String, enum: Object.values(MONITOR_TYPES), default: MONITOR_TYPES.HTTP },
     name: { type: String, required: true, trim: true, maxlength: 100 },
-    url: { type: String, required: true, trim: true },
+    url: { type: String, required: isPolled, trim: true },
     method: { type: String, enum: HTTP_METHODS, default: 'GET' },
     // Interval bounds depend on DEMO_MODE, so they are enforced by the Zod schema in the API.
-    intervalSec: { type: Number, required: true, min: 10 },
+    intervalSec: { type: Number, required: isPolled, min: 10 },
     timeoutMs: { type: Number, default: DEFAULT_TIMEOUT_MS },
     expectedStatus: {
       min: { type: Number, default: DEFAULT_EXPECTED_STATUS.min },
@@ -66,6 +72,17 @@ const monitorSchema = new mongoose.Schema(
     budgetAction: { type: String, enum: BUDGET_ACTIONS, default: 'slow' },
     // "YYYY-MM" of the month whose budget ran out (restriction active), else null.
     budgetExceededMonth: { type: String, default: null },
+    // Heartbeat monitors (U3): the customer's job calls /ping/<token>.
+    expectedEverySec: { type: Number, default: undefined },
+    graceSec: { type: Number, default: undefined },
+    // Secret in the ping URL; unique (sparse: other monitor types have none).
+    heartbeatToken: { type: String, default: undefined },
+    lastPingAt: { type: Date, default: null },
+    lastStartAt: { type: Date, default: null },
+    // When a missing ping becomes a failure: last ping (or creation/resume)
+    // + expectedEverySec + graceSec. Advanced one period per missed period.
+    nextDueAt: { type: Date, default: null },
+
     status: {
       type: String,
       enum: Object.values(MONITOR_STATUS),
@@ -100,5 +117,9 @@ const monitorSchema = new mongoose.Schema(
 monitorSchema.index({ workspaceId: 1, createdAt: -1 });
 // Worker reconcile on boot: "all active monitors".
 monitorSchema.index({ isPaused: 1 });
+// Ping lookup by token; sparse because only heartbeat monitors have one.
+monitorSchema.index({ heartbeatToken: 1 }, { unique: true, sparse: true });
+// Overdue detector: "active heartbeats whose next ping is due".
+monitorSchema.index({ type: 1, isPaused: 1, nextDueAt: 1 });
 
 export const Monitor = mongoose.models.Monitor || mongoose.model('Monitor', monitorSchema);

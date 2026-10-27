@@ -30,6 +30,7 @@ async function main() {
     env,
     logger,
     scheduler,
+    agenda,
     getRealtimeStatus: () => realtime?.status() ?? 'not_started',
   });
   const server = http.createServer(app);

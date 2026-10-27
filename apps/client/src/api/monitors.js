@@ -56,6 +56,12 @@ export const useResumeMonitor = (wid, mid) =>
     http.post(`/workspaces/${wid}/monitors/${mid}/resume`).then(unwrap),
   );
 
+/** Heartbeat: new secret ping URL; the old one stops working immediately. */
+export const useRegenerateHeartbeatToken = (wid, mid) =>
+  useMonitorMutation(wid, () =>
+    http.post(`/workspaces/${wid}/monitors/${mid}/heartbeat-token`).then(unwrap),
+  );
+
 /** "Test now" for an unsaved configuration (the form). Result isn't stored. */
 export const useTestMonitorConfig = (wid) =>
   useMutation({

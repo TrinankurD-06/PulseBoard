@@ -1,4 +1,4 @@
-import { ALERT_KIND } from '../constants.js';
+import { ALERT_KIND, MONITOR_TYPES } from '../constants.js';
 
 /** 3725 -> "1h 2m 5s". Used in alert text. */
 export function humanDuration(totalSeconds) {
@@ -30,11 +30,19 @@ export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
     };
   }
 
+  // Heartbeat monitors have no URL: the alert talks about pings instead.
+  const isHeartbeat = monitor.type === MONITOR_TYPES.HEARTBEAT;
+
   if (kind === ALERT_KIND.DOWN) {
+    const since = monitor.lastPingAt
+      ? new Date(monitor.lastPingAt).toUTCString()
+      : 'it was created';
     return {
       ...base,
       title: `🔴 ${monitor.name} is DOWN`,
-      summary: `${monitor.url} has failed its last checks.`,
+      summary: isHeartbeat
+        ? `No ping from ${monitor.name} since ${since}.`
+        : `${monitor.url} has failed its last checks.`,
       fields: [
         ['Cause', incident.cause || 'Unknown'],
         ['Down since', new Date(incident.startedAt).toUTCString()],
@@ -49,7 +57,9 @@ export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
   return {
     ...base,
     title: `✅ ${monitor.name} is back UP`,
-    summary: `${monitor.url} is responding normally again.`,
+    summary: isHeartbeat
+      ? `${monitor.name} is sending pings again.`
+      : `${monitor.url} is responding normally again.`,
     fields: [
       ['Downtime', humanDuration(incident.durationSec ?? 0)],
       ['Cause', incident.cause || 'Unknown'],

@@ -4,7 +4,7 @@ import { AlertChannel, Incident, Monitor } from '@pulseboard/shared/models';
 import { AGENDA_COLLECTION, createAgenda } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createIncidentEngine } from '../src/incidents/engine.js';
+import { createIncidentEngine } from '@pulseboard/shared/incident';
 import { createSendAlertJob } from '../src/jobs/sendAlert.js';
 
 const logger = createLogger({ name: 'incident-test' });

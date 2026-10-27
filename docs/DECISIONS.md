@@ -886,3 +886,53 @@ now`), so even with several workers only one sends the warning and only one appl
   applies from next month; raising the budget lifts the current restriction immediately.
 - In DEMO_MODE the default fastest adaptive interval is 10 s, so an adaptive monitor's timeout
   must be ≤ 10 s unless the fastest interval is raised (checks may run that often).
+
+## U3: Heartbeat monitors
+
+### D77. Heartbeats: the customer calls us, we send nothing
+
+- For cron jobs, workers and paid endpoints, polling is the wrong tool: a daily job can't be
+  "checked" every minute, and every poll of a paid endpoint costs money. A heartbeat monitor
+  gives the job a secret URL (`/api/v1/ping/<token>`) to call when it runs; PulseBoard sends
+  **zero** requests to the customer.
+- The token is the only credential (no login), so it is long and random (24 bytes,
+  base64url → 32 chars), unique, regenerable (the old URL stops working at once), rate-limited
+  **per token** (60/min), and masked for viewers. It is stored readable (unlike the agent key in
+  U4) because the UI must show it in copy-paste snippets; it only lets someone _send pings_.
+- `/fail` lets a job report its own failure (with a message), `/start` lets the next ping
+  carry the run's duration.
+
+### D78. One failure per missed period (and why thresholds became per type)
+
+- An overdue detector runs every 30 s, but it must not record a failure every 30 s: uptime %
+  is "successful checks ÷ all checks", so a daily job would show one success against
+  thousands of failures. Instead it records **exactly one failure per missed period**,
+  advancing `nextDueAt` with a conditional update so two workers can't both record it. Uptime %
+  then means "share of expected runs that pinged".
+- With one sample per period, "3 failures in a row" would mean three missed runs: three days
+  for a daily job. So incident thresholds became **per monitor type**: heartbeat 1/1 (the
+  grace period is the confirmation), http and agent keep 3/2. The pure state machine takes the
+  thresholds as input; the http rules and their tests are unchanged.
+
+### D79. One incident engine, used by two processes
+
+- Pings arrive at the **API**, overdue failures are found by the **worker**. Rather than
+  duplicating the incident logic, the engine moved from the worker into `shared`; both
+  processes run the same atomic counting and guarded transitions. The API can queue alert jobs
+  because its Agenda instance writes jobs without processing them.
+- Pings are stored in the same `CheckResult` time-series collection (with `source:
+'heartbeat'`), so uptime %, rollups, 90-day bars, status pages and alerts work for heartbeat
+  monitors without any changes.
+
+### D80. Heartbeat details settled during U3
+
+- Token: 32 random bytes, base64url (43 characters), regenerable; the old URL returns 404 at once.
+- Missed periods are backfilled at most 50 per detector run, so a worker that was off for a
+  long time catches up over a few 30 s runs instead of writing thousands of failures at once.
+- Between the due time and the next detector run (≤ 30 s) the UI already shows "Overdue since
+  …" while the status changes at the detector run: the card is exact, the status is
+  confirmed.
+- Validated on real processes: `/start` → ping recorded a 1.2 s run duration; stopping pings
+  opened an incident 44 s later ("No ping received within 10s + 5s grace"); the next ping
+  resolved it; `/fail?message=…` opened an incident with that cause; usage showed 0 requests
+  sent and 6 pings received.

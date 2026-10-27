@@ -19,7 +19,8 @@ const newMonitorButtonClasses =
 function summarize(monitors) {
   const count = (status) => monitors.filter((m) => m.status === status).length;
   const responseTimes = monitors
-    .filter((m) => !m.isPaused && m.lastResponseMs != null)
+    // Heartbeat 'response' is a job's run duration, not an HTTP response time.
+    .filter((m) => !m.isPaused && m.type !== 'heartbeat' && m.lastResponseMs != null)
     .map((m) => m.lastResponseMs);
   const avgResponseMs = responseTimes.length
     ? responseTimes.reduce((sum, ms) => sum + ms, 0) / responseTimes.length

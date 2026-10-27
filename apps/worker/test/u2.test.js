@@ -12,7 +12,7 @@ import {
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createBudgetEnforcer } from '../src/budget.js';
-import { createIncidentEngine } from '../src/incidents/engine.js';
+import { createIncidentEngine } from '@pulseboard/shared/incident';
 import { createBudgetResetJob } from '../src/jobs/budgetReset.js';
 import { createRunCheckJob } from '../src/jobs/runCheck.js';
 import { createSendNoticeJob } from '../src/jobs/sendNotice.js';

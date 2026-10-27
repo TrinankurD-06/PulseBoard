@@ -41,6 +41,21 @@ export async function clearUsageMarkers(monitorId, month, markers) {
   );
 }
 
+/** Counts one heartbeat ping received for the month of `at` (upsert $inc, like recordUsage). */
+export async function recordPing(monitor, at = new Date()) {
+  await MonitorUsage.updateOne(
+    { monitorId: monitor._id, month: monthKey(at) },
+    { $inc: { pings: 1 }, $setOnInsert: { workspaceId: monitor.workspaceId } },
+    { upsert: true },
+  );
+}
+
+/** Heartbeat pings received this month. */
+export async function pingsThisMonth(monitorId, at = new Date()) {
+  const usage = await MonitorUsage.findOne({ monitorId, month: monthKey(at) }).lean();
+  return usage?.pings ?? 0;
+}
+
 /** Requests sent this month (0 when nothing was sent yet). */
 export async function requestsThisMonth(monitorId, at = new Date()) {
   const usage = await MonitorUsage.findOne({ monitorId, month: monthKey(at) }).lean();
