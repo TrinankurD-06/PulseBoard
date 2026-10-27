@@ -19,6 +19,7 @@ import {
   DailyRollup,
   Incident,
   Monitor,
+  MonitorUsage,
   StatusPage,
 } from '@pulseboard/shared/models';
 import { hasRole } from '@pulseboard/shared/roles';
@@ -441,6 +442,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
         CheckResult.deleteMany({ 'meta.monitorId': monitor._id }),
         AgentReport.deleteMany({ 'meta.monitorId': monitor._id }),
         DailyRollup.deleteMany({ monitorId: monitor._id }),
+        MonitorUsage.deleteMany({ monitorId: monitor._id }),
         Incident.deleteMany({ monitorId: monitor._id }),
         StatusPage.updateMany({ monitorIds: monitor._id }, { $pull: { monitorIds: monitor._id } }),
       ]);

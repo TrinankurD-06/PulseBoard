@@ -1,22 +1,87 @@
 # PulseBoard
 
-**Uptime monitoring and public status pages, built on the MERN stack.**
-PulseBoard checks your websites and APIs every few seconds, opens an incident when one goes
+**Cost-aware uptime monitoring and public status pages, built on the MERN stack.**
+PulseBoard watches your websites, APIs and background jobs, opens an incident when one goes
 down, alerts your team on Discord, Slack or email, shows everything live on a dashboard,
 and publishes a public status page for your users.
+
+It is **push-first**: polling a site costs its owner real requests (and often database or
+paid-API calls), so PulseBoard prefers to be told. Cron jobs ping a heartbeat URL, Express apps
+report through a tiny agent, and PulseBoard only sends requests when something goes quiet. When
+it does poll, it uses cheap `HEAD` requests, slows down while everything is healthy, shows what
+each monitor costs and respects a monthly budget.
 
 MongoDB is the only infrastructure: it stores the data, it is the job queue (Agenda), and its
 change streams are the realtime event bus. No Redis, no message broker.
 
 ![Dashboard during an outage](docs/screenshots/dashboard-outage.png)
 
+## Monitor types
+
+| Type                              | How it works                                                                                                                                                          | Requests to your servers                                     |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Website / API** (`http`, pull)  | PulseBoard checks a URL on an interval: `HEAD` by default, adaptive interval, optional keyword.                                                                       | one per check (43,200 a month at 1 min, fewer when adaptive) |
+| **Heartbeat** (`heartbeat`, push) | Your cron job or worker calls a secret URL when it runs (`/start`, `/fail` optional). No ping within the expected period + grace → incident.                          | **0**                                                        |
+| **Agent** (`agent`, push)         | `pulseboard-agent` in your Express app reports request rate, error rate and p50/p95/p99 latency. Silent agent → PulseBoard probes your URL before deciding it's down. | **0** while reporting, 3 probes per silence                  |
+
+All three share the same incident engine, uptime maths, 90-day bars, alerts and status pages.
+
+### Install the agent
+
+```bash
+npm install pulseboard-agent
+```
+
+```js
+import express from 'express';
+import { pulseboard } from 'pulseboard-agent';
+
+const app = express();
+app.use(
+  pulseboard({ apiKey: process.env.PULSEBOARD_KEY, endpoint: 'https://<your-pulseboard>/api/v1' }),
+);
+```
+
+Create an **Agent** monitor in the dashboard to get the key (it is shown once). The agent has no
+dependencies, never blocks or throws into your app, keeps bounded memory and sends only
+aggregates and route **patterns** (`/api/orders/:id`): no URLs, ids, query strings, headers or
+bodies. Details in [packages/agent/README.md](packages/agent/README.md).
+
+### Heartbeat in one line
+
+```bash
+# crontab: run the backup, then tell PulseBoard it worked
+0 3 * * * /usr/local/bin/backup.sh && curl -fsS https://<your-pulseboard>/api/v1/ping/<token>
+```
+
+## Cost features
+
+- **Cheap checks**: new http monitors use `HEAD` (falling back to `GET` once if the server
+  rejects it, and remembering that), never download a body unless a keyword needs it, and
+  identify themselves (`User-Agent: PulseBoard/1.0 (+…/bot)`, `X-PulseBoard-Check: 1`) so you
+  can filter them out of analytics and billing. The public `/bot` page explains how.
+- **Cost visibility**: every request sent is counted per monitor and month. Set a price per
+  1,000 requests (INR, USD, EUR or GBP) and the form shows a live monthly estimate; the monitor
+  page shows requests and cost so far.
+- **Adaptive intervals**: after 10 good checks in a row the interval doubles (up to the
+  "slowest" you set); a failure, an outage or an unusually slow response brings it straight back.
+- **Budgets**: a monthly request budget per monitor. 80 % → one warning alert; 100 % → slow down to
+  every 15 minutes or pause until the 1st, plus one alert. Raising the budget lifts it at once.
+- **Cost & usage page**: requests sent, requests saved compared with 1-minute polling, estimated
+  monthly requests and cost per currency for the whole workspace, with a sortable per-monitor
+  table and budget bars.
+
 ## Features
 
 - **HTTP checks every 10–30 s** (GET/HEAD/POST) with expected status range, keyword match,
   custom headers, timeout, up to 3 redirects, and a **DNS / TCP / TLS / TTFB / download**
   timing breakdown measured on a fresh connection every time. TLS certificate expiry badge.
-- **Incidents without noise**: down after 3 consecutive failures, up after 2 successes.
-  Race-safe (concurrent checks can't open two incidents) and timed from the first failed check.
+- **Incidents without noise**: down after 3 consecutive failures, up after 2 successes (a
+  heartbeat: the first missed period, the first ping). Race-safe (concurrent checks can't open
+  two incidents) and timed from the first failed check.
+- **Agent dashboards**: live request rate, error rate (with your threshold), latency
+  percentiles and top routes for apps running the agent. A silent agent whose app still answers
+  is shown as **degraded** (with one notice), not as an outage.
 - **Alerts** to Discord (embeds), Slack (Block Kit) and email (HTML), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
 - **Live dashboard**: MongoDB change streams → Socket.io push status, response times and
@@ -48,21 +113,25 @@ flowchart LR
     Browser <-- "Socket.io (live events)" --> API
     API -- "schedule / cancel jobs<br/>CRUD" --> DB[(MongoDB<br/>replica set)]
     DB -- "agendaJobs" --> Worker["Worker<br/>Agenda"]
-    Worker -- "HTTP checks" --> Sites[(Monitored sites)]
+    Worker -- "HEAD checks, probes" --> Sites[(Monitored sites)]
+    Jobs["Cron jobs"] -- "heartbeat pings" --> API
+    Sites -- "agent reports" --> API
     Worker -- "results, incidents" --> DB
     Worker -- "alerts" --> Notify["Discord · Slack · Email"]
     DB -. "change streams" .-> API
 ```
 
-- **API** (`apps/api`): REST, auth, RBAC, analytics, Socket.io. Creates Agenda jobs but never
-  runs them.
-- **Worker** (`apps/worker`): runs `run-check`, `send-alert`, `rollup`, `finalize-rollup`
-  jobs; serves only `/health`. Several workers can run at once; Agenda's locking means a check
-  never runs twice.
+- **API** (`apps/api`): REST, auth, RBAC, analytics, Socket.io, and the public ping and agent
+  report endpoints. Creates Agenda jobs but never runs them.
+- **Worker** (`apps/worker`): runs `run-check`, `send-alert`, `send-notice`,
+  `heartbeat-overdue`, `agent-silence`, `rollup`, `finalize-rollup` and `budget-reset` jobs;
+  serves only `/health`. Several workers can run at once; Agenda's locking means a check never
+  runs twice.
 - **Shared** (`packages/shared`): Mongoose models, Zod schemas (also used by client forms),
-  check runner, SSRF guard, incident state machine, uptime maths.
+  check runner, SSRF guard, incident engine and state machine, uptime and cost maths.
+- **Agent** (`packages/agent`): `pulseboard-agent`, the npm package for customers' Express apps.
 - **Demo target** (`apps/demo-target`): a tiny site you can switch to up / down / slow / 500 /
-  missing-keyword for live demos.
+  missing-keyword, running the agent, with a heartbeat script, for live demos.
 
 More diagrams (check lifecycle, incident states, data model) in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Every design decision and its alternatives are
@@ -84,9 +153,14 @@ git clone <repo-url> pulseboard && cd pulseboard
 cp .env.example .env         # works as-is for local development
 docker compose up -d         # MongoDB as a single-node replica set (rs0), needed for change streams
 npm install
+npm run migrate              # only when upgrading an existing database (safe to re-run)
 npm run seed                 # demo account + realistic history (safe to re-run)
 npm run dev                  # api :4000 · worker :4002/health · client :5173 · demo-target :4011
+npm run heartbeat -w @pulseboard/demo-target   # optional, in a second terminal: the demo cron job
 ```
+
+The seed writes `apps/demo-target/.pulseboard-demo.json` (git-ignored) with the demo agent key
+and heartbeat URL, so the demo-target starts reporting through the agent by itself.
 
 Open <http://localhost:5173> and log in with **demo@pulseboard.dev / demo1234** (the login
 page has a "Fill in" button in demo mode). The public status page is at
@@ -100,14 +174,16 @@ link appears in the incident timeline.
 
 ### Scripts
 
-| Command                                       | What it does                                               |
-| --------------------------------------------- | ---------------------------------------------------------- |
-| `npm run dev`                                 | Runs API, worker, client and demo-target with live reload  |
-| `npm run seed`                                | (Re)creates the demo account and its history               |
-| `npm test`                                    | All test suites (shared, API, worker, client, demo-target) |
-| `npm run test:coverage -w @pulseboard/shared` | Coverage of the shared core logic                          |
-| `npm run lint`                                | ESLint across the monorepo                                 |
-| `npm run format`                              | Prettier across the monorepo                               |
+| Command                                        | What it does                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `npm run dev`                                  | Runs API, worker, client and demo-target with live reload         |
+| `npm run seed`                                 | (Re)creates the demo account and its history                      |
+| `npm run migrate`                              | Applies pending schema migrations (idempotent)                    |
+| `npm run heartbeat -w @pulseboard/demo-target` | Demo cron job: pings the heartbeat (`--fail`, `--stop-after <n>`) |
+| `npm test`                                     | All test suites (shared, API, worker, client, demo-target, agent) |
+| `npm run test:coverage -w @pulseboard/shared`  | Coverage of the shared core logic                                 |
+| `npm run lint`                                 | ESLint across the monorepo                                        |
+| `npm run format`                               | Prettier across the monorepo                                      |
 
 ## Environment variables
 
@@ -132,6 +208,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `WORKER_HEALTH_PORT`       | worker      | `4002`                                                                      | Worker `/health` port                                          |
 | `AGENDA_MAX_CONCURRENCY`   | worker      | `20`                                                                        | Checks a worker runs in parallel                               |
 | `DASHBOARD_URL`            | api, worker | `http://localhost:5173`                                                     | Links in alerts                                                |
+| `APP_URL`                  | api, worker | empty → `DASHBOARD_URL`                                                     | Public URL in the checker's User-Agent (`+APP_URL/bot`)        |
 | `SMTP_HOST` … `SMTP_PASS`  | api, worker | empty                                                                       | Email delivery; empty = Ethereal test inbox                    |
 | `ALERT_FROM_EMAIL`         | api, worker | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                         |
 | `SEED_DISCORD_WEBHOOK_URL` | seed        | empty                                                                       | Creates a Discord channel when seeding                         |
@@ -139,6 +216,9 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `SEED_ALERT_EMAIL`         | seed        | empty                                                                       | Email channel target (default: the demo user)                  |
 | `SEED_DEMO_TARGET_URL`     | seed        | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)   |
 | `DEMO_TARGET_PORT`         | demo-target | `4011`                                                                      | Port (4001 is often taken by VS Code)                          |
+| `PULSEBOARD_AGENT_KEY`     | demo-target | empty → seed file                                                           | Agent key for the demo-target's own agent                      |
+| `PULSEBOARD_ENDPOINT`      | demo-target | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)             |
+| `HEARTBEAT_URL`            | heartbeat   | empty → seed file                                                           | Ping URL used by the demo heartbeat script                     |
 | `VITE_API_URL`             | client      | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                   |
 | `VITE_SOCKET_URL`          | client      | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)          |
 
@@ -148,11 +228,18 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 npm test
 ```
 
-281 tests across five workspaces, all run against an in-memory MongoDB **replica set**
+571 tests across six workspaces, all run against an in-memory MongoDB **replica set**
 (so change streams and transactions behave like production):
 
-- **Unit**: incident state machine (incl. flapping), uptime maths, SSRF IP checker, check
-  evaluation, schemas, alert formatting.
+- **Unit**: incident state machine (incl. flapping and per-type thresholds), uptime maths, SSRF
+  IP checker, check evaluation, schemas, alert formatting, cost estimator, adaptive interval
+  rules, budget states, agent report evaluation; the agent SDK's aggregation, percentiles,
+  route patterns, bounded memory and failure handling.
+- **Upgrade**: HEAD→GET fallback and usage metering; adaptive intervals applied to **real**
+  Agenda jobs; budget warning/slow/pause exactly once and the monthly reset; heartbeat pings,
+  overdue detection with two concurrent detectors; agent reports, silence → probes → incident
+  or degraded; migrations idempotent; workspace usage; one test file proving http, heartbeat
+  and agent monitors get identical uptime, rollups, status pages, incidents and alerts.
 - **Integration**: auth flow incl. refresh rotation and reuse detection; RBAC matrix; monitor
   CRUD + real Agenda jobs created/cancelled; check runner against a local HTTP server
   (timeouts, redirects, body cap); incident engine incl. a concurrency race; alert retries;
@@ -211,6 +298,23 @@ The worker reconciles jobs on start, so seeded monitors begin checking immediate
 8. **(Optional) under the hood.** `/health` on API and worker; run two workers to show checks
    aren't duplicated (Agenda locking); `docs/DECISIONS.md` for the reasoning.
 
+**Push-first part (about 5 more minutes)**
+
+9. **Agent.** Open **Checkout API (agent)**: live request rate, error rate and latency from the
+   demo-target's own traffic. Point at "requests saved vs 1-minute polling".
+10. **Errors.** On `/admin`, switch on **5xx errors**: the error-rate chart jumps and after 3
+    report windows (~1.5 min) an incident opens with "Error rate … above 5 %". Switch it off.
+11. **Agent silent.** Click **agent silent**: the site keeps serving, so after ~1 min the probes
+    succeed and the monitor turns amber **Degraded** with one notice, no incident.
+12. **Crash.** Click **crash**: no reports, probes refused, and within ~2 minutes an incident
+    opens and the alert arrives. Click **restore**: the next reports resolve it.
+13. **Heartbeat.** Run `npm run heartbeat -w @pulseboard/demo-target -- --stop-after 3`: three
+    pings, then silence; **Nightly backup** opens an incident once the expected period + grace
+    has passed. Start the script again and the first ping resolves it. `--fail` reports a
+    failure with a message.
+14. **Cost & usage.** Requests sent this month, requests saved, the estimate and cost per
+    currency, per-monitor intervals (adaptive / slowed) and budget bars.
+
 Tip: in production the free demo-target sleeps when idle; open its `/admin` page a minute
 before the demo.
 
@@ -218,12 +322,13 @@ before the demo.
 
 ```
 apps/
-  api/           Express REST API, Socket.io, change streams, seed script
-  worker/        Agenda jobs: checks, incident engine, alerts, rollups
+  api/           Express REST API, Socket.io, change streams, ping + agent endpoints, seed, migrations
+  worker/        Agenda jobs: checks, heartbeat overdue, agent silence + probes, alerts, notices, rollups, budgets
   client/        React app (Vite)
-  demo-target/   Switchable demo website
+  demo-target/   Switchable demo website with the agent, heartbeat script
 packages/
-  shared/        Models, schemas, check runner, SSRF guard, state machine, uptime maths
-docs/            ARCHITECTURE.md, API.md, DECISIONS.md, PROGRESS.md, screenshots/
+  shared/        Models, schemas, check runner, SSRF guard, incident engine, uptime + cost maths
+  agent/         pulseboard-agent: Express middleware that reports metrics (npm package)
+docs/            ARCHITECTURE.md, API.md, DECISIONS.md, PROGRESS.md, upgrade/, screenshots/
 docker-compose.yml  render.yaml  .env.example
 ```

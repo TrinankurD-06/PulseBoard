@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Receipt,
   Settings,
   Users,
   X,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { to: 'incidents', label: 'Incidents', icon: AlertTriangle },
   { to: 'alerts', label: 'Alert channels', icon: Bell },
   { to: 'status-pages', label: 'Status pages', icon: Globe },
+  { to: 'usage', label: 'Cost & usage', icon: Receipt },
   { to: 'team', label: 'Team', icon: Users },
   { to: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -108,7 +110,7 @@ export default function AppLayout() {
     return <NotFound message="This workspace doesn't exist or you're not a member." />;
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="hidden border-r border-slate-200 lg:block dark:border-slate-800">
         <div className="sticky top-0 h-screen">
           <Sidebar connected={connected} />

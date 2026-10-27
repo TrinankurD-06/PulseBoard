@@ -8,7 +8,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { axisProps, formatTick, gridProps, tooltipBoxClasses } from './chartTheme.js';
+import {
+  axisProps,
+  formatTick,
+  gridProps,
+  niceTicks,
+  tooltipBoxClasses,
+  yAxisWidth,
+} from './chartTheme.js';
 
 function ChartTooltip({ active, payload, series, format }) {
   if (!active || !payload?.length) return null;
@@ -72,6 +79,14 @@ export default function MetricLineChart({
     return <p className="py-16 text-center text-sm text-slate-500">{emptyText}</p>;
   }
   const maxThreshold = Math.max(0, ...thresholds.map((t) => t.value));
+  // Round ticks from our own domain (Recharts would label the raw maximum,
+  // e.g. 181.9/min), and an axis wide enough for the longest label.
+  const dataMax = Math.max(
+    0,
+    ...data.flatMap((row) => series.map((s) => row[s.key]).filter(Number.isFinite)),
+  );
+  const ticks = niceTicks(Math.max(dataMax, maxThreshold * 1.1));
+  const width = yAxisWidth(ticks.map(format));
 
   return (
     <div>
@@ -89,10 +104,13 @@ export default function MetricLineChart({
             <YAxis
               {...axisProps}
               axisLine={false}
-              width={52}
+              width={width}
               tickFormatter={format}
-              // Keep a threshold visible even when every value is far below it.
-              domain={[0, (dataMax) => Math.max(dataMax, maxThreshold * 1.1)]}
+              // The ticks include any threshold, so it stays visible even when
+              // every value is far below it.
+              ticks={ticks}
+              domain={[0, ticks[ticks.length - 1]]}
+              interval={0}
             />
             <Tooltip
               content={<ChartTooltip series={series} format={format} />}

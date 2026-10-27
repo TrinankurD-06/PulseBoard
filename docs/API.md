@@ -32,7 +32,9 @@ httpOnly cookie (`pb_refresh`, path `/api/v1/auth`) that the browser sends autom
 | 401  | `UNAUTHORIZED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` | Missing/expired token; wrong login; bad refresh        |
 | 403  | `FORBIDDEN`                                                    | Member of the workspace, but role too low              |
 | 404  | `NOT_FOUND`                                                    | Missing resource, or not a member of the workspace     |
+| 400  | `NOT_SUPPORTED`                                                | Action doesn't apply to this monitor type              |
 | 409  | `CONFLICT`, `LAST_OWNER`                                       | Duplicate (email, slug, member); last owner protection |
+| 409  | `BUDGET_EXCEEDED`                                              | Resume of a monitor paused by its budget, still over   |
 | 413  | `PAYLOAD_TOO_LARGE`                                            | Body over 100 kB                                       |
 | 429  | `RATE_LIMITED`                                                 | Rate limit hit (see below)                             |
 | 502  | `ALERT_DELIVERY_FAILED`                                        | Test alert couldn't be delivered                       |
@@ -42,7 +44,8 @@ httpOnly cookie (`pb_refresh`, path `/api/v1/auth`) that the browser sends autom
 (+ members, workspace settings). The minimum role is listed for each workspace endpoint.
 
 **Rate limits.** login/register: 20 per 15 min per IP · refresh: 60 per 15 min per IP ·
-"Test now": 5 per min per user · test alert: 5 per min per user · public status: 120 per min per IP.
+"Test now": 5 per min per user · test alert: 5 per min per user · public status: 120 per min per IP
+· heartbeat pings: 60 per min per token · agent reports: 30 per min per key.
 
 ---
 
@@ -229,14 +232,44 @@ Monitor object (as returned to members/owners; for viewers, header **values** ar
   "lastError": null,
   "lastTimings": { "dnsMs": 3.1, "tcpMs": 11.2, "tlsMs": 24.9, "ttfbMs": 46.0, "downloadMs": 2.2 },
   "sslExpiresAt": "2027-01-15T23:59:59.000Z",
+  "type": "http",
+  "headUnsupported": false,
+  "costPer1kRequests": 0.5,
+  "currency": "INR",
+  "adaptive": true,
+  "minIntervalSec": 30,
+  "maxIntervalSec": 600,
+  "currentIntervalSec": 120,
+  "monthlyRequestBudget": 20000,
+  "budgetAction": "slow",
+  "budgetExceededMonth": null,
+  "pausedReason": null,
   "createdAt": "…",
   "updatedAt": "…"
 }
 ```
 
+There are three monitor **types**, fixed at creation (`PATCH` can't change `type`):
+
+| `type`      | Who sends traffic                                    | Type-specific fields                                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `http`      | PulseBoard checks the URL (pull)                     | `url`, `method`, `intervalSec`, `timeoutMs`, `expectedStatus`, `keyword`, `headers`, cost, adaptive and budget fields above                                                                                                                                        |
+| `heartbeat` | Your job pings PulseBoard (push)                     | `expectedEverySec`, `graceSec`, `heartbeatToken` (masked `••••••` for viewers), `lastPingAt`, `lastStartAt`, `nextDueAt`                                                                                                                                           |
+| `agent`     | `pulseboard-agent` in your app reports to PulseBoard | `reportEverySec`, `errorRateThreshold` (%), `p95ThresholdMs`, `probeUrl`, `externalCheckEverySec`, `agentKeyPrefix`, `lastReportAt`, `silenceState` (`reporting`, `probing`, `silent`). The key itself is never stored readable (`agentKeyHash` is never returned) |
+
+`status`: `pending` | `up` | `down` | `paused` | `degraded`. `degraded` only happens for agent
+monitors: the agent stopped reporting but the probe URL still answers. It is not an incident, and
+public status pages show it as operational.
+
+Adaptive interval (http): `intervalSec` is the **base** interval and `currentIntervalSec` is what
+the scheduler uses right now. After 10 successful checks in a row the interval doubles (up to
+`maxIntervalSec`). A failure, a `down` status or a response slower than twice the 24 h average
+brings it back down. When a monthly budget is reached, `budgetAction` decides: `slow` (check
+every 15 min until the next month) or `pause` (`pausedReason: "budget_exceeded"`).
+
 ### `GET /workspaces/:wid/monitors` (viewer)
 
-Paginated, newest first. Optional `?status=up|down|pending|paused`.
+Paginated, newest first. Optional `?status=up|down|pending|paused|degraded`.
 
 ### `POST /workspaces/:wid/monitors` (member)
 
@@ -253,11 +286,50 @@ Paginated, newest first. Optional `?status=up|down|pending|paused`.
 }
 ```
 
-Only `name`, `url` and `intervalSec` are required. Rules: `intervalSec` ≥ 30 (≥ 10 in DEMO_MODE),
-≤ 86400; `timeoutMs` 1000–30000 and ≤ interval; `method` GET/HEAD/POST; `Host`, `Content-Length`
-and similar headers can't be set. `201` monitor (status `pending`); its check job is scheduled
-and runs right away. `400 UNSAFE_TARGET` for private/loopback/metadata addresses (unless
-`ALLOW_PRIVATE_TARGETS=true`).
+Only `name`, `url` and `intervalSec` are required (`type` defaults to `http`). Rules: `intervalSec`
+≥ 30 (≥ 10 in DEMO_MODE), ≤ 86400; `timeoutMs` 1000–30000 and ≤ interval; `method` GET/HEAD/POST;
+`Host`, `Content-Length` and similar headers can't be set. `201` monitor (status `pending`); its
+check job is scheduled and runs right away. `400 UNSAFE_TARGET` for private/loopback/metadata
+addresses (unless `ALLOW_PRIVATE_TARGETS=true`).
+
+Cost-related fields (all optional) and their defaults for new monitors:
+
+- `method` defaults to `HEAD`, or `GET` when a `keyword` is set. `HEAD` with a keyword is rejected
+  (`method`: "HEAD responses have no body"). If a server answers `HEAD` with 405/501, the checker
+  retries with `GET` and remembers it (`headUnsupported: true`).
+- `costPer1kRequests` (≥ 0 or `null`) and `currency` (`INR` default, `USD`, `EUR`, `GBP`).
+- `adaptive` defaults to `true`, with `minIntervalSec` (≥ mode minimum, ≤ `intervalSec`) and
+  `maxIntervalSec` (≥ `intervalSec`, default 600). When adaptive, `timeoutMs` must fit in
+  `minIntervalSec`.
+- `monthlyRequestBudget` (integer ≥ 1 or `null`) and `budgetAction` (`slow` default, or `pause`).
+
+**Heartbeat** monitor:
+
+```json
+{ "type": "heartbeat", "name": "Nightly backup", "expectedEverySec": 86400, "graceSec": 900 }
+```
+
+`expectedEverySec` ≥ mode minimum and ≤ 30 days; `graceSec` 0–86400 (default 60). The response
+includes `heartbeatToken`; the ping URL is `/api/v1/ping/<heartbeatToken>`. No `url`, no check job.
+
+**Agent** monitor:
+
+```json
+{
+  "type": "agent",
+  "name": "Checkout API",
+  "reportEverySec": 60,
+  "errorRateThreshold": 5,
+  "p95ThresholdMs": 800,
+  "probeUrl": "https://api.example.com/health",
+  "externalCheckEverySec": 1800
+}
+```
+
+All but `name` are optional: `reportEverySec` 30–300 (default 60), `errorRateThreshold` 0–100
+(default 5), `probeUrl` (SSRF-checked like `url`), `externalCheckEverySec` 300–86400 (needs
+`probeUrl`; off by default). The `201` response contains **`agentKey` once** (`pbk_…`). Only its
+SHA-256 hash is stored, so it can't be shown again.
 
 ### `GET /workspaces/:wid/monitors/:mid` (viewer)
 
@@ -266,7 +338,19 @@ and runs right away. `400 UNSAFE_TARGET` for private/loopback/metadata addresses
 ### `PATCH /workspaces/:wid/monitors/:mid` (member)
 
 Any subset of the create fields, e.g. `{ "intervalSec": 60 }`. Merged with the stored monitor
-and re-validated as a whole; the job is rescheduled with the new interval.
+and re-validated as a whole; the job is rescheduled with the new interval. Changing `intervalSec`
+or `adaptive` resets `currentIntervalSec` to the base interval. Raising `monthlyRequestBudget`
+above this month's usage lifts a budget pause or slowdown immediately.
+
+### `POST /workspaces/:wid/monitors/:mid/heartbeat-token` (member)
+
+Heartbeat monitors only (`400 NOT_SUPPORTED` otherwise). `200` monitor with a new
+`heartbeatToken`; the old ping URL returns `404` immediately.
+
+### `POST /workspaces/:wid/monitors/:mid/agent-key` (member)
+
+Agent monitors only. `200 { "data": { …monitor, "agentKey": "pbk_…" } }`, the new key shown once;
+reports with the old key get `401` immediately.
 
 ### `DELETE /workspaces/:wid/monitors/:mid` (member)
 
@@ -278,7 +362,9 @@ and re-validated as a whole; the job is rescheduled with the new interval.
 
 ### `POST /workspaces/:wid/monitors/:mid/resume` (member)
 
-`200` monitor (`status: "pending"`, counters reset). Reschedules the job.
+`200` monitor (`status: "pending"`, counters reset). Reschedules the job (heartbeat: the next ping
+is due `expectedEverySec + graceSec` from now). A monitor paused by its budget that is still over
+budget → `409 BUDGET_EXCEEDED` ("Raise the monthly budget to resume this monitor").
 
 ### `POST /workspaces/:wid/monitors/test` (member, 5/min)
 
@@ -301,7 +387,8 @@ A failed check is still `200`, e.g. `{ "ok": false, "statusCode": null, "error":
 
 ### `POST /workspaces/:wid/monitors/:mid/test` (member, 5/min)
 
-Same, for a saved monitor.
+Same, for a saved monitor; counted in the monitor's monthly usage. Agent monitors test their
+`probeUrl`. Heartbeat monitors, and agent monitors without a probe URL → `400 NOT_SUPPORTED`.
 
 ## Monitor analytics
 
@@ -358,6 +445,179 @@ Recent response times for every monitor of the workspace (last 6 h, up to `point
 ```json
 { "data": { "66f…": [{ "t": "…", "ms": 87.4, "ok": true }] } }
 ```
+
+### `GET /workspaces/:wid/monitors/:mid/usage` (viewer)
+
+Requests, cost, budget and interval state of one monitor for the current UTC month:
+
+```json
+{
+  "data": {
+    "month": "2026-10",
+    "requests": 1234,
+    "estimatedSoFar": 1250,
+    "estimatedMonthly": 43200,
+    "costPer1kRequests": 0.5,
+    "currency": "INR",
+    "actualCost": 0.62,
+    "estimatedMonthlyCost": 21.6,
+    "method": "HEAD",
+    "headUnsupported": false,
+    "budget": {
+      "monthlyRequestBudget": 20000,
+      "budgetAction": "slow",
+      "usedRatio": 0.062,
+      "state": "ok",
+      "exceededThisMonth": false
+    },
+    "pings": 0,
+    "reports": 0,
+    "requestsSaved": 21600,
+    "interval": {
+      "adaptive": true,
+      "intervalSec": 60,
+      "currentIntervalSec": 120,
+      "minIntervalSec": 30,
+      "maxIntervalSec": 600,
+      "slowedByBudget": false
+    }
+  }
+}
+```
+
+`requests` = requests PulseBoard sent to your server (checks, HEAD→GET retries and redirect hops,
+probes, "Test now"). `pings` (heartbeat) and `reports` (agent) are requests received instead.
+`requestsSaved` = requests a month avoided compared with checking every minute (43,200 a month).
+Costs are `null` without a price. `budget.state`: `none` | `ok` | `warning` (≥ 80 %) |
+`exceeded` (≥ 100 %).
+
+### `GET /workspaces/:wid/monitors/:mid/agent-metrics?from&to` (viewer)
+
+Agent monitors. Default the last hour, max range 24 h, at most 500 points (merged into buckets
+when there are more reports):
+
+```json
+{
+  "data": {
+    "points": [
+      {
+        "t": "…",
+        "requests": 166,
+        "errors5xx": 0,
+        "errors4xx": 2,
+        "errorRate": 0,
+        "p50Ms": 16.4,
+        "p95Ms": 31.7,
+        "p99Ms": 32.2
+      }
+    ],
+    "topRoutes": [{ "route": "/api/orders/:id", "requests": 410, "errors5xx": 1, "p95Ms": 95.2 }],
+    "lastReport": {
+      "hostname": "web-1",
+      "agentVersion": "1.0.0",
+      "uptimeSec": 86400,
+      "windowEnd": "…"
+    }
+  }
+}
+```
+
+`errorRate` is the 5xx percentage. Reports are kept for 7 days.
+
+### `GET /workspaces/:wid/usage?month=YYYY-MM` (viewer)
+
+The Cost & Usage page: the whole workspace for one month (default: the current UTC month).
+
+```json
+{
+  "data": {
+    "month": "2026-10",
+    "totals": {
+      "monitors": 6,
+      "byType": { "http": 4, "heartbeat": 1, "agent": 1 },
+      "requests": 51234,
+      "estimatedMonthlyRequests": 172800,
+      "requestsSaved": 86400,
+      "pings": 1440,
+      "reports": 43200,
+      "costByCurrency": [{ "currency": "INR", "actual": 512.34, "estimatedMonthly": 1728 }]
+    },
+    "monitors": [
+      {
+        "id": "…",
+        "name": "Checkout API (agent)",
+        "type": "agent",
+        "status": "up",
+        "intervalLabelSec": 30,
+        "adaptive": false,
+        "currentIntervalSec": null,
+        "requests": 12,
+        "estimatedMonthlyRequests": 0,
+        "requestsSaved": 43200,
+        "pings": 0,
+        "reports": 1440,
+        "costPer1kRequests": null,
+        "currency": "INR",
+        "actualCost": null,
+        "estimatedMonthlyCost": null,
+        "budget": { "monthlyRequestBudget": null, "usedRatio": null, "state": "none" }
+      }
+    ]
+  }
+}
+```
+
+`intervalLabelSec`: http → the current (adaptive) interval, heartbeat → `expectedEverySec`,
+agent → `reportEverySec`. Costs are summed **per currency**, never converted.
+
+---
+
+## Push endpoints (no login)
+
+These are called by your systems, not by the dashboard. The secret in the URL or header is the
+only authentication. Responses never reveal anything about the monitor.
+
+### `GET|POST /ping/:token` · `/ping/:token/start` · `/ping/:token/fail` (60/min per token)
+
+Heartbeat monitors. Call `/ping/:token` when your job finished successfully, optionally
+`/start` when it begins (the next ping then records the run duration), and `/fail` when it ran
+and failed (message from `?message=…` or JSON `{ "message": "…" }`, max 500 characters).
+
+```bash
+curl -fsS https://pulseboard.example.com/api/v1/ping/<token>
+```
+
+`200 { "ok": true }`; paused monitor → `200 { "ok": true, "ignored": "paused" }`; unknown token →
+`404`. No ping within `expectedEverySec + graceSec` counts as one failed check per missed period,
+and heartbeat monitors open an incident on the **first** failure (and resolve on the first ping).
+
+### `POST /agent/report` (30/min per key)
+
+Sent by `pulseboard-agent` every `reportEverySec`. `Authorization: Bearer <agentKey>`.
+
+```json
+{
+  "windowStart": "2026-10-27T03:00:00.000Z",
+  "windowEnd": "2026-10-27T03:01:00.000Z",
+  "requests": 1234,
+  "errors5xx": 3,
+  "errors4xx": 17,
+  "p50Ms": 12.4,
+  "p95Ms": 88.1,
+  "p99Ms": 240.3,
+  "topRoutes": [{ "route": "/api/orders/:id", "requests": 410, "errors5xx": 1, "p95Ms": 95.2 }],
+  "agentVersion": "1.0.0",
+  "hostname": "web-1",
+  "uptimeSec": 86400
+}
+```
+
+`202 { "ok": true }`. `401` missing/unknown key, `400` invalid body. A report is a failed check
+when the 5xx rate is above `errorRateThreshold` or `p95Ms` is above `p95ThresholdMs`; otherwise
+(including zero traffic) it's a successful one. Incidents follow the usual 3 failures / 2
+successes. If no report arrives for 2 × `reportEverySec`, the worker probes `probeUrl` (up to 3
+HEAD requests, 10 s apart): all fail → incident; one answers → status `degraded` and a one-time
+"agent silent" notice.
 
 ---
 
@@ -500,6 +760,7 @@ Only public data: no URLs, ids, headers or error messages. Headers:
 ```
 
 `overall`: `operational` | `partial_outage` | `major_outage` | `no_data` (paused monitors ignored).
+A `degraded` monitor is shown as `up`. No URLs, ping tokens, agent keys or probe URLs, for any type.
 
 ---
 
@@ -519,9 +780,9 @@ On connect the socket joins one room per workspace the user belongs to.
 | ----------------- | ------- | ------------------------------------------------------------- |
 | `workspaces:sync` | ack fn  | Re-join rooms after joining/leaving a workspace → `{ rooms }` |
 
-| Server → client     | Payload                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check:result`      | `{ monitorId, workspaceId, status, isPaused, lastCheckedAt, lastResponseMs, lastOk, lastStatusCode, lastError, lastTimings, sslExpiresAt }` |
-| `incident:opened`   | `{ id, monitorId, workspaceId, startedAt, resolvedAt: null, durationSec: null, cause }`                                                     |
-| `incident:resolved` | same, with `resolvedAt` and `durationSec`                                                                                                   |
-| `incident:updated`  | same; sent when the timeline changes (e.g. an alert was sent)                                                                               |
+| Server → client     | Payload                                                                                                                                                                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check:result`      | `{ monitorId, workspaceId, status, isPaused, lastCheckedAt, lastResponseMs, lastOk, lastStatusCode, lastError, lastTimings, sslExpiresAt, adaptive, currentIntervalSec, pausedReason, budgetExceededMonth, lastPingAt, nextDueAt, lastReportAt, silenceState }` |
+| `incident:opened`   | `{ id, monitorId, workspaceId, startedAt, resolvedAt: null, durationSec: null, cause }`                                                                                                                                                                         |
+| `incident:resolved` | same, with `resolvedAt` and `durationSec`                                                                                                                                                                                                                       |
+| `incident:updated`  | same; sent when the timeline changes (e.g. an alert was sent)                                                                                                                                                                                                   |

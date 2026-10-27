@@ -993,3 +993,52 @@ now`), so even with several workers only one sends the warning and only one appl
   after 66 s with one notice and **no** incident; process killed → 3 probes failed → incident after
   108 s ("Connection refused"); restarted → resolved after 63 s; only 4 requests ever sent (probes),
   12 reports received.
+
+### D85. The Cost & Usage page: one aggregation, totals that match the rows
+
+- `GET /workspaces/:wid/usage?month=YYYY-MM` reads the month's `MonitorUsage` documents in one
+  aggregation and the workspace's monitors in one query. No per-monitor queries, so the page stays
+  cheap however many monitors there are.
+- Totals are the sum of the rows. Deleting a monitor now also deletes its usage documents (and
+  deleting a workspace its usage and agent reports, which were previously left behind), so the
+  totals always match the table.
+- Costs are summed **per currency** and never converted: we have no exchange-rate source, and a
+  converted total would look precise while being wrong. The cost sort compares raw amounts.
+- Paused monitors send nothing, so the page shows them with 0 estimated requests, cost and
+  requests saved. The single-monitor usage card keeps the plain estimate, because it describes
+  the monitor's configuration.
+- Estimates and budgets describe the **current** configuration, even when an earlier month is
+  selected. We store requests per month, not past configurations, and the page says "at the
+  current intervals".
+- "Requests saved" for an adaptive http monitor is computed from its estimate, which is the
+  upper bound at the base interval (D69). So adaptive back-off shows up in "requests sent" but
+  not as savings: the figure is conservative on purpose, and only counts what is guaranteed.
+- Rejected: a chart of requests over time. One number per month doesn't make a meaningful line,
+  and stat tiles plus a sortable table answer "what costs what" directly.
+
+### D86. Same guarantees for every monitor type, proven through the real entry points
+
+`apps/api/test/crossType.test.js` drives each type through the path production uses: http through
+`runHttpCheck` and the incident engine (as `run-check` does), heartbeat through the ping
+endpoint, and agent through the report endpoint. It then checks the same things for all three:
+result `source`, uptime %, `rollupDay`, the 90-day series, incident open/resolve, alert jobs only
+for enabled channels, and a public status page that leaks no URLs, tokens, key hashes, probe URLs
+or error text. Calling internal functions directly would have been easier, but it could miss
+exactly the wiring that differs between types.
+
+### D87. The demo: a real agent, real traffic, one-click scenarios
+
+- The seed writes the git-ignored `apps/demo-target/.pulseboard-demo.json` (agent key, endpoint,
+  report interval, heartbeat URL). The demo-target reads it, or the `PULSEBOARD_AGENT_KEY` /
+  `PULSEBOARD_ENDPOINT` env vars, and re-reads it every 5 s, so re-seeding needs no restart.
+  Re-seeding keeps an existing, well-formed key and token, so a running demo keeps working.
+- The demo-target generates about 1 request per second for itself, so the agent charts move
+  without a load generator (`DEMO_TRAFFIC=off` disables it).
+- The **agent silent** scenario also resets the site to healthy. Probes count a 500 as down, so
+  a silent agent on an erroring site would open an incident instead of showing "degraded". This
+  was caught in the frontend smoke run.
+- The heartbeat script isn't started by `npm run dev`: the demo starts it by hand, so "pings
+  stop → incident" can be shown. `--stop-after <n>` counts runs. The seeded heartbeat history
+  has no random single failures, because one missed period opens a heartbeat incident.
+- Seed values go through the API's own Zod schemas, so seeded monitors get the same defaults
+  (HEAD, adaptive, thresholds) as monitors created in the UI.

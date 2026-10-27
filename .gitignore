@@ -7,3 +7,6 @@ coverage/
 *.log
 .DS_Store
 .vite/
+
+# Written by npm run seed: the demo agent key and heartbeat URL
+apps/demo-target/.pulseboard-demo.json

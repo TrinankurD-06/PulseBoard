@@ -1,11 +1,13 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import {
+  AgentReport,
   AlertChannel,
   CheckResult,
   DailyRollup,
   Incident,
   Membership,
   Monitor,
+  MonitorUsage,
   StatusPage,
   Workspace,
 } from '@pulseboard/shared/models';
@@ -87,6 +89,8 @@ export async function deleteWorkspace(workspaceId, scheduler) {
   await Promise.all([
     Monitor.deleteMany({ workspaceId }),
     CheckResult.deleteMany({ 'meta.workspaceId': workspaceId }),
+    AgentReport.deleteMany({ 'meta.workspaceId': workspaceId }),
+    MonitorUsage.deleteMany({ workspaceId }),
     DailyRollup.deleteMany({ workspaceId }),
     Incident.deleteMany({ workspaceId }),
     AlertChannel.deleteMany({ workspaceId }),

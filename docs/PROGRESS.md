@@ -88,14 +88,28 @@ currency INR.
       only, bounded memory, zero-traffic reports), hashed agent keys, report endpoint +
       evaluation, AgentReport time-series, silence → 3 probes → incident or `degraded`, external
       check, agent wizard/detail page with live metrics and requests-saved.
-- [ ] **U5. Cost & Usage page, cross-type tests, demo, docs**
+- [x] **U5. Cost & Usage page, cross-type tests, demo, docs**: workspace usage endpoint (one
+      aggregation, per-currency costs) and page (stat tiles, sortable table, budget bars, month
+      selector), cross-type integration tests, seed with one monitor of each type + demo file,
+      demo-target running the agent with crash / agent-silent / 5xx / restore scenarios and
+      internal traffic, heartbeat cron script, docs (README, ARCHITECTURE diagrams, API, D85–D87).
+
+## Definition of done: verified 27 Oct (real run: migrate, seed, `npm run dev`)
+
+- [x] Existing http monitor unchanged by `npm run migrate` (method, interval, status, counters
+      kept; `adaptive: false`); second run is a no-op.
+- [x] New http monitor defaults to HEAD + adaptive; estimate 43,200 requests ≈ ₹21.6/month.
+- [x] Heartbeat: pings stop → incident after 108 s (1 min + 30 s grace + detector), alert
+      queued; next ping resolves it; `--fail` opens one with the job's message.
+- [x] Demo-target agent reports live metrics (route patterns only); crash → 3 probes →
+      incident + alert after 84 s; restore → resolved in 60 s; agent silent → degraded after
+      63 s with one notice and no incident.
+- [x] Cost & Usage page shows 86,400 requests saved, per-currency costs; renders without
+      console errors or sideways scrolling at 1360 and 390 px.
+- [x] Gate: 571/571 tests (agent 24, shared 228, api 181, client 57, demo-target 22, worker 59),
+      ESLint and Prettier clean, client build OK.
 
 ## Resume note (upgrade)
 
-U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 committed. U4 gate: 522/522 tests (agent 24,
-shared 228, api 164, client 42, demo-target 5, worker 59); real SDK run: error-rate incident
-84 s, degraded 66 s (no incident), crash → probes → incident 108 s, resolved 63 s.
-Next: U5 (contract `docs/upgrade/U5-contract.md`): backend = workspace usage endpoint,
-cross-type tests, seed; frontend = Cost & Usage page, demo-target with agent + toggles +
-heartbeat cron, also fix clipped y-axis label in MetricLineChart; integration = docs. Run
-`npm install` so the pulseboard-agent workspace link exists for demo-target.
+Upgrade complete: U1 `9fc020d`, U2 `256d24b`, U3 `b6389a2`, U4 `086c3f4`, U5 committed after
+this note. Nothing pushed yet.

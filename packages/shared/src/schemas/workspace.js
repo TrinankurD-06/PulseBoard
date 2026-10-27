@@ -14,3 +14,11 @@ export const addMemberSchema = z.object({
 });
 
 export const updateMemberSchema = z.object({ role });
+
+// Cost & Usage page (U5): a calendar month in UTC, "YYYY-MM".
+export const workspaceUsageQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Month must look like YYYY-MM')
+    .optional(),
+});

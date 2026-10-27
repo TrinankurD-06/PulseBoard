@@ -4,6 +4,7 @@ import { budgetSummary } from '../../lib/budget.js';
 import { formatCount, formatCurrency, formatMonth } from '../../lib/format.js';
 import Card, { CardHeader } from '../ui/Card.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
+import BudgetMeter from './BudgetMeter.jsx';
 
 function Row({ label, children, hint }) {
   return (
@@ -15,40 +16,13 @@ function Row({ label, children, hint }) {
   );
 }
 
-const BAR_TONE = {
-  ok: { bar: 'bg-status-up', label: 'Within budget' },
-  warning: { bar: 'bg-status-pending', label: 'Nearly used up' },
-  exceeded: { bar: 'bg-status-down', label: 'Budget reached' },
-};
-
-/** Monthly budget usage: text label + percentage, the bar colour is only a reinforcement. */
+/** Monthly budget usage, when the monitor has a budget. */
 function BudgetBar({ usage }) {
   const summary = budgetSummary(usage);
   if (!summary) return null;
-  const tone = BAR_TONE[summary.exceeded ? 'exceeded' : summary.state] ?? BAR_TONE.ok;
   return (
     <div className="mx-5 mb-5">
-      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
-        <span className="text-slate-500">
-          Monthly budget: {formatCount(summary.used)} of {formatCount(summary.budget)} requests
-        </span>
-        <span className="font-medium">
-          {summary.percent}% · {tone.label}
-        </span>
-      </div>
-      <div
-        className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
-        role="progressbar"
-        aria-label="Monthly request budget used"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.min(100, summary.percent)}
-      >
-        <div
-          className={`h-full rounded-full ${tone.bar}`}
-          style={{ width: `${Math.min(100, summary.percent)}%` }}
-        />
-      </div>
+      <BudgetMeter summary={summary} />
     </div>
   );
 }

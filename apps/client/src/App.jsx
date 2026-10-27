@@ -22,6 +22,7 @@ const Register = lazy(() => import('./pages/auth/Register.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const StatusPages = lazy(() => import('./pages/StatusPages.jsx'));
 const Team = lazy(() => import('./pages/Team.jsx'));
+const Usage = lazy(() => import('./pages/Usage.jsx'));
 
 export default function App() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="incidents" element={<Incidents />} />
             <Route path="alerts" element={<AlertChannels />} />
             <Route path="status-pages" element={<StatusPages />} />
+            <Route path="usage" element={<Usage />} />
             <Route path="team" element={<Team />} />
             <Route path="settings" element={<Settings />} />
           </Route>

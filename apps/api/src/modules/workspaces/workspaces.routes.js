@@ -1,12 +1,15 @@
 import { ROLES } from '@pulseboard/shared/constants';
+import { monthKey } from '@pulseboard/shared/cost';
 import {
   createWorkspaceSchema,
   paginationSchema,
   updateWorkspaceSchema,
+  workspaceUsageQuerySchema,
 } from '@pulseboard/shared/schemas';
 import { Router } from 'express';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
+import { getWorkspaceUsage } from './usage.service.js';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -33,6 +36,17 @@ export function workspacesRouter({ scheduler }) {
     const workspace = await getWorkspace(req.params.wid);
     res.json({ data: toWorkspaceDto(workspace, req.membership.role) });
   });
+
+  // Cost & Usage page (U5): every monitor's usage for a month (default: this UTC month).
+  router.get(
+    '/:wid/usage',
+    requireRole(ROLES.VIEWER),
+    validate({ query: workspaceUsageQuerySchema }),
+    async (req, res) => {
+      const month = req.valid.query.month ?? monthKey(new Date());
+      res.json({ data: await getWorkspaceUsage(req.params.wid, month) });
+    },
+  );
 
   router.patch(
     '/:wid',
