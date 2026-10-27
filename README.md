@@ -169,7 +169,7 @@ cp .env.example .env         # works as-is for local development
 docker compose up -d         # local MongoDB replica set (rs0); skip it if MONGODB_URI in .env is an Atlas string
 npm install
 npm run migrate              # only when upgrading an existing database (safe to re-run)
-npm run seed                 # demo account + realistic history (safe to re-run)
+npm run seed                 # demo account with sample data (safe to re-run; `npm run seed:clear` removes it)
 npm run dev                  # api :4000 · worker :4002/health · client :5173 · demo-target :4011
 npm run heartbeat -w @pulseboard/demo-target   # optional, in a second terminal: the demo cron job
 ```
@@ -181,6 +181,41 @@ Open <http://localhost:5173> and log in with **demo@pulseboard.dev / demo1234** 
 page has a "Fill in" button in demo mode). The public status page is at
 <http://localhost:5173/status/acme>, and the demo target's control panel at
 <http://localhost:4011/admin>.
+
+### Sample data and `npm run seed:clear`
+
+The seed creates a workspace with seven monitors, and only some of them have history:
+
+- **Fictional, with sample data:** **Demo API**, **Demo Checkout**, **Demo Cron Job** and
+  **Demo Agent**. They watch the local demo-target (or receive its heartbeat and agent reports), so
+  their 30 days of uptime, 24 hours of checks, past incidents, usage and agent reports are
+  invented. Every document they own has `isSeed: true`, and the app marks it with a
+  **Sample data** badge (incident cards, charts, gauges and the public status page).
+- **Real, starting empty:** **Google**, **GitHub** and **Example.com**. They are real monitors with
+  no invented history, so they show "No data yet" until the worker's first check, and every number
+  afterwards is real. They keep their cost and budget settings for the cost demo.
+
+```bash
+npm run seed:clear           # deletes every isSeed document: the fictional monitors and all their data
+```
+
+`seed:clear` needs no confirmation flag: it prints what it is about to delete, deletes it, and
+prints the counts. It removes the fictional monitors together with their checks, incidents,
+rollups, usage, agent reports and scheduler jobs, and takes them off status pages. Real monitors and
+their data, users, workspaces and alert channels are never touched, and a second run does nothing. It
+refuses to run without `MONGODB_URI`. Deleting time-series check results with a filter needs
+MongoDB 7.0 or newer (Atlas and the docker-compose image qualify).
+
+The fictional monitors only make sense beside a local demo-target, so on a hosted database they
+are skipped (the real sites are still created). Set `SEED_LOCAL_DEMO=true` to include them anyway,
+or `false` to leave them out locally.
+
+**Databases seeded by an older version** gave Google, GitHub and the others backfilled history
+too. After upgrading, `npm run migrate` runs migration `004-mark-legacy-sample-data`: history
+cannot predate its monitor, so incidents that started before a monitor was created and daily
+rollups for days entirely before it existed are flagged `isSeed`, and raw checks older than the
+monitor are deleted. Anything created at or after the monitor's creation is kept. Then
+`npm run seed:clear` removes the flagged history.
 
 To receive real Discord or Slack alerts, put a webhook URL in `SEED_DISCORD_WEBHOOK_URL` or
 `SEED_SLACK_WEBHOOK_URL` before seeding, or add a channel on the **Alert channels** page.
@@ -217,7 +252,8 @@ verified; otherwise a new user (no password) with a personal workspace is create
 | Command                                        | What it does                                                      |
 | ---------------------------------------------- | ----------------------------------------------------------------- |
 | `npm run dev`                                  | Runs API, worker, client and demo-target with live reload         |
-| `npm run seed`                                 | (Re)creates the demo account and its history                      |
+| `npm run seed`                                 | (Re)creates the demo account with sample data                     |
+| `npm run seed:clear`                           | Deletes all sample data (`isSeed`), keeps real monitors and data  |
 | `npm run migrate`                              | Applies pending schema migrations (idempotent)                    |
 | `npm run heartbeat -w @pulseboard/demo-target` | Demo cron job: pings the heartbeat (`--fail`, `--stop-after <n>`) |
 | `npm test`                                     | All test suites (shared, API, worker, client, demo-target, agent) |
@@ -229,44 +265,44 @@ verified; otherwise a new user (no password) with a personal workspace is create
 
 All variables live in one `.env` at the repository root (see `.env.example`).
 
-| Variable                       | Used by                | Default / example                                                           | Purpose                                                                                                                              |
-| ------------------------------ | ---------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `NODE_ENV`                     | all                    | `development`                                                               | `production` enables secure cookies and JSON logs                                                                                    |
-| `MONGODB_URI`                  | api, worker            | `mongodb://localhost:27017/pulseboard?replicaSet=rs0&directConnection=true` | Must be a replica set (change streams)                                                                                               |
-| `LOG_LEVEL`                    | api, worker            | `info`                                                                      | pino log level                                                                                                                       |
-| `DEMO_MODE`                    | api, worker            | `true`                                                                      | Allows 10 s check intervals (30 s otherwise); shows demo login                                                                       |
-| `ALLOW_PRIVATE_TARGETS`        | api, worker            | `true` locally, `false` in production                                       | Allows monitoring localhost/private IPs (local demo-target)                                                                          |
-| `RUN_MODE`                     | api                    | `api` (or `combined`)                                                       | `combined` makes the API also run the worker in the same process (one-service hosting). `/health` then reports `worker`              |
-| `API_PORT` (or `PORT`)         | api                    | `4000`                                                                      | HTTP port                                                                                                                            |
-| `CLIENT_ORIGIN`                | api                    | `http://localhost:5173`                                                     | CORS + Socket.io allowed origin                                                                                                      |
-| `JWT_ACCESS_SECRET`            | api                    | 32+ random chars                                                            | Signs access tokens                                                                                                                  |
-| `JWT_REFRESH_SECRET`           | api                    | 32+ random chars, different                                                 | Signs refresh tokens                                                                                                                 |
-| `ACCESS_TOKEN_TTL`             | api                    | `15m`                                                                       | Access token lifetime                                                                                                                |
-| `REFRESH_TOKEN_TTL_DAYS`       | api                    | `7`                                                                         | Refresh token lifetime                                                                                                               |
-| `BCRYPT_COST`                  | api                    | `12`                                                                        | Password hashing work factor                                                                                                         |
-| `AUTH_RATE_LIMIT_MAX`          | api                    | `20`                                                                        | Login/register attempts per IP per 15 min                                                                                            |
-| `TRUST_PROXY`                  | api                    | `false` (`true` on Render)                                                  | Real client IPs behind a proxy                                                                                                       |
-| `GOOGLE_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with Google" (both needed)                                                                                          |
-| `GITHUB_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with GitHub" (both needed)                                                                                          |
-| `WORKER_HEALTH_PORT`           | worker                 | `4002`                                                                      | Worker `/health` port                                                                                                                |
-| `AGENDA_MAX_CONCURRENCY`       | worker, api (combined) | `20`                                                                        | Checks a worker runs in parallel                                                                                                     |
-| `DASHBOARD_URL`                | api, worker            | `http://localhost:5173`                                                     | Links in alerts                                                                                                                      |
-| `APP_URL`                      | api, worker            | empty → `DASHBOARD_URL`                                                     | Public web app URL: checker User-Agent, OAuth callback URLs                                                                          |
-| `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Email delivery; empty = Ethereal test inbox                                                                                          |
-| `RESEND_API_KEY`               | api, worker            | empty                                                                       | Send email over Resend's HTTPS API instead of SMTP (needed on Render's free plan, which blocks SMTP). Takes precedence over `SMTP_*` |
-| `ALERT_FROM_EMAIL`             | api, worker            | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                                                                                               |
-| `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                               |
-| `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                 |
-| `SEED_ALERT_EMAIL`             | seed                   | empty                                                                       | Email channel target (default: the demo user)                                                                                        |
-| `SEED_DEMO_TARGET_URL`         | seed                   | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)                                                                         |
-| `SEED_LOCAL_DEMO`              | seed                   | auto: on for a local database                                               | `true`/`false` forces the demo-target, heartbeat and agent monitors on or off. Off on a hosted database, where they would sit down   |
-| `SEED_API_URL`                 | seed                   | empty → `http://localhost:4000/api/v1`                                      | API URL written to the demo file for the agent and heartbeat                                                                         |
-| `DEMO_TARGET_PORT`             | demo-target            | `4011`                                                                      | Port (4001 is often taken by VS Code)                                                                                                |
-| `PULSEBOARD_AGENT_KEY`         | demo-target            | empty → seed file                                                           | Agent key for the demo-target's own agent                                                                                            |
-| `PULSEBOARD_ENDPOINT`          | demo-target            | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)                                                                                   |
-| `HEARTBEAT_URL`                | heartbeat              | empty → seed file                                                           | Ping URL used by the demo heartbeat script                                                                                           |
-| `VITE_API_URL`                 | client                 | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                                                                                         |
-| `VITE_SOCKET_URL`              | client                 | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)                                                                                |
+| Variable                       | Used by                | Default / example                                                           | Purpose                                                                                                                                       |
+| ------------------------------ | ---------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                     | all                    | `development`                                                               | `production` enables secure cookies and JSON logs                                                                                             |
+| `MONGODB_URI`                  | api, worker            | `mongodb://localhost:27017/pulseboard?replicaSet=rs0&directConnection=true` | Must be a replica set (change streams)                                                                                                        |
+| `LOG_LEVEL`                    | api, worker            | `info`                                                                      | pino log level                                                                                                                                |
+| `DEMO_MODE`                    | api, worker            | `true`                                                                      | Allows 10 s check intervals (30 s otherwise); shows demo login                                                                                |
+| `ALLOW_PRIVATE_TARGETS`        | api, worker            | `true` locally, `false` in production                                       | Allows monitoring localhost/private IPs (local demo-target)                                                                                   |
+| `RUN_MODE`                     | api                    | `api` (or `combined`)                                                       | `combined` makes the API also run the worker in the same process (one-service hosting). `/health` then reports `worker`                       |
+| `API_PORT` (or `PORT`)         | api                    | `4000`                                                                      | HTTP port                                                                                                                                     |
+| `CLIENT_ORIGIN`                | api                    | `http://localhost:5173`                                                     | CORS + Socket.io allowed origin                                                                                                               |
+| `JWT_ACCESS_SECRET`            | api                    | 32+ random chars                                                            | Signs access tokens                                                                                                                           |
+| `JWT_REFRESH_SECRET`           | api                    | 32+ random chars, different                                                 | Signs refresh tokens                                                                                                                          |
+| `ACCESS_TOKEN_TTL`             | api                    | `15m`                                                                       | Access token lifetime                                                                                                                         |
+| `REFRESH_TOKEN_TTL_DAYS`       | api                    | `7`                                                                         | Refresh token lifetime                                                                                                                        |
+| `BCRYPT_COST`                  | api                    | `12`                                                                        | Password hashing work factor                                                                                                                  |
+| `AUTH_RATE_LIMIT_MAX`          | api                    | `20`                                                                        | Login/register attempts per IP per 15 min                                                                                                     |
+| `TRUST_PROXY`                  | api                    | `false` (`true` on Render)                                                  | Real client IPs behind a proxy                                                                                                                |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with Google" (both needed)                                                                                                   |
+| `GITHUB_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with GitHub" (both needed)                                                                                                   |
+| `WORKER_HEALTH_PORT`           | worker                 | `4002`                                                                      | Worker `/health` port                                                                                                                         |
+| `AGENDA_MAX_CONCURRENCY`       | worker, api (combined) | `20`                                                                        | Checks a worker runs in parallel                                                                                                              |
+| `DASHBOARD_URL`                | api, worker            | `http://localhost:5173`                                                     | Links in alerts                                                                                                                               |
+| `APP_URL`                      | api, worker            | empty → `DASHBOARD_URL`                                                     | Public web app URL: checker User-Agent, OAuth callback URLs                                                                                   |
+| `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Email delivery; empty = Ethereal test inbox                                                                                                   |
+| `RESEND_API_KEY`               | api, worker            | empty                                                                       | Send email over Resend's HTTPS API instead of SMTP (needed on Render's free plan, which blocks SMTP). Takes precedence over `SMTP_*`          |
+| `ALERT_FROM_EMAIL`             | api, worker            | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                                                                                                        |
+| `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                                        |
+| `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                          |
+| `SEED_ALERT_EMAIL`             | seed                   | empty                                                                       | Email channel target (default: the demo user)                                                                                                 |
+| `SEED_DEMO_TARGET_URL`         | seed                   | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)                                                                                  |
+| `SEED_LOCAL_DEMO`              | seed                   | auto: on for a local database                                               | `true`/`false` forces the fictional Demo API, Checkout, Cron Job and Agent monitors on or off. Off on a hosted database (they would sit down) |
+| `SEED_API_URL`                 | seed                   | empty → `http://localhost:4000/api/v1`                                      | API URL written to the demo file for the agent and heartbeat                                                                                  |
+| `DEMO_TARGET_PORT`             | demo-target            | `4011`                                                                      | Port (4001 is often taken by VS Code)                                                                                                         |
+| `PULSEBOARD_AGENT_KEY`         | demo-target            | empty → seed file                                                           | Agent key for the demo-target's own agent                                                                                                     |
+| `PULSEBOARD_ENDPOINT`          | demo-target            | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)                                                                                            |
+| `HEARTBEAT_URL`                | heartbeat              | empty → seed file                                                           | Ping URL used by the demo heartbeat script                                                                                                    |
+| `VITE_API_URL`                 | client                 | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                                                                                                  |
+| `VITE_SOCKET_URL`              | client                 | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)                                                                                         |
 
 ## Testing
 
@@ -338,9 +374,10 @@ Render, so the refresh cookie stays first-party. Set the environment variable
 MONGODB_URI="<atlas uri>" SEED_DISCORD_WEBHOOK_URL="<webhook>" npm run seed
 ```
 
-The seed's "demo target" monitor points at `localhost:4011`, which a deployed API refuses
-(private target). Delete that monitor, or host `apps/demo-target` somewhere public and pass
-`SEED_DEMO_TARGET_URL`. The worker reconciles jobs on start, so seeded monitors begin checking
+On a hosted database the seed skips the fictional Demo monitors (they point at `localhost:4011`,
+which a deployed API refuses) and creates only the real sites, empty. To include the Demo monitors,
+host `apps/demo-target` somewhere public and pass `SEED_DEMO_TARGET_URL`. Remove all sample data
+later with `npm run seed:clear`. The worker reconciles jobs on start, so seeded monitors begin checking
 immediately.
 
 ## Demo script (about 5 minutes)
@@ -348,7 +385,7 @@ immediately.
 1. **Landing → login.** Open the site, show the pitch, log in as the demo user ("Fill in").
 2. **Dashboard.** Four monitors with live sparklines; point at the **Live** indicator. Explain:
    the worker writes to MongoDB, change streams push to the browser.
-3. **Monitor detail** (Checkout API). Uptime tiles, response-time chart (switch 1h/24h/7d),
+3. **Monitor detail** (Demo API). Uptime tiles, response-time chart (switch 1h/24h/7d),
    timing breakdown, 90-day bars (hover a day), the Table view toggle. Press **Test now**.
 4. **Break it.** Open the demo-target control page (`/admin`) and click **down**.
    Back on the dashboard: within ~30 s (3 failed checks at 10 s) the card turns **red**, a
@@ -363,7 +400,7 @@ immediately.
 
 **Push-first part (about 5 more minutes)**
 
-9. **Agent.** Open **Checkout API (agent)**: live request rate, error rate and latency from the
+9. **Agent.** Open **Demo Agent**: live request rate, error rate and latency from the
    demo-target's own traffic. Point at "requests saved vs 1-minute polling".
 10. **Errors.** On `/admin`, switch on **5xx errors**: the error-rate chart jumps and after 3
     report windows (~1.5 min) an incident opens with "Error rate … above 5 %". Switch it off.
@@ -372,7 +409,7 @@ immediately.
 12. **Crash.** Click **crash**: no reports, probes refused, and within ~2 minutes an incident
     opens and the alert arrives. Click **restore**: the next reports resolve it.
 13. **Heartbeat.** Run `npm run heartbeat -w @pulseboard/demo-target -- --stop-after 3`: three
-    pings, then silence; **Nightly backup** opens an incident once the expected period + grace
+    pings, then silence; **Demo Cron Job** opens an incident once the expected period + grace
     has passed. Start the script again and the first ping resolves it. `--fail` reports a
     failure with a message.
 14. **Cost & usage.** Requests sent this month, requests saved, the estimate and cost per

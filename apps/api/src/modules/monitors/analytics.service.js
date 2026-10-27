@@ -1,6 +1,6 @@
 import { budgetState, effectiveIntervalSec, isBudgetSlowed } from '@pulseboard/shared/adaptive';
 import { errorRateOf } from '@pulseboard/shared/agent';
-import { DEFAULT_CURRENCY } from '@pulseboard/shared/constants';
+import { CHECK_STATE, DEFAULT_CURRENCY } from '@pulseboard/shared/constants';
 import {
   costOf,
   estimateMonthlyCost,
@@ -11,7 +11,13 @@ import {
   monthStart,
 } from '@pulseboard/shared/cost';
 import { mongoose } from '@pulseboard/shared/db';
-import { AgentReport, CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
+import {
+  AgentReport,
+  CheckResult,
+  DailyRollup,
+  Incident,
+  Monitor,
+} from '@pulseboard/shared/models';
 import { pingsThisMonth, reportsThisMonth, requestsThisMonth } from '@pulseboard/shared/usage';
 import {
   addDays,
@@ -19,8 +25,9 @@ import {
   combineRollups,
   DAY_MS,
   fillDailySeries,
-  uptimePercent,
+  uptimeFromDowntime,
   utcDayStart,
+  windowUptime,
 } from '@pulseboard/shared/uptime';
 
 export const MAX_CHART_POINTS = 500;
@@ -77,38 +84,116 @@ export async function getUsage(monitorId, now = new Date()) {
 }
 
 /**
- * Uptime % for the four windows shown on the monitor page.
- * 24h comes from raw checks (exact, minute-level); 7/30/90 days come from
- * daily rollups, because raw checks are only kept for 7 days. Today's rollup
- * is refreshed every 15 minutes, so the long windows include today.
+ * When we started watching a monitor: its first stored result (raw results
+ * live 7 days, so for an old monitor this is about a week ago, which is the
+ * widest window computed from raw data). If no raw result is left, the
+ * earliest daily rollup. null when there is neither: a monitor that has
+ * produced nothing yet has no uptime to report ("no data", not 100%), which is
+ * why the monitor's creation time is not used.
+ */
+export async function getWatchStart(monitorId) {
+  const id = toObjectId(monitorId);
+  const first = await CheckResult.findOne({ 'meta.monitorId': id }, { timestamp: 1 })
+    .sort({ timestamp: 1 })
+    .lean();
+  if (first) return new Date(first.timestamp);
+  const rollup = await DailyRollup.findOne({ monitorId: id }, { date: 1 }).sort({ date: 1 }).lean();
+  return rollup ? new Date(rollup.date) : null;
+}
+
+/** Incidents of a monitor that overlap [from, now): what uptime windows are computed from. */
+export const getIncidentsSince = (monitorId, from, now) =>
+  Incident.find(
+    {
+      monitorId: toObjectId(monitorId),
+      startedAt: { $lt: now },
+      $or: [{ resolvedAt: null }, { resolvedAt: { $gt: from } }],
+    },
+    { startedAt: 1, resolvedAt: 1, isSeed: 1 },
+  ).lean();
+
+/** The rollup fields uptime needs (coveredSec and isFinal decide the covered time). */
+const UPTIME_FIELDS = {
+  monitorId: 1,
+  date: 1,
+  totalChecks: 1,
+  upChecks: 1,
+  downtimeSec: 1,
+  coveredSec: 1,
+  isFinal: 1,
+  isSeed: 1,
+};
+
+/**
+ * Uptime % for the four windows shown on the monitor page, from confirmed
+ * downtime (incidents) over the time we were watching: a failed check that
+ * never opened an incident changes nothing.
+ * 24h and 7d are computed from incidents directly (exact, open incidents count
+ * up to now); 30/90 days come from daily rollups, because raw checks are only
+ * kept for 7 days. Today's rollup is refreshed every 15 minutes.
+ * `includesSampleData` is true when any rollup or incident used is seed data.
  */
 export async function getUptime(monitorId, now = new Date()) {
   const id = toObjectId(monitorId);
-  const [raw] = await CheckResult.aggregate([
-    { $match: { 'meta.monitorId': id, timestamp: { $gte: new Date(now - DAY_MS) } } },
-    { $group: { _id: null, total: { $sum: 1 }, up: { $sum: { $cond: ['$ok', 1, 0] } } } },
-  ]);
-
   const today = utcDayStart(now);
-  const rollups = await DailyRollup.find(
-    { monitorId: id, date: { $gte: addDays(today, -89) } },
-    { date: 1, totalChecks: 1, upChecks: 1, downtimeSec: 1 },
-  ).lean();
+  const [rollups, incidents, watchStart] = await Promise.all([
+    DailyRollup.find({ monitorId: id, date: { $gte: addDays(today, -89) } }, UPTIME_FIELDS).lean(),
+    getIncidentsSince(id, new Date(now - 7 * DAY_MS), now),
+    getWatchStart(id),
+  ]);
+  // No start of watching means nothing was ever recorded: no data, not 100%.
+  const window = (days) =>
+    watchStart
+      ? windowUptime({ incidents, from: new Date(now - days * DAY_MS), to: now, now, watchStart })
+          .uptime
+      : null;
   const lastDays = (days) =>
     combineRollups(rollups.filter((r) => r.date >= addDays(today, 1 - days)));
 
   return {
-    h24: uptimePercent(raw?.up ?? 0, raw?.total ?? 0),
-    d7: lastDays(7).uptime,
+    h24: window(1),
+    d7: window(7),
     d30: lastDays(30).uptime,
     d90: lastDays(90).uptime,
+    includesSampleData: rollups.some((r) => r.isSeed) || incidents.some((i) => i.isSeed),
   };
+}
+
+/**
+ * Uptime across every monitor of a workspace for the last `days` days (rollups,
+ * today included): total downtime over total covered time, plus each monitor's
+ * own figure. null when nothing was covered ("no data yet", not 100%).
+ */
+export async function getUptimeSummary(workspaceId, days, now = new Date()) {
+  const monitors = await Monitor.find({ workspaceId: toObjectId(workspaceId) }, { _id: 1 }).lean();
+  const rollups = await DailyRollup.find(
+    {
+      monitorId: { $in: monitors.map((m) => m._id) },
+      date: { $gte: addDays(utcDayStart(now), 1 - days) },
+    },
+    UPTIME_FIELDS,
+  ).lean();
+
+  let downtimeSec = 0;
+  let coveredSec = 0;
+  const perMonitor = monitors.map((monitor) => {
+    const own = combineRollups(rollups.filter((r) => String(r.monitorId) === String(monitor._id)));
+    downtimeSec += own.downtimeSec;
+    coveredSec += own.coveredSec;
+    return { id: String(monitor._id), uptime: own.uptime };
+  });
+  return { days, uptime: uptimeFromDowntime(downtimeSec, coveredSec), monitors: perMonitor };
 }
 
 const toPoint = (check) => ({
   t: check.timestamp,
   totalMs: check.totalMs,
   ok: check.ok,
+  // Older results have no state: derive it from ok. 'unknown' = the checker was offline.
+  state: check.state ?? (check.ok ? CHECK_STATE.OK : CHECK_STATE.FAILED),
+  errorCode: check.errorCode ?? null,
+  error: check.error ?? null,
+  sample: Boolean(check.isSeed),
   statusCode: check.statusCode ?? null,
   timings: check.timings ?? null,
 });
@@ -126,8 +211,9 @@ export async function getRecentChecks(monitorId, limit) {
  * Checks in [from, to) for the response-time chart. Up to 500 points are
  * returned raw; beyond that they're averaged into equal time buckets in
  * MongoDB, so a 7-day range (~60k checks at 10s) is still a light response.
- * A bucket is "ok" only if every check in it passed, so outages never get
- * averaged away.
+ * A bucket is "ok" only if every counted check in it passed, so outages never
+ * get averaged away; unknown results (checker offline) are not counted, and a
+ * bucket of nothing but unknown has state 'unknown'.
  */
 export async function getChecksInRange(monitorId, from, to) {
   const match = { 'meta.monitorId': toObjectId(monitorId), timestamp: { $gte: from, $lt: to } };
@@ -147,7 +233,10 @@ export async function getChecksInRange(monitorId, from, to) {
         totalMs: { $avg: '$totalMs' },
         maxMs: { $max: '$totalMs' },
         count: { $sum: 1 },
+        known: { $sum: { $cond: [{ $ne: ['$state', CHECK_STATE.UNKNOWN] }, 1, 0] } },
         upCount: { $sum: { $cond: ['$ok', 1, 0] } },
+        errorCode: { $max: { $cond: ['$ok', null, '$errorCode'] } },
+        sample: { $max: '$isSeed' },
         dnsMs: { $avg: '$timings.dnsMs' },
         tcpMs: { $avg: '$timings.tcpMs' },
         tlsMs: { $avg: '$timings.tlsMs' },
@@ -168,8 +257,16 @@ export async function getChecksInRange(monitorId, from, to) {
       t: b._id,
       totalMs: round1(b.totalMs),
       maxMs: b.maxMs,
-      ok: b.upCount === b.count,
-      upRatio: b.upCount / b.count,
+      ok: b.known > 0 && b.upCount === b.known,
+      state:
+        b.known === 0
+          ? CHECK_STATE.UNKNOWN
+          : b.upCount === b.known
+            ? CHECK_STATE.OK
+            : CHECK_STATE.FAILED,
+      errorCode: b.errorCode ?? null,
+      sample: Boolean(b.sample),
+      upRatio: b.known ? b.upCount / b.known : null,
       count: b.count,
       timings: {
         dnsMs: round1(b.dnsMs),
@@ -207,7 +304,14 @@ export async function getSparklines(workspaceId, points, now = new Date()) {
     {
       $group: {
         _id: '$meta.monitorId',
-        recent: { $push: { t: '$timestamp', ms: '$totalMs', ok: '$ok' } },
+        recent: {
+          $push: {
+            t: '$timestamp',
+            ms: '$totalMs',
+            ok: '$ok',
+            state: { $ifNull: ['$state', { $cond: ['$ok', CHECK_STATE.OK, CHECK_STATE.FAILED] }] },
+          },
+        },
       },
     },
     { $project: { recent: { $reverseArray: { $slice: ['$recent', points] } } } },

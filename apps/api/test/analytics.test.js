@@ -1,5 +1,5 @@
 import { mongoose } from '@pulseboard/shared/db';
-import { CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
+import { CheckResult, DailyRollup, Incident, Monitor } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { addDays, utcDayStart } from '@pulseboard/shared/uptime';
 import request from 'supertest';
@@ -45,36 +45,106 @@ async function insertChecks(
   );
 }
 
+/** One raw result at a fixed age: a monitor is "watched" from its first result on. */
+async function insertCheckAt(ageMs, { ok = true } = {}) {
+  await CheckResult.insertMany([
+    {
+      timestamp: new Date(Date.now() - ageMs),
+      meta: { monitorId: monitor._id, workspaceId: new mongoose.Types.ObjectId(wid) },
+      ok,
+      totalMs: 100,
+      statusCode: ok ? 200 : 503,
+    },
+  ]);
+}
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+
 describe('GET /monitors/:mid/uptime', () => {
-  it('computes 24h from raw checks and longer windows from rollups', async () => {
-    await insertChecks(100, { isOk: (i) => i % 50 !== 0 }); // 2 failures out of 100
+  it('is 1 - confirmed downtime / watched time: 24h and 7d from incidents, 30d and 90d from rollups', async () => {
+    // Watched for 6 days. 2 failed checks out of 100 recently never opened an incident.
+    await insertCheckAt(6 * DAY);
+    await insertChecks(100, { isOk: (i) => i % 50 !== 0 });
+    // One incident, exactly one hour long, 5 hours ago.
+    await Incident.create({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      startedAt: new Date(Date.now() - 5 * HOUR),
+      resolvedAt: new Date(Date.now() - 4 * HOUR),
+      cause: 'Timed out',
+    });
     const today = utcDayStart(new Date());
+    const rollup = (daysAgo, fields) => ({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      date: addDays(today, -daysAgo),
+      totalChecks: 100,
+      upChecks: 100,
+      ...fields,
+    });
     await DailyRollup.create([
-      { monitorId: monitor._id, workspaceId: wid, date: today, totalChecks: 100, upChecks: 98 },
-      {
-        monitorId: monitor._id,
-        workspaceId: wid,
-        date: addDays(today, -10),
-        totalChecks: 100,
-        upChecks: 50,
-      },
-      {
-        monitorId: monitor._id,
-        workspaceId: wid,
-        date: addDays(today, -60),
-        totalChecks: 100,
-        upChecks: 0,
-      },
+      rollup(0, { coveredSec: 43_200, downtimeSec: 0 }), // half a day watched, no downtime
+      rollup(10, { coveredSec: 86_400, downtimeSec: 21_600 }), // 6 h down
+      rollup(60, { coveredSec: 86_400, downtimeSec: 86_400 }), // the whole day down
     ]);
 
     const res = await get(`/${monitor._id}/uptime`);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ h24: 98, d7: 98, d30: 74, d90: 49.333 });
+    expect(res.body.data).toEqual({
+      h24: 95.833, // 1 - 3600 / 86400
+      d7: 99.306, // 1 - 3600 / (6 days watched)
+      d30: 83.333, // 1 - 21600 / (43200 + 86400)
+      d90: 50, // 1 - 108000 / 216000
+      includesSampleData: false,
+    });
+  });
+
+  it('is not lowered by failed checks that never opened an incident', async () => {
+    await insertCheckAt(25 * HOUR);
+    await insertChecks(100, { isOk: (i) => i % 2 === 0 }); // half of them failed
+    const res = await get(`/${monitor._id}/uptime`);
+    expect(res.body.data.h24).toBe(100);
+    expect(res.body.data.d7).toBe(100);
+  });
+
+  it('counts an incident that is still open up to now', async () => {
+    await insertCheckAt(2 * DAY);
+    await Incident.create({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      startedAt: new Date(Date.now() - 6 * HOUR),
+      cause: 'Down',
+    });
+    const res = await get(`/${monitor._id}/uptime`);
+    expect(res.body.data.h24).toBeLessThan(80); // 6 h of 24 h watched, so at most 75 %
+    expect(res.body.data.h24).toBeGreaterThan(74);
+  });
+
+  it('flags sample data when seeded rollups or incidents are involved', async () => {
+    await insertCheckAt(2 * DAY);
+    await DailyRollup.create({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      date: utcDayStart(new Date()),
+      totalChecks: 10,
+      upChecks: 10,
+      coveredSec: 3600,
+      isSeed: true,
+    });
+    const res = await get(`/${monitor._id}/uptime`);
+    expect(res.body.data.includesSampleData).toBe(true);
   });
 
   it('returns null (not 100%) when there is no data yet', async () => {
     const res = await get(`/${monitor._id}/uptime`);
-    expect(res.body.data).toEqual({ h24: null, d7: null, d30: null, d90: null });
+    expect(res.body.data).toEqual({
+      h24: null,
+      d7: null,
+      d30: null,
+      d90: null,
+      includesSampleData: false,
+    });
   });
 
   it('404s for a monitor of another workspace', async () => {
@@ -137,12 +207,19 @@ describe('GET /monitors/:mid/daily', () => {
       workspaceId: wid,
       date: addDays(today, -1),
       totalChecks: 200,
-      upChecks: 199,
+      upChecks: 199, // one failed check: it must not matter
       downtimeSec: 30,
+      coveredSec: 86_400,
     });
     const res = await get(`/${monitor._id}/daily?days=90`);
     expect(res.body.data).toHaveLength(90);
-    expect(res.body.data.at(-2)).toMatchObject({ uptime: 99.5, downtimeSec: 30 });
+    // 1 - 30 / 86400, not 199 / 200
+    expect(res.body.data.at(-2)).toMatchObject({
+      uptime: 99.965,
+      downtimeSec: 30,
+      coveredSec: 86_400,
+      sample: false,
+    });
     expect(res.body.data.at(-1).uptime).toBeNull();
   });
 });

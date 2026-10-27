@@ -9,6 +9,7 @@
     "start": "node src/server.js",
     "test": "vitest run",
     "seed": "node scripts/seed.js",
+    "seed:clear": "node scripts/seed-clear.js",
     "migrate": "node scripts/migrate.js"
   },
   "dependencies": {

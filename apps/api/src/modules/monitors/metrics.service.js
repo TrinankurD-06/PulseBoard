@@ -1,9 +1,12 @@
-import { MISSED_PING_PREFIX, MONITOR_TYPES } from '@pulseboard/shared/constants';
+import { CHECK_STATE, MISSED_PING_PREFIX, MONITOR_TYPES } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
 import { AgentReport, CheckResult, Monitor } from '@pulseboard/shared/models';
+import { windowUptime } from '@pulseboard/shared/uptime';
+import { getIncidentsSince, getWatchStart } from './analytics.service.js';
 
 const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
 
+const MAX_FAILURES = 20;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 
@@ -70,11 +73,23 @@ export function summarizeSeries(values) {
  * (a bucket, the current window or the previous window) into a number or null;
  * `seconds` is the span the document covers, for rates.
  */
-export function buildMetric({ key, label, unit, decimals, grid, buckets, current, previous, at }) {
+export function buildMetric({
+  key,
+  label,
+  unit,
+  decimals,
+  grid,
+  buckets,
+  current,
+  previous,
+  at,
+  offline = new Set(),
+}) {
   const bucketSec = grid.bucketMs / 1000;
+  // A bucket of nothing but unknown results (checker offline) is a gap, never a value.
   const raw = grid.starts.map((start) => {
     const doc = buckets.get(start.getTime());
-    return doc ? at(doc, bucketSec) : null;
+    return doc && !offline.has(start.getTime()) ? at(doc, bucketSec) : null;
   });
   const windowSec = (grid.now - grid.from) / 1000;
   const value = current ? at(current, windowSec) : null;
@@ -92,7 +107,42 @@ export function buildMetric({ key, label, unit, decimals, grid, buckets, current
     peak: round(summary.peak),
     average: round(summary.average),
     low: round(summary.low),
-    series: grid.starts.map((start, i) => ({ t: start.toISOString(), v: round(raw[i]) })),
+    series: grid.starts.map((start, i) => ({
+      t: start.toISOString(),
+      v: round(raw[i]),
+      ...(offline.has(start.getTime()) && { offline: true }),
+    })),
+  };
+}
+
+/** Buckets whose results were all unknown (the checker was offline): n counts known results only. */
+export function offlineBuckets(buckets) {
+  return new Set(
+    [...buckets].filter(([, doc]) => !doc.n && doc.unknown > 0).map(([start]) => start),
+  );
+}
+
+/**
+ * Uptime documents for buildMetric, from incidents (confirmed downtime) over
+ * the time we were watching: one per bucket, the current window and the
+ * previous one. A window nothing was watched in has no document (null).
+ */
+export function buildUptimeParts(grid, { incidents, watchStart, offline }) {
+  const of = (from, to) => {
+    if (!watchStart) return null; // never recorded anything: no figures
+    const { uptime } = windowUptime({ incidents, from, to, now: grid.now, watchStart });
+    return uptime == null ? null : { uptime };
+  };
+  const buckets = new Map();
+  for (const start of grid.starts) {
+    const doc = of(start, new Date(start.getTime() + grid.bucketMs));
+    if (doc) buckets.set(start.getTime(), doc);
+  }
+  return {
+    buckets,
+    current: of(grid.from, grid.now),
+    previous: of(grid.prevFrom, grid.from),
+    offline,
   };
 }
 
@@ -101,14 +151,14 @@ const mean = (sum, n) => (n ? sum / n : null);
 
 /** Metric definitions per document shape: [key, label, unit, decimals, at]. */
 export const HTTP_METRICS = [
-  ['uptime', 'Uptime', '%', 2, (d) => ratio(d.ok, d.n)],
+  ['uptime', 'Uptime', '%', 2, (d) => d.uptime ?? null],
   ['p95', 'p95 response', 'ms', 0, (d) => d.p95?.[0] ?? null],
   ['failed', 'Failed checks', '%', 2, (d) => ratio(d.n - d.ok, d.n)],
   ['avgResponse', 'Avg response', 'ms', 0, (d) => mean(d.sumMs, d.nMs)],
 ];
 
 export const HEARTBEAT_METRICS = [
-  ['uptime', 'Uptime', '%', 2, (d) => ratio(d.ok, d.n)],
+  ['uptime', 'Uptime', '%', 2, (d) => d.uptime ?? null],
   ['missed', 'Missed pings', 'pings', 0, (d) => (d.n ? d.missed : null)],
   // Lateness documents are built in JS from the per-bucket sums.
   ['lateness', 'Avg lateness', 'ms', 0, (d) => mean(d.lateSum, d.lateN)],
@@ -119,7 +169,7 @@ export const AGENT_METRICS = [
   ['requestRate', 'Request rate', 'req/s', 2, (d, sec) => d.requests / sec],
   ['p95Latency', 'p95 latency', 'ms', 1, (d) => mean(d.weighted, d.weight)],
   ['errorRate', 'Error rate', '%', 2, (d) => ratio(d.errors5xx, d.requests)],
-  ['uptime', 'Uptime', '%', 2, (d) => ratio(d.ok, d.n)],
+  ['uptime', 'Uptime', '%', 2, (d) => d.uptime ?? null],
 ];
 
 /** Averages of the timing breakdown per bucket (http only); null fields for empty buckets. */
@@ -129,6 +179,7 @@ export function buildTimings(grid, buckets) {
     const field = (name) => (doc ? roundTo(doc[name], 0) : null);
     return {
       t: start.toISOString(),
+      ...(doc && !doc.n && doc.unknown > 0 && { offline: true }),
       dnsMs: field('dnsMs'),
       tcpMs: field('tcpMs'),
       tlsMs: field('tlsMs'),
@@ -155,7 +206,17 @@ export function buildLive(grid, lastAt, buckets, current) {
 }
 
 /** Assembles `data` from aggregated documents (see getMetrics for where they come from). */
-export function assembleMetrics({ type, grid, defs, parts, timings, live, empty }) {
+export function assembleMetrics({
+  type,
+  grid,
+  defs,
+  parts,
+  timings,
+  live,
+  empty,
+  failures = [],
+  includesSampleData = false,
+}) {
   return {
     type,
     range: grid.range,
@@ -168,6 +229,8 @@ export function assembleMetrics({ type, grid, defs, parts, timings, live, empty 
     ),
     timings,
     live,
+    failures,
+    includesSampleData,
   };
 }
 
@@ -182,20 +245,26 @@ const isMissed = {
 };
 const hasMs = { $isNumber: '$totalMs' };
 const okWithMs = { $and: ['$ok', hasMs] };
+// Older results have no state, so "not unknown" (not "ok or failed") is the test.
+const isUnknown = { $eq: ['$state', CHECK_STATE.UNKNOWN] };
+const known = { $not: [isUnknown] };
 const count = (condition) => ({ $sum: { $cond: [condition, 1, 0] } });
 
 /** $group accumulators for check results; `withTimings` adds the per-bucket timing averages. */
 function checkAccumulators({ withTimings = false } = {}) {
   const timing = (name) => ({ $avg: { $cond: ['$ok', `$timings.${name}`, null] } });
   return {
-    n: { $sum: 1 },
+    // n counts results the checker could judge; unknown ones (checker offline) are tallied apart.
+    n: count(known),
     ok: count('$ok'),
+    unknown: count(isUnknown),
+    seed: { $max: { $cond: ['$isSeed', 1, 0] } },
     sumMs: { $sum: { $cond: [okWithMs, '$totalMs', 0] } },
     nMs: count(okWithMs),
     // Heartbeat: every ping that carries a duration (a failed timed run too).
-    sumAll: { $sum: { $cond: [hasMs, '$totalMs', 0] } },
-    nAll: count(hasMs),
-    missed: count(isMissed),
+    sumAll: { $sum: { $cond: [{ $and: [known, hasMs] }, '$totalMs', 0] } },
+    nAll: count({ $and: [known, hasMs] }),
+    missed: count({ $and: [known, isMissed] }),
     p95: {
       $percentile: {
         input: { $cond: [okWithMs, '$totalMs', null] },
@@ -246,11 +315,34 @@ async function aggregateChecks(monitorId, grid, { withTimings }) {
       },
     },
   ]);
+  const buckets = byStart(result.buckets);
   return {
-    buckets: byStart(result.buckets),
+    buckets,
     current: stripId(result.current),
     previous: stripId(result.previous),
+    offline: offlineBuckets(buckets),
   };
+}
+
+/** The newest failed checks of the current window (unknown ones are not failures), for the error list. */
+async function recentFailures(monitorId, grid) {
+  const rows = await CheckResult.find(
+    {
+      'meta.monitorId': monitorId,
+      timestamp: { $gte: grid.from, $lte: grid.now },
+      ok: false,
+      state: { $ne: CHECK_STATE.UNKNOWN },
+    },
+    { timestamp: 1, errorCode: 1, error: 1 },
+  )
+    .sort({ timestamp: -1 })
+    .limit(MAX_FAILURES)
+    .lean();
+  return rows.map((row) => ({
+    t: row.timestamp.toISOString(),
+    code: row.errorCode ?? null,
+    message: row.error ?? null,
+  }));
 }
 
 /**
@@ -387,48 +479,51 @@ export async function getMetrics(monitorId, range, now = new Date()) {
   const grid = bucketGrid(range, now);
   const isHttp = monitor.type === MONITOR_TYPES.HTTP;
 
-  const [checks, latest] = await Promise.all([
+  const [checks, latest, failures, incidents, watchStart] = await Promise.all([
     aggregateChecks(id, grid, { withTimings: isHttp }),
     CheckResult.findOne({ 'meta.monitorId': id }, { timestamp: 1 }).sort({ timestamp: -1 }).lean(),
+    recentFailures(id, grid),
+    getIncidentsSince(id, grid.prevFrom, now),
+    getWatchStart(id),
   ]);
   const live = buildLive(grid, latest?.timestamp, checks.buckets, checks.current);
+  // Unknown results are not data: a window of only those has no figures (but is not "empty" history).
   const hasChecks = Boolean(checks.current || checks.previous);
+  const includesSampleData =
+    Boolean(checks.current?.seed || checks.previous?.seed) || incidents.some((i) => i.isSeed);
+  // Uptime is confirmed downtime (incidents) over the time we were watching, never check pass rates.
+  const uptime = buildUptimeParts(grid, { incidents, watchStart, offline: checks.offline });
+  const common = { type: monitor.type, grid, live, failures, includesSampleData };
 
   if (monitor.type === MONITOR_TYPES.HEARTBEAT) {
     const late = await aggregateLateness(id, grid, monitor.expectedEverySec);
-    const parts = (key) => (key === 'lateness' ? late : checks);
+    const parts = (key) => (key === 'lateness' ? late : key === 'uptime' ? uptime : checks);
     return assembleMetrics({
-      type: monitor.type,
-      grid,
+      ...common,
       defs: HEARTBEAT_METRICS,
       parts,
       timings: null,
-      live,
       empty: !hasChecks,
     });
   }
 
   if (monitor.type === MONITOR_TYPES.AGENT) {
     const reports = await aggregateReports(id, grid);
-    const parts = (key) => (key === 'uptime' ? checks : reports);
+    const parts = (key) => (key === 'uptime' ? uptime : reports);
     return assembleMetrics({
-      type: monitor.type,
-      grid,
+      ...common,
       defs: AGENT_METRICS,
       parts,
       timings: null,
-      live,
       empty: !hasChecks && !(reports.current || reports.previous),
     });
   }
 
   return assembleMetrics({
-    type: monitor.type,
-    grid,
+    ...common,
     defs: HTTP_METRICS,
-    parts: () => checks,
+    parts: (key) => (key === 'uptime' ? uptime : checks),
     timings: buildTimings(grid, checks.buckets),
-    live,
     empty: !hasChecks,
   });
 }

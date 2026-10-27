@@ -1,9 +1,17 @@
 import * as monitorTypesAndCost from './001-monitor-types-and-cost.js';
 import * as adaptiveAndBudget from './002-adaptive-and-budget.js';
 import * as userIdentities from './003-user-identities.js';
+import * as markLegacySampleData from './004-mark-legacy-sample-data.js';
+import * as rollupCoveredSeconds from './005-rollup-covered-seconds.js';
 
 // All migrations, in the order they must run. Add new ones at the end.
-export const migrations = [monitorTypesAndCost, adaptiveAndBudget, userIdentities];
+export const migrations = [
+  monitorTypesAndCost,
+  adaptiveAndBudget,
+  userIdentities,
+  markLegacySampleData,
+  rollupCoveredSeconds,
+];
 
 const APPLIED = 'migrations';
 

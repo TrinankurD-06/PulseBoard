@@ -13,7 +13,7 @@ import {
 import { rollupDay } from '@pulseboard/shared/rollup';
 import { AGENDA_COLLECTION, createAgenda } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
-import { uptimePercent } from '@pulseboard/shared/uptime';
+import { uptimeFromDowntime } from '@pulseboard/shared/uptime';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -225,12 +225,18 @@ describe.each(Object.keys(DRIVERS))('%s monitors', (type) => {
     const uptime = await request(app)
       .get(ws(`/monitors/${monitor.id}/uptime`))
       .set(owner.auth);
-    expect(uptime.body.data.h24).toBe(uptimePercent(up, up + down));
+    // Uptime is confirmed downtime over watched time, never the pass rate: the incident
+    // lasted milliseconds and nothing was watched for a full second yet, so this is
+    // 'no data' or 100, and in particular not up / (up + down).
+    expect([null, 100]).toContain(uptime.body.data.h24);
 
-    await rollupDay(new Date());
+    // An hour later (a fixed clock keeps the covered time well above zero).
+    await rollupDay(new Date(), { now: LATER() });
     const rollup = await DailyRollup.findOne({ monitorId: monitor.id }).lean();
     expect(rollup).toMatchObject({ totalChecks: up + down, upChecks: up });
-    expect(rollup.downtimeSec).toBeGreaterThanOrEqual(0);
+    expect(rollup.coveredSec).toBeGreaterThanOrEqual(3600);
+    expect(rollup.coveredSec).toBeLessThan(3700);
+    expect(rollup.downtimeSec).toBeLessThanOrEqual(1);
 
     const daily = await request(app)
       .get(ws(`/monitors/${monitor.id}/daily?days=90`))
@@ -239,14 +245,16 @@ describe.each(Object.keys(DRIVERS))('%s monitors', (type) => {
     const days = daily.body.data;
     expect(days).toHaveLength(90);
     expect(days.at(-1)).toMatchObject({ totalChecks: up + down });
-    expect(days.at(-1).uptime).toBe(uptimePercent(up, up + down));
+    // Downtime over covered time, the same as the rollup says: the failed checks changed nothing.
+    expect(days.at(-1).uptime).toBe(uptimeFromDowntime(rollup.downtimeSec, rollup.coveredSec));
+    expect(days.at(-1).uptime).toBeGreaterThan(99.9);
     expect(days.slice(0, -1).every((day) => day.totalChecks === 0)).toBe(true);
   });
 
   it('shows on a public status page without leaking anything', async () => {
     const { monitor, secrets } = await driver.create();
     await runOutage(driver, monitor, type);
-    await rollupDay(new Date());
+    await rollupDay(new Date(), { now: LATER() });
     const page = await request(app)
       .post(ws('/status-pages'))
       .set(owner.auth)
@@ -273,6 +281,9 @@ describe.each(Object.keys(DRIVERS))('%s monitors', (type) => {
   });
 });
 
+/** An hour from now: lets rollups cover a real span of time instead of milliseconds. */
+const LATER = () => new Date(Date.now() + 60 * 60 * 1000);
+
 describe('all three types together', () => {
   it('appear side by side on one status page with the same public shape', async () => {
     const created = {};
@@ -280,7 +291,7 @@ describe('all three types together', () => {
       created[type] = (await driver.create()).monitor;
       await driver.check(created[type], true);
     }
-    await rollupDay(new Date());
+    await rollupDay(new Date(), { now: LATER() });
     await request(app)
       .post(ws('/status-pages'))
       .set(owner.auth)

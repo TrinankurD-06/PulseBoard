@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
     "seed": "npm run seed -w @pulseboard/api",
+    "seed:clear": "npm run seed:clear -w @pulseboard/api",
     "migrate": "npm run migrate -w @pulseboard/api"
   },
   "devDependencies": {

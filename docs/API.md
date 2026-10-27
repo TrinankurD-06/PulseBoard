@@ -468,26 +468,54 @@ Same, for a saved monitor; counted in the monitor's monthly usage. Agent monitor
 
 ## Monitor analytics
 
+**How uptime is counted.** Uptime is `100 × (1 − confirmed downtime ÷ time watched)`. Confirmed
+downtime is the time covered by incidents (an incident opens after 3 failed checks, or 1 for a
+heartbeat). A failed check that never opened an incident does not change uptime: it shows only in
+"Failed checks". "Time watched" starts at the monitor's first stored result, so a brand-new
+monitor has `null` ("no data"), never 100 %. A check that failed with a network error while the
+checker itself was offline is stored as `state: "unknown"` and counts nowhere.
+
 ### `GET /workspaces/:wid/monitors/:mid/uptime` (viewer)
 
 ```json
-{ "data": { "h24": 99.306, "d7": 99.898, "d30": 99.869, "d90": 99.923 } }
+{
+  "data": { "h24": 99.306, "d7": 99.898, "d30": 99.869, "d90": 99.923, "includesSampleData": false }
+}
 ```
 
-Percentages with 3 decimals; `null` = no data. 24 h from raw checks, others from daily rollups.
+Percentages with 3 decimals; `null` = no data. 24 h and 7 d are computed from incidents over the
+watched time (an open incident counts up to now); 30 d and 90 d from daily rollups (downtime over
+the seconds each day was covered). `includesSampleData` is `true` when any rollup or incident used
+was created by the demo seed (`isSeed`).
+
+### `GET /workspaces/:wid/monitors/uptime-summary?days=30` (viewer)
+
+Uptime across every monitor of the workspace: total downtime over total covered time, from the
+daily rollups of the last `days` days (1–90, default 30), and each monitor's own figure. Used by the
+dashboard gauge. `uptime` is `null` when nothing was covered.
+
+```json
+{ "data": { "days": 30, "uptime": 99.912, "monitors": [{ "id": "6532…", "uptime": 99.95 }] } }
+```
 
 ### `GET /workspaces/:wid/monitors/:mid/checks?from&to` (viewer)
 
 ISO dates; default the last 24 h; max range 7 days. Up to 500 raw points:
 
 ```json
-{ "data": { "downsampled": false, "bucketSec": null, "points": [{ "t": "…", "totalMs": 87.4, "ok": true, "statusCode": 200, "timings": { … } }] } }
+{ "data": { "downsampled": false, "bucketSec": null, "points": [{ "t": "…", "totalMs": 87.4, "ok": true, "state": "ok", "errorCode": null, "error": null, "sample": false, "statusCode": 200, "timings": { … } }] } }
 ```
 
-More points are averaged into equal buckets (a bucket is `ok: false` if any check failed):
+Every point carries `state` (`ok`, `failed`, or `unknown` when the checker itself was offline; older
+results without one are derived from `ok`), the failure's machine-readable `errorCode` (`ETIMEDOUT`,
+`ENOTFOUND`, `HTTP_503`, `KEYWORD_MISSING`...) and human `error`, and `sample` (`true` for seeded
+demo data). An `unknown` point has `ok: false` but is not a failure.
+
+More points are averaged into equal buckets (a bucket is `ok: false` if any counted check failed;
+unknown results are not counted, and a bucket of only unknown results has `state: "unknown"`):
 
 ```json
-{ "data": { "downsampled": true, "bucketSec": 173, "points": [{ "t": "…", "totalMs": 41.2, "maxMs": 66, "ok": true, "upRatio": 1, "count": 17, "timings": { … } }] } }
+{ "data": { "downsampled": true, "bucketSec": 173, "points": [{ "t": "…", "totalMs": 41.2, "maxMs": 66, "ok": true, "state": "ok", "errorCode": null, "sample": false, "upRatio": 1, "count": 17, "timings": { … } }] } }
 ```
 
 ### `GET /workspaces/:wid/monitors/:mid/checks?limit=30` (viewer)
@@ -496,7 +524,10 @@ The latest N raw checks (1–200), oldest first. Used by the timing breakdown ch
 
 ### `GET /workspaces/:wid/monitors/:mid/daily?days=90` (viewer)
 
-Exactly `days` entries (≤ 90), oldest first, missing days filled with `uptime: null`:
+Exactly `days` entries (≤ 90), oldest first, missing days filled with `uptime: null`.
+`uptime` is `100 × (1 − downtimeSec ÷ coveredSec)` for that day; `coveredSec` is how long the monitor
+was watched that day (from its first result, to the end of the day or now), and `sample` is `true`
+for seeded demo days. Check counts are shown for information and do not drive `uptime`:
 
 ```json
 {
@@ -507,6 +538,8 @@ Exactly `days` entries (≤ 90), oldest first, missing days filled with `uptime:
       "upChecks": 8631,
       "uptime": 99.896,
       "downtimeSec": 90,
+      "coveredSec": 86400,
+      "sample": false,
       "avgResponseMs": 41.3,
       "p95ResponseMs": 66.1
     }
@@ -667,20 +700,34 @@ window.
 sum/count of `totalMs` over ok checks that have one) so a client can fold new checks in.
 Rounding: `%` 2 decimals, `ms` integers (agent `p95Latency`: 1 decimal), `req/s` 2 decimals, counts integers. `p95` is approximate.
 
+**Uptime is confirmed downtime.** Every `uptime` figure (each bucket, the whole range, the previous
+range) is `100 × (1 − incident downtime ÷ time watched)`, so failed checks that never opened an
+incident do not change it; they show in `failed` and in `failures`. A window nothing was watched in
+has `null`.
+
+**Checker offline.** Results with `state: "unknown"` (a network failure while the checker itself
+could not reach two reference hosts) are not counted anywhere: not in `failed`, not in uptime, not in
+the `live` accumulators. A bucket that holds only such results has `v: null` and `offline: true` on
+its `series` point (and on its `timings` entry), so a chart can draw a "Checker offline" gap.
+
+**`failures`** (top level, all monitor types): the newest failed results of the current range, at
+most 20, `{ "t": "…", "code": "ETIMEDOUT", "message": "Timed out after 10000ms" }`; unknown
+results are excluded. **`includesSampleData`** is `true` when seeded demo data is part of the range.
+
 | type      | key           | unit  | definition                                                                                                                   |
 | --------- | ------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
-| http      | `uptime`      | %     | ok checks / checks                                                                                                           |
+| http      | `uptime`      | %     | `100 × (1 − incident downtime ÷ watched time)`; failed checks alone do not lower it                                          |
 | http      | `p95`         | ms    | approximate 95th percentile of `totalMs` over ok checks                                                                      |
-| http      | `failed`      | %     | failed checks / checks                                                                                                       |
+| http      | `failed`      | %     | failed checks / counted checks (unknown results excluded)                                                                    |
 | http      | `avgResponse` | ms    | mean `totalMs` over ok checks                                                                                                |
-| heartbeat | `uptime`      | %     | ok / (pings + missed periods)                                                                                                |
+| heartbeat | `uptime`      | %     | same incident-based formula (a missed period opens an incident at once)                                                      |
 | heartbeat | `missed`      | pings | failures written by the overdue detector; buckets without any result are `null`                                              |
 | heartbeat | `lateness`    | ms    | mean of `max(0, gap to the previous ping - expectedEverySec)` per ping (success or `/fail`; one ping before the window used) |
 | heartbeat | `duration`    | ms    | mean `totalMs` of pings that carry one (timed `/start` runs)                                                                 |
 | agent     | `requestRate` | req/s | requests / bucket seconds (`value`: requests / window seconds)                                                               |
 | agent     | `p95Latency`  | ms    | requests-weighted mean of the reports' `p95Ms` (1 decimal)                                                                   |
 | agent     | `errorRate`   | %     | 5xx / requests; `null` when there were no requests                                                                           |
-| agent     | `uptime`      | %     | ok / checks (agent, probe and external sources)                                                                              |
+| agent     | `uptime`      | %     | same incident-based formula                                                                                                  |
 
 ### `GET /workspaces/:wid/usage?month=YYYY-MM` (viewer)
 
@@ -793,8 +840,15 @@ Incident object:
   "resolvedAt": "2026-10-27T03:15:10.000Z",
   "durationSec": 900,
   "cause": "Unexpected status 500 (expected 200–399)",
+  "causeCode": "HTTP_500",
+  "isSeed": false,
   "timeline": [
-    { "at": "…", "type": "opened", "message": "Down after 3 consecutive failed checks: …" },
+    {
+      "at": "…",
+      "type": "opened",
+      "code": "HTTP_500",
+      "message": "Down after 3 consecutive failed checks: …"
+    },
     { "at": "…", "type": "alert_sent", "message": "Down alert via Discord (#ops) sent" },
     {
       "at": "…",
@@ -805,6 +859,11 @@ Incident object:
   ]
 }
 ```
+
+`causeCode` is the machine-readable code of the failure that opened the incident (`ETIMEDOUT`,
+`ENOTFOUND`, `HTTP_503`, `KEYWORD_MISSING`, `HEARTBEAT_MISSED`, `AGENT_SILENT`...; `null` for older
+incidents) and the `opened` timeline entry repeats it as `code`. `isSeed` is `true` for incidents created
+by the demo seed (the app marks them "Sample data").
 
 ### `GET /workspaces/:wid/incidents` (viewer)
 
@@ -901,6 +960,7 @@ Only public data: no URLs, ids, headers or error messages. Headers:
     "title": "Acme Status",
     "description": "Live availability of Acme Inc. services",
     "overall": "operational",
+    "includesSampleData": false,
     "monitors": [
       {
         "name": "Checkout API",
@@ -910,12 +970,23 @@ Only public data: no URLs, ids, headers or error messages. Headers:
       }
     ],
     "incidents": [
-      { "monitorName": "Checkout API", "startedAt": "…", "resolvedAt": "…", "durationSec": 900 }
+      {
+        "monitorName": "Checkout API",
+        "startedAt": "…",
+        "resolvedAt": "…",
+        "durationSec": 900,
+        "sample": false
+      }
     ],
     "generatedAt": "2026-10-27T09:15:00.000Z"
   }
 }
 ```
+
+`uptime90` and each day's `uptime` are `100 × (1 − incident downtime ÷ watched time)`, the same rule as
+everywhere else: failed checks that never opened an incident do not lower them, and `null` means no
+data. `includesSampleData` (and an incident's `sample`) is `true` for seeded demo data, which the page
+labels "Sample data".
 
 `overall`: `operational` | `partial_outage` | `major_outage` | `no_data` (paused monitors ignored).
 A `degraded` monitor is shown as `up`. No URLs, ping tokens, agent keys or probe URLs, for any type.

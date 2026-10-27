@@ -12,6 +12,7 @@ import {
   getRecentChecks,
   getSparklines,
   getUptime,
+  getUptimeSummary,
   getUsage,
 } from './analytics.service.js';
 import { getMetrics, METRIC_RANGES } from './metrics.service.js';
@@ -31,6 +32,7 @@ const rangeQuery = z.object({
 });
 const dailyQuery = z.object({ days: z.coerce.number().int().min(1).max(90).default(90) });
 const metricsQuery = z.object({ range: z.enum(Object.keys(METRIC_RANGES)).default('24h') });
+const summaryQuery = z.object({ days: z.coerce.number().int().min(1).max(90).default(30) });
 const sparklineQuery = z.object({ points: z.coerce.number().int().min(2).max(60).default(30) });
 
 /** 404 unless the monitor belongs to this workspace (same rule as the CRUD routes). */
@@ -52,6 +54,11 @@ export function monitorAnalyticsRouter() {
 
   router.get('/sparklines', viewer, validate({ query: sparklineQuery }), async (req, res) => {
     res.json({ data: await getSparklines(req.params.wid, req.valid.query.points) });
+  });
+
+  // Workspace-wide uptime over the last N days (dashboard gauge), from rollups.
+  router.get('/uptime-summary', viewer, validate({ query: summaryQuery }), async (req, res) => {
+    res.json({ data: await getUptimeSummary(req.params.wid, req.valid.query.days) });
   });
 
   router.get('/:mid/usage', viewer, assertMonitorInWorkspace, async (req, res) => {

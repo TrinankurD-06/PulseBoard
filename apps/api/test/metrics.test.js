@@ -1,6 +1,6 @@
 import { MISSED_PING_PREFIX } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
-import { AgentReport, CheckResult, Monitor } from '@pulseboard/shared/models';
+import { AgentReport, CheckResult, Incident, Monitor } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -143,6 +143,13 @@ describe('GET /monitors/:mid/metrics (http)', () => {
 
   it('computes uptime, failed, avg, p95 and change vs the previous window', async () => {
     await seed();
+    // Uptime comes from incidents only: 10 minutes of confirmed downtime in the current window.
+    await Incident.create({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      startedAt: at(-30 * MIN),
+      resolvedAt: at(-20 * MIN),
+    });
     const data = await getMetrics(monitor._id, '24h', NOW);
     expect(data).toMatchObject({ type: 'http', range: '24h', bucketMs: 900_000, empty: false });
     expect(data.from).toBe(grid.from.toISOString());
@@ -151,8 +158,10 @@ describe('GET /monitors/:mid/metrics (http)', () => {
     for (const m of data.metrics) expect(m.series).toHaveLength(96);
 
     const uptime = metric(data, 'uptime');
-    expect(uptime).toMatchObject({ label: 'Uptime', unit: '%', value: 83.33, previous: 100 });
-    expect(uptime.change).toBe(-16.7);
+    const coveredSec = (NOW - grid.from) / 1000;
+    const expected = Math.round((1 - 600 / coveredSec) * 10_000) / 100;
+    expect(uptime).toMatchObject({ label: 'Uptime', unit: '%', value: expected, previous: 100 });
+    expect(uptime.change).toBe(Math.round((expected - 100) * 10) / 10);
     expect(metric(data, 'failed')).toMatchObject({ value: 16.67, previous: 0, change: null });
     const avg = metric(data, 'avgResponse');
     expect(avg).toMatchObject({ value: 145, previous: 100, change: 45 });
@@ -165,7 +174,7 @@ describe('GET /monitors/:mid/metrics (http)', () => {
   it('puts gaps as null and keeps current/peak/low/average over buckets with data', async () => {
     await seed();
     const data = await getMetrics(monitor._id, '24h', NOW);
-    const uptime = metric(data, 'uptime');
+    const uptime = metric(data, 'failed');
     const present = nonNull(uptime);
     expect(present.length).toBeGreaterThan(0);
     expect(present.length).toBeLessThan(96);
@@ -175,7 +184,7 @@ describe('GET /monitors/:mid/metrics (http)', () => {
     expect(uptime.low).toBe(Math.min(...values));
     expect(uptime.current).toBe(values[values.length - 1]);
     // Last bucket: the ok check at -7 min and the two failures.
-    expect(uptime.series[95].v).toBe(33.33);
+    expect(uptime.series[95].v).toBe(66.67);
     expect(uptime.series.map((p) => p.t)[0]).toBe(grid.from.toISOString());
   });
 
@@ -216,13 +225,15 @@ describe('GET /monitors/:mid/metrics (http)', () => {
     expect(data.live.range).toEqual({ n: 0, ok: 0, sumMs: 0, nMs: 0 });
   });
 
-  it('is not empty when only the previous window has data; value is null, previous set', async () => {
+  it('is not empty when only the previous window has data; value comes from watched time', async () => {
     const g = bucketGrid('1h', NOW);
     await CheckResult.insertMany([check(monitor._id, new Date(g.from.getTime() - 5 * MIN))]);
     const data = await getMetrics(monitor._id, '1h', NOW);
     expect(data.empty).toBe(false);
     const uptime = metric(data, 'uptime');
-    expect(uptime).toMatchObject({ value: null, previous: 100, change: null });
+    // We were watching all along and no incident opened: 100% in both windows.
+    expect(uptime).toMatchObject({ value: 100, previous: 100, change: 0 });
+    expect(metric(data, 'failed')).toMatchObject({ value: null, previous: 0 });
   });
 
   it('serves all three ranges with 60, 96 and 84 buckets', async () => {
@@ -248,7 +259,9 @@ describe('GET /monitors/:mid/metrics (http)', () => {
     const data = await getMetrics(monitor._id, '24h', NOW);
     expect(Date.now() - started).toBeLessThan(3000);
     expect(data.live.range.n).toBe(5000);
-    expect(metric(data, 'uptime').value).toBe(90);
+    // 10% of the checks failed but no incident opened: uptime is unchanged.
+    expect(metric(data, 'failed').value).toBe(10);
+    expect(metric(data, 'uptime').value).toBe(100);
   });
 });
 
@@ -290,7 +303,8 @@ describe('GET /monitors/:mid/metrics (heartbeat)', () => {
     const data = await getMetrics(hb._id, '1h', NOW);
     expect(data).toMatchObject({ type: 'heartbeat', empty: false, timings: null });
     expect(data.metrics.map((m) => m.key)).toEqual(['uptime', 'missed', 'lateness', 'duration']);
-    expect(metric(data, 'uptime')).toMatchObject({ value: 60 });
+    // Missed pings are not downtime until an incident opens.
+    expect(metric(data, 'uptime')).toMatchObject({ value: 100 });
     const missed = metric(data, 'missed');
     expect(missed).toMatchObject({ unit: 'pings', value: 1, previous: 1, change: 0 });
     // A failed ping that is not a missed record is not counted as missed.
@@ -379,7 +393,7 @@ describe('GET /monitors/:mid/metrics (agent)', () => {
     expect(metric(data, 'p95Latency').value).toBe(125);
     expect(metric(data, 'p95Latency').series.some((p) => p.v === 100)).toBe(true);
     expect(metric(data, 'errorRate').value).toBe(0.75);
-    expect(metric(data, 'uptime').value).toBe(75);
+    expect(metric(data, 'uptime').value).toBe(100);
     expect(data.empty).toBe(false);
   });
 
@@ -389,6 +403,7 @@ describe('GET /monitors/:mid/metrics (agent)', () => {
     expect(metric(data, 'errorRate').value).toBeNull();
     expect(metric(data, 'p95Latency').value).toBeNull();
     expect(metric(data, 'requestRate').value).toBe(0);
+    // No checks stored and the monitor is newer than the window: nothing was watched.
     expect(metric(data, 'uptime').value).toBeNull();
     expect(data.empty).toBe(false);
   });
@@ -464,5 +479,132 @@ describe('agent p95 latency precision', () => {
     expect(m.value).toBe(0.5);
     expect(m.peak).toBe(0.8);
     expect(m.low).toBe(0.4);
+  });
+});
+
+describe('GET /monitors/:mid/metrics (unknown results, failures, sample data)', () => {
+  const grid = bucketGrid('24h', NOW);
+  const unknown = (ts, extra = {}) =>
+    check(monitor._id, ts, {
+      ok: false,
+      state: 'unknown',
+      unknownReason: 'checker_offline',
+      totalMs: null,
+      errorCode: 'ENOTFOUND',
+      error: 'getaddrinfo ENOTFOUND',
+      ...extra,
+    });
+  const bucketStart = (ts) =>
+    new Date(Math.floor(ts.getTime() / grid.bucketMs) * grid.bucketMs).toISOString();
+
+  it('excludes unknown results from failed, uptime counts and the live accumulators', async () => {
+    await CheckResult.insertMany([
+      check(monitor._id, at(-4 * MIN), { state: 'ok' }),
+      check(monitor._id, at(-5 * MIN), { state: 'ok' }),
+      check(monitor._id, at(-6 * MIN), { state: 'ok' }),
+      check(monitor._id, at(-7 * MIN), { ok: false, state: 'failed', totalMs: null }),
+      unknown(at(-3 * MIN)),
+      unknown(at(-2 * MIN)),
+    ]);
+    const data = await getMetrics(monitor._id, '24h', NOW);
+    expect(metric(data, 'failed').value).toBe(25); // 1 of 4, not 3 of 6
+    expect(data.live.range).toMatchObject({ n: 4, ok: 3 });
+    expect(data.live.last).toMatchObject({ n: 4, ok: 3 });
+    expect(metric(data, 'uptime').value).toBe(100);
+    expect(data.empty).toBe(false);
+  });
+
+  it('marks buckets of only unknown results offline (value null) on every metric and timings', async () => {
+    const offlineAt = at(-60 * MIN);
+    await CheckResult.insertMany([
+      check(monitor._id, at(-3 * MIN), { timings: { dnsMs: 2, tcpMs: 4, tlsMs: 6 } }),
+      unknown(offlineAt),
+      unknown(new Date(offlineAt.getTime() + 20_000)),
+    ]);
+    const data = await getMetrics(monitor._id, '24h', NOW);
+    const t = bucketStart(offlineAt);
+    for (const key of ['uptime', 'p95', 'failed', 'avgResponse']) {
+      const point = metric(data, key).series.find((p) => p.t === t);
+      expect(point).toEqual({ t, v: null, offline: true });
+      // Buckets that were not offline never carry the flag.
+      expect(metric(data, key).series.filter((p) => p.offline)).toHaveLength(1);
+    }
+    expect(data.timings.find((x) => x.t === t)).toMatchObject({ offline: true, dnsMs: null });
+    expect(data.timings.filter((x) => x.offline)).toHaveLength(1);
+    // The window's figures ignore the offline gap.
+    expect(metric(data, 'failed').value).toBe(0);
+  });
+
+  it('lists the 20 newest failures with code and message, never unknown ones', async () => {
+    await CheckResult.insertMany([
+      ...Array.from({ length: 25 }, (_, i) =>
+        check(monitor._id, at(-(i + 1) * MIN), {
+          ok: false,
+          state: 'failed',
+          totalMs: null,
+          errorCode: `HTTP_5${String(i).padStart(2, '0')}`,
+          error: `Unexpected status ${i}`,
+        }),
+      ),
+      unknown(at(-30_000)),
+      check(monitor._id, at(-90_000)),
+    ]);
+    const { failures } = await getMetrics(monitor._id, '24h', NOW);
+    expect(failures).toHaveLength(20);
+    expect(failures[0]).toEqual({
+      t: at(-MIN).toISOString(),
+      code: 'HTTP_500',
+      message: 'Unexpected status 0',
+    });
+    expect(failures[19].code).toBe('HTTP_519');
+    const times = failures.map((f) => new Date(f.t).getTime());
+    expect([...times].sort((a, b) => b - a)).toEqual(times);
+    expect(failures.some((f) => f.code === 'ENOTFOUND')).toBe(false);
+  });
+
+  it('has an empty failures list and includesSampleData false without any', async () => {
+    await CheckResult.insertMany([check(monitor._id, at(-MIN))]);
+    const data = await getMetrics(monitor._id, '24h', NOW);
+    expect(data).toMatchObject({ failures: [], includesSampleData: false });
+  });
+
+  it('flags includesSampleData for seeded checks and for seeded incidents', async () => {
+    await CheckResult.insertMany([check(monitor._id, at(-MIN), { isSeed: true })]);
+    expect((await getMetrics(monitor._id, '24h', NOW)).includesSampleData).toBe(true);
+
+    await CheckResult.deleteMany({});
+    await CheckResult.insertMany([check(monitor._id, at(-MIN))]);
+    await Incident.create({
+      monitorId: monitor._id,
+      workspaceId: wid,
+      startedAt: at(-30 * MIN),
+      resolvedAt: at(-20 * MIN),
+      isSeed: true,
+    });
+    expect((await getMetrics(monitor._id, '24h', NOW)).includesSampleData).toBe(true);
+  });
+
+  it('counts an open incident as downtime up to now, in the bucket it falls in', async () => {
+    await CheckResult.insertMany([check(monitor._id, at(-50 * MIN))]);
+    await Incident.create({ monitorId: monitor._id, workspaceId: wid, startedAt: at(-10 * MIN) });
+    const data = await getMetrics(monitor._id, '1h', NOW);
+    const uptime = metric(data, 'uptime');
+    // The last one-minute bucket is 30 s old: all of it is downtime.
+    expect(uptime.series[59].v).toBe(0);
+    expect(uptime.series[50].v).toBe(0);
+    expect(uptime.series[49].v).toBe(50); // the incident opened 30 s into this minute
+    expect(uptime.series[48].v).toBe(100);
+    // Watched for 50 minutes, 10 of them down.
+    expect(uptime.value).toBe(80);
+  });
+
+  it('serves the new fields over HTTP', async () => {
+    await CheckResult.insertMany([
+      check(monitor._id, new Date(Date.now() - 2 * MIN), { ok: false, errorCode: 'ETIMEDOUT' }),
+    ]);
+    const res = await get(`/${monitor._id}/metrics`);
+    expect(res.body.data.failures).toHaveLength(1);
+    expect(res.body.data.failures[0].code).toBe('ETIMEDOUT');
+    expect(res.body.data.includesSampleData).toBe(false);
   });
 });

@@ -122,9 +122,17 @@ describe('GET /public/status/:slug', () => {
         date: addDays(today, -1),
         totalChecks: 100,
         upChecks: 99,
-        downtimeSec: 30,
+        downtimeSec: 864,
+        coveredSec: 86_400,
       },
-      { monitorId: api._id, workspaceId: wid, date: today, totalChecks: 100, upChecks: 100 },
+      {
+        monitorId: api._id,
+        workspaceId: wid,
+        date: today,
+        totalChecks: 100,
+        upChecks: 100,
+        coveredSec: 86_400,
+      },
     ]);
     await Incident.create({
       monitorId: web._id,
@@ -143,12 +151,98 @@ describe('GET /public/status/:slug', () => {
     const body = res.body.data;
     expect(body).toMatchObject({ title: 'Acme Status', overall: 'partial_outage' });
     expect(body.monitors.map((m) => [m.name, m.status, m.uptime90])).toEqual([
-      ['API', 'up', 99.5],
+      ['API', 'up', 99.5], // 864 s down of 172,800 s covered
       ['Website', 'down', null],
     ]);
     expect(body.monitors[0].days).toHaveLength(90);
     expect(body.incidents).toHaveLength(1);
-    expect(body.incidents[0]).toMatchObject({ monitorName: 'Website', resolvedAt: null });
+    expect(body.incidents[0]).toMatchObject({
+      monitorName: 'Website',
+      resolvedAt: null,
+      sample: false,
+    });
+    expect(body.includesSampleData).toBe(false);
+    // Uptime is confirmed downtime over covered time: 864 s of 86,400 s.
+    expect(body.monitors[0].days.at(-2).uptime).toBe(99);
+    expect(body.monitors[0].days.at(-1).uptime).toBe(100);
+  });
+
+  it('flags sample data (seeded rollups and incidents) and nothing else leaks', async () => {
+    await DailyRollup.create({
+      monitorId: web._id,
+      workspaceId: wid,
+      date: addDays(utcDayStart(new Date()), -3),
+      totalChecks: 10,
+      upChecks: 10,
+      coveredSec: 86_400,
+      isSeed: true,
+    });
+    await Incident.create({
+      monitorId: web._id,
+      workspaceId: wid,
+      startedAt: new Date(Date.now() - 3_600_000),
+      resolvedAt: new Date(Date.now() - 3_000_000),
+      durationSec: 600,
+      cause: 'Connection refused to 10.0.3.7:5432',
+      causeCode: 'ECONNREFUSED',
+      isSeed: true,
+      timeline: [{ type: 'opened', message: 'secret detail', code: 'ECONNREFUSED' }],
+    });
+    await createPage();
+    const body = (await getPublic()).body.data;
+    expect(body.includesSampleData).toBe(true);
+    expect(body.incidents.map((i) => i.sample).sort()).toEqual([false, true]);
+
+    // Whitelist: exactly these keys, at every level.
+    expect(Object.keys(body).sort()).toEqual([
+      'description',
+      'generatedAt',
+      'incidents',
+      'includesSampleData',
+      'monitors',
+      'overall',
+      'title',
+    ]);
+    for (const monitor of body.monitors) {
+      expect(Object.keys(monitor).sort()).toEqual(['days', 'name', 'status', 'uptime90']);
+      for (const day of monitor.days) {
+        expect(Object.keys(day).sort()).toEqual(['date', 'downtimeSec', 'totalChecks', 'uptime']);
+      }
+    }
+    for (const incident of body.incidents) {
+      expect(Object.keys(incident).sort()).toEqual([
+        'durationSec',
+        'monitorName',
+        'resolvedAt',
+        'sample',
+        'startedAt',
+      ]);
+    }
+    const text = JSON.stringify(body);
+    for (const secret of ['ECONNREFUSED', 'secret detail', 'causeCode', 'coveredSec', 'isSeed']) {
+      expect(text).not.toContain(secret);
+    }
+  });
+
+  it('uses legacy rollups without coveredSec (a full day when final)', async () => {
+    const today = utcDayStart(new Date());
+    await DailyRollup.create([
+      {
+        monitorId: web._id,
+        workspaceId: wid,
+        date: addDays(today, -2),
+        totalChecks: 50,
+        upChecks: 50,
+        downtimeSec: 8640,
+        isFinal: true,
+      },
+      // Not final and no coverage: skipped for uptime.
+      { monitorId: web._id, workspaceId: wid, date: today, totalChecks: 5, upChecks: 0 },
+    ]);
+    await createPage();
+    const web90 = (await getPublic()).body.data.monitors[1];
+    expect(web90.uptime90).toBe(90);
+    expect(web90.days.at(-1).uptime).toBeNull();
   });
 
   it('exposes no private data (URLs, ids, headers, error details)', async () => {

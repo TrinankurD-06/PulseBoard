@@ -151,6 +151,8 @@ describe('migration 001-monitor-types-and-cost', () => {
       '001-monitor-types-and-cost',
       '002-adaptive-and-budget',
       '003-user-identities',
+      '004-mark-legacy-sample-data',
+      '005-rollup-covered-seconds',
     ]);
 
     const migrated = await monitors.findOne({ _id: insertedId });

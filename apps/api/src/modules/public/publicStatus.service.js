@@ -18,7 +18,8 @@ const MAX_INCIDENTS = 20;
  *
  * This is a whitelist: only what's written here leaves the API. In particular
  * no monitor URLs (could be internal hosts), ids, workspace ids, headers or
- * error messages (could reveal infrastructure details).
+ * error messages (could reveal infrastructure details). Uptime is confirmed
+ * downtime over covered time (rollups), never check pass rates.
  */
 export async function buildPublicStatus(slug, now = new Date()) {
   const page = await StatusPage.findOne({ slug, isPublic: true }).lean();
@@ -37,14 +38,23 @@ export async function buildPublicStatus(slug, now = new Date()) {
   const [rollups, incidents] = await Promise.all([
     DailyRollup.find(
       { monitorId: { $in: ids }, date: { $gte: addDays(utcDayStart(now), 1 - DAYS) } },
-      { monitorId: 1, date: 1, totalChecks: 1, upChecks: 1, downtimeSec: 1 },
+      {
+        monitorId: 1,
+        date: 1,
+        totalChecks: 1,
+        upChecks: 1,
+        downtimeSec: 1,
+        coveredSec: 1,
+        isFinal: 1,
+        isSeed: 1,
+      },
     ).lean(),
     Incident.find(
       {
         monitorId: { $in: ids },
         startedAt: { $gte: new Date(now - INCIDENT_WINDOW_DAYS * DAY_MS) },
       },
-      { monitorId: 1, startedAt: 1, resolvedAt: 1, durationSec: 1 },
+      { monitorId: 1, startedAt: 1, resolvedAt: 1, durationSec: 1, isSeed: 1 },
     )
       .sort({ startedAt: -1 })
       .limit(MAX_INCIDENTS)
@@ -78,7 +88,9 @@ export async function buildPublicStatus(slug, now = new Date()) {
       startedAt: incident.startedAt,
       resolvedAt: incident.resolvedAt ?? null,
       durationSec: incident.durationSec ?? null,
+      sample: Boolean(incident.isSeed),
     })),
+    includesSampleData: rollups.some((r) => r.isSeed) || incidents.some((i) => i.isSeed),
     generatedAt: now,
   };
 }
