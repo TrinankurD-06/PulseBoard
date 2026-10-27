@@ -37,12 +37,12 @@ export const alertEnvFields = {
   // Public URL of the web app, used in the checker's User-Agent ("+APP_URL/bot").
   // Defaults to DASHBOARD_URL (see appUrlOf).
   APP_URL: z.preprocess((value) => value || undefined, z.string().url().optional()),
-  SMTP_HOST: z.string().default(''),
+  SMTP_HOST: z.string().trim().default(''),
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   // Email over Resend's HTTPS API. Set it where outbound SMTP is blocked (Render's free plan).
-  RESEND_API_KEY: z.string().default(''),
+  RESEND_API_KEY: z.string().trim().default(''),
   ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
 };
 

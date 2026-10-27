@@ -30,10 +30,12 @@ export const envSchema = z.object({
   ALLOW_PRIVATE_TARGETS: booleanString,
   LOG_LEVEL: z.string().default('info'),
   // OAuth sign-in. A provider is enabled only when both its id and secret are set.
-  GOOGLE_CLIENT_ID: z.string().default(''),
-  GOOGLE_CLIENT_SECRET: z.string().default(''),
-  GITHUB_CLIENT_ID: z.string().default(''),
-  GITHUB_CLIENT_SECRET: z.string().default(''),
+  // Trimmed: a newline or space pasted into a hosting dashboard would otherwise be sent
+  // to the provider as part of the id (GitHub answers "app not found").
+  GOOGLE_CLIENT_ID: z.string().trim().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
+  GITHUB_CLIENT_ID: z.string().trim().default(''),
+  GITHUB_CLIENT_SECRET: z.string().trim().default(''),
   ...alertEnvFields,
 });
 
