@@ -135,3 +135,7 @@ export const ALERT_RETRY_DELAYS_SEC = Object.freeze([30, 120, 480]);
 export const ALERT_KIND = Object.freeze({ DOWN: 'down', UP: 'up', TEST: 'test', NOTICE: 'notice' });
 
 export const PAGINATION = Object.freeze({ DEFAULT_LIMIT: 20, MAX_LIMIT: 100 });
+
+// Sign-in providers the API knows how to talk to. Each is enabled only when its
+// client id and secret are configured (see GET /auth/oauth/providers).
+export const OAUTH_PROVIDERS = Object.freeze(['google', 'github']);

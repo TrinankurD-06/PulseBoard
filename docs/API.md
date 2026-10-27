@@ -40,10 +40,16 @@ httpOnly cookie (`pb_refresh`, path `/api/v1/auth`) that the browser sends autom
 | 502  | `ALERT_DELIVERY_FAILED`                                        | Test alert couldn't be delivered                       |
 | 500  | `INTERNAL`                                                     | Unexpected error (details are logged, not returned)    |
 
+OAuth sign-in failures (`OAUTH_NOT_CONFIGURED`, `OAUTH_DENIED`, `OAUTH_STATE_INVALID`,
+`OAUTH_EMAIL_UNVERIFIED`, `OAUTH_PROVIDER_ERROR`) are not JSON responses: they arrive as
+`?status=error&code=…` on the redirect to the client (see
+[Sign in with Google / GitHub](#sign-in-with-google--github)).
+
 **Roles.** `viewer` (read) < `member` (+ monitors, alert channels, status pages) < `owner`
 (+ members, workspace settings). The minimum role is listed for each workspace endpoint.
 
-**Rate limits.** login/register: 20 per 15 min per IP · refresh: 60 per 15 min per IP ·
+**Rate limits.** login/register: 20 per 15 min per IP · OAuth start/callback: 40 per 15 min
+per IP · refresh: 60 per 15 min per IP ·
 "Test now": 5 per min per user · test alert: 5 per min per user · public status: 120 per min per IP
 · heartbeat pings: 60 per min per token · agent reports: 30 per min per key.
 
@@ -113,8 +119,8 @@ Errors: `400` validation (password 8–72 chars), `409` email taken, `429`.
 { "email": "ada@example.com", "password": "password123" }
 ```
 
-`200`, same response shape as register. Wrong password and unknown email both return
-`401 INVALID_CREDENTIALS`.
+`200`, same response shape as register. Wrong password, unknown email, and an account that
+signed up with Google/GitHub and has no password all return `401 INVALID_CREDENTIALS`.
 
 ### `POST /auth/refresh`
 
@@ -136,7 +142,13 @@ session from that login.
 ```json
 {
   "data": {
-    "user": { "id": "66f…", "name": "Ada Lovelace", "email": "ada@example.com" },
+    "user": {
+      "id": "66f…",
+      "name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "providers": ["google"],
+      "hasPassword": true
+    },
     "workspaces": [
       {
         "id": "66f…",
@@ -149,6 +161,70 @@ session from that login.
   }
 }
 ```
+
+`providers` lists the linked sign-in providers by name only; `hasPassword` is `false` for
+accounts created with Google/GitHub. Provider account ids and the password hash are never
+returned.
+
+### Sign in with Google / GitHub
+
+Authorization code flow with PKCE (S256) and `state`. A provider is enabled only when both its
+`*_CLIENT_ID` and `*_CLIENT_SECRET` are set. `start` and `callback` are **browser
+navigations**, not fetch calls: they always answer `302`.
+
+#### `GET /auth/oauth/providers`
+
+The enabled providers, in this order. Empty when none is configured (the client hides the
+buttons).
+
+```json
+{
+  "data": [
+    { "id": "google", "name": "Google" },
+    { "id": "github", "name": "GitHub" }
+  ]
+}
+```
+
+#### `GET /auth/oauth/:provider/start?next=/app/...`
+
+`302` to the provider's consent page. Sets `pb_oauth` (httpOnly, SameSite=Lax, path
+`/api/v1/auth/oauth`, 10 minutes, HMAC-signed) holding the state, the PKCE verifier and
+`next`. `next` must be a relative path starting with a single `/`; anything else (`//host`,
+`/host`, `https:`, control characters, over 512 chars) becomes `/app`.
+
+The provider is sent back to `${APP_URL}/api/v1/auth/oauth/:provider/callback` (`APP_URL`
+defaults to `DASHBOARD_URL`): the client origin, which proxies `/api` to the API.
+
+#### `GET /auth/oauth/:provider/callback`
+
+Called by the provider. Verifies `state` against the cookie (constant time), exchanges the code
+with the verifier, reads the profile, then picks the user:
+
+1. this provider account is already linked → that user;
+2. else the provider says the email is **verified** and a user has that email → link to them;
+3. else create a user (name from the profile, no password) with a personal workspace, as
+   registration does.
+
+It then sets the `pb_refresh` cookie exactly as login does, clears `pb_oauth`, and redirects:
+
+| Result  | Redirect                                                                    |
+| ------- | --------------------------------------------------------------------------- |
+| Success | `${APP_URL}/auth/callback?status=ok&next=<sanitised next>`                  |
+| Failure | `${APP_URL}/auth/callback?status=error&code=<code>` (no session is created) |
+
+The client then calls `POST /auth/refresh` to get an access token. No token is ever put in a
+URL.
+
+| `code`                   | When                                                                   |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `OAUTH_NOT_CONFIGURED`   | Unknown provider, or its credentials aren't set                        |
+| `OAUTH_DENIED`           | The user pressed "Cancel" at the provider (`error=access_denied`)      |
+| `OAUTH_STATE_INVALID`    | Missing, expired, forged or mismatched state (or another provider's)   |
+| `OAUTH_EMAIL_UNVERIFIED` | The provider has no verified (GitHub: primary verified) email for them |
+| `OAUTH_PROVIDER_ERROR`   | Token exchange or profile request failed (network, non-2xx, bad body)  |
+| `RATE_LIMITED`           | Too many sign-in attempts from this IP                                 |
+| `INTERNAL`               | Unexpected server error (logged)                                       |
 
 ---
 

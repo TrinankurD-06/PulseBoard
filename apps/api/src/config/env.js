@@ -24,6 +24,11 @@ const envSchema = z.object({
   DEMO_MODE: booleanString,
   ALLOW_PRIVATE_TARGETS: booleanString,
   LOG_LEVEL: z.string().default('info'),
+  // OAuth sign-in. A provider is enabled only when both its id and secret are set.
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
+  GITHUB_CLIENT_ID: z.string().default(''),
+  GITHUB_CLIENT_SECRET: z.string().default(''),
   ...alertEnvFields,
 });
 

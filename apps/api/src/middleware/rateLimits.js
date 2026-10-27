@@ -5,14 +5,14 @@ const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 // Counters live in process memory. That's correct for a single API instance;
 // several instances would each count separately (see DECISIONS.md).
-function limiter({ windowMs, limit, message, keyGenerator }) {
+function limiter({ windowMs, limit, message, keyGenerator, handler }) {
   return rateLimit({
     windowMs,
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     ...(keyGenerator && { keyGenerator }),
-    handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', message)),
+    handler: handler ?? ((_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', message))),
   });
 }
 
@@ -22,6 +22,20 @@ export function createAuthLimiter(max) {
     windowMs: FIFTEEN_MINUTES,
     limit: max,
     message: 'Too many attempts. Please try again in a few minutes.',
+  });
+}
+
+/**
+ * OAuth start/callback, per client IP. A sign-in is two requests, so twice the
+ * login budget. These are browser navigations, not fetches, so `onLimited`
+ * answers with a redirect instead of JSON.
+ */
+export function createOAuthLimiter(max, onLimited) {
+  return limiter({
+    windowMs: FIFTEEN_MINUTES,
+    limit: max * 2,
+    message: 'Too many sign-in attempts. Please try again in a few minutes.',
+    handler: (req, res) => onLimited(req, res),
   });
 }
 

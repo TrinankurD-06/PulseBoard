@@ -43,6 +43,16 @@ services:
         sync: false
       - key: ALERT_FROM_EMAIL
         sync: false
+      # Optional "Sign in with Google/GitHub": leave empty to hide a provider.
+      # Callback: https://<your-vercel-app>/api/v1/auth/oauth/<google|github>/callback
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
 
   - type: worker
     name: pulseboard-worker

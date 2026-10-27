@@ -4,10 +4,11 @@ import { authenticate } from '../../middleware/authenticate.js';
 import { createAuthLimiter, createRefreshLimiter } from '../../middleware/rateLimits.js';
 import { validate } from '../../middleware/validate.js';
 import { createAuthService } from './auth.service.js';
+import { oauthRouter } from './oauth/oauth.routes.js';
 
 export const REFRESH_COOKIE = 'pb_refresh';
 
-export function authRouter({ env, tokens, logger }) {
+export function authRouter({ env, tokens, logger, oauthFetch }) {
   const router = Router();
   const auth = createAuthService({ env, tokens, logger });
   const authLimiter = createAuthLimiter(env.AUTH_RATE_LIMIT_MAX);
@@ -23,11 +24,15 @@ export function authRouter({ env, tokens, logger }) {
     path: '/api/v1/auth',
   };
 
-  function sendSession(res, status, { user, accessToken, refreshToken }) {
+  function setRefreshCookie(res, refreshToken) {
     res.cookie(REFRESH_COOKIE, refreshToken, {
       ...cookieOptions,
       maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
     });
+  }
+
+  function sendSession(res, status, { user, accessToken, refreshToken }) {
+    setRefreshCookie(res, refreshToken);
     res.status(status).json({ data: { ...(user && { user }), accessToken } });
   }
 
@@ -55,6 +60,9 @@ export function authRouter({ env, tokens, logger }) {
     res.clearCookie(REFRESH_COOKIE, cookieOptions);
     res.status(204).end();
   });
+
+  // Sign in with Google / GitHub. Issues the same session (refresh cookie) as login.
+  router.use('/oauth', oauthRouter({ env, auth, logger, setRefreshCookie, fetchImpl: oauthFetch }));
 
   router.get('/me', authenticate(tokens), async (req, res) => {
     res.json({ data: await auth.me(req.userId) });

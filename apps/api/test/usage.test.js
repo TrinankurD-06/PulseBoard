@@ -146,10 +146,11 @@ describe('migration 001-monitor-types-and-cost', () => {
     const monitors = mongoose.connection.db.collection('monitors');
     const { insertedId } = await monitors.insertOne(oldShape());
 
-    // U2 added migration 002, which runs too (covered by its own tests).
+    // Later migrations run too (each covered by its own tests).
     expect(await runMigrations(mongoose.connection.db, { logger: silent })).toEqual([
       '001-monitor-types-and-cost',
       '002-adaptive-and-budget',
+      '003-user-identities',
     ]);
 
     const migrated = await monitors.findOne({ _id: insertedId });

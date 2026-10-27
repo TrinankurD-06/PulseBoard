@@ -172,6 +172,31 @@ To receive real Discord or Slack alerts, put a webhook URL in `SEED_DISCORD_WEBH
 Without SMTP settings, email alerts go to a free Ethereal test inbox, and each message's preview
 link appears in the incident timeline.
 
+### Sign in with Google / GitHub (optional)
+
+The buttons appear only for providers whose client id **and** secret are set in `.env`
+(restart the API after adding them). The callback URL is `<APP_URL>/api/v1/auth/oauth/<provider>/callback`
+(`APP_URL` falls back to `DASHBOARD_URL`); it goes through the client origin, which proxies
+`/api` to the API.
+
+| Environment | Google callback                                               | GitHub callback                                               |
+| ----------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| Development | `http://localhost:5173/api/v1/auth/oauth/google/callback`     | `http://localhost:5173/api/v1/auth/oauth/github/callback`     |
+| Production  | `https://<your-vercel-app>/api/v1/auth/oauth/google/callback` | `https://<your-vercel-app>/api/v1/auth/oauth/github/callback` |
+
+- **Google**: [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials)
+  → Create credentials → OAuth client ID → _Web application_. Add both callback URLs under
+  _Authorized redirect URIs_ (configure the OAuth consent screen first if asked; scopes
+  `openid email profile`). Copy the id and secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+- **GitHub**: [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
+  → New OAuth App. Homepage: your app URL; _Authorization callback URL_: the callback above.
+  GitHub allows one callback per app, so create one app for development and one for production.
+  Generate a client secret and copy both into `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
+
+A provider account is linked to an existing user only when the provider reports the email as
+verified; otherwise a new user (no password) with a personal workspace is created. Run
+`npm run migrate` once on an existing database to add the identities index.
+
 ### Scripts
 
 | Command                                        | What it does                                                      |
@@ -189,39 +214,41 @@ link appears in the incident timeline.
 
 All variables live in one `.env` at the repository root (see `.env.example`).
 
-| Variable                   | Used by     | Default / example                                                           | Purpose                                                        |
-| -------------------------- | ----------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `NODE_ENV`                 | all         | `development`                                                               | `production` enables secure cookies and JSON logs              |
-| `MONGODB_URI`              | api, worker | `mongodb://localhost:27017/pulseboard?replicaSet=rs0&directConnection=true` | Must be a replica set (change streams)                         |
-| `LOG_LEVEL`                | api, worker | `info`                                                                      | pino log level                                                 |
-| `DEMO_MODE`                | api, worker | `true`                                                                      | Allows 10 s check intervals (30 s otherwise); shows demo login |
-| `ALLOW_PRIVATE_TARGETS`    | api, worker | `true` locally, `false` in production                                       | Allows monitoring localhost/private IPs (local demo-target)    |
-| `API_PORT` (or `PORT`)     | api         | `4000`                                                                      | HTTP port                                                      |
-| `CLIENT_ORIGIN`            | api         | `http://localhost:5173`                                                     | CORS + Socket.io allowed origin                                |
-| `JWT_ACCESS_SECRET`        | api         | 32+ random chars                                                            | Signs access tokens                                            |
-| `JWT_REFRESH_SECRET`       | api         | 32+ random chars, different                                                 | Signs refresh tokens                                           |
-| `ACCESS_TOKEN_TTL`         | api         | `15m`                                                                       | Access token lifetime                                          |
-| `REFRESH_TOKEN_TTL_DAYS`   | api         | `7`                                                                         | Refresh token lifetime                                         |
-| `BCRYPT_COST`              | api         | `12`                                                                        | Password hashing work factor                                   |
-| `AUTH_RATE_LIMIT_MAX`      | api         | `20`                                                                        | Login/register attempts per IP per 15 min                      |
-| `TRUST_PROXY`              | api         | `false` (`true` on Render)                                                  | Real client IPs behind a proxy                                 |
-| `WORKER_HEALTH_PORT`       | worker      | `4002`                                                                      | Worker `/health` port                                          |
-| `AGENDA_MAX_CONCURRENCY`   | worker      | `20`                                                                        | Checks a worker runs in parallel                               |
-| `DASHBOARD_URL`            | api, worker | `http://localhost:5173`                                                     | Links in alerts                                                |
-| `APP_URL`                  | api, worker | empty → `DASHBOARD_URL`                                                     | Public URL in the checker's User-Agent (`+APP_URL/bot`)        |
-| `SMTP_HOST` … `SMTP_PASS`  | api, worker | empty                                                                       | Email delivery; empty = Ethereal test inbox                    |
-| `ALERT_FROM_EMAIL`         | api, worker | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                         |
-| `SEED_DISCORD_WEBHOOK_URL` | seed        | empty                                                                       | Creates a Discord channel when seeding                         |
-| `SEED_SLACK_WEBHOOK_URL`   | seed        | empty                                                                       | Creates a Slack channel when seeding                           |
-| `SEED_ALERT_EMAIL`         | seed        | empty                                                                       | Email channel target (default: the demo user)                  |
-| `SEED_DEMO_TARGET_URL`     | seed        | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)   |
-| `SEED_API_URL`             | seed        | empty → `http://localhost:4000/api/v1`                                      | API URL written to the demo file for the agent and heartbeat   |
-| `DEMO_TARGET_PORT`         | demo-target | `4011`                                                                      | Port (4001 is often taken by VS Code)                          |
-| `PULSEBOARD_AGENT_KEY`     | demo-target | empty → seed file                                                           | Agent key for the demo-target's own agent                      |
-| `PULSEBOARD_ENDPOINT`      | demo-target | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)             |
-| `HEARTBEAT_URL`            | heartbeat   | empty → seed file                                                           | Ping URL used by the demo heartbeat script                     |
-| `VITE_API_URL`             | client      | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                   |
-| `VITE_SOCKET_URL`          | client      | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)          |
+| Variable                       | Used by     | Default / example                                                           | Purpose                                                        |
+| ------------------------------ | ----------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `NODE_ENV`                     | all         | `development`                                                               | `production` enables secure cookies and JSON logs              |
+| `MONGODB_URI`                  | api, worker | `mongodb://localhost:27017/pulseboard?replicaSet=rs0&directConnection=true` | Must be a replica set (change streams)                         |
+| `LOG_LEVEL`                    | api, worker | `info`                                                                      | pino log level                                                 |
+| `DEMO_MODE`                    | api, worker | `true`                                                                      | Allows 10 s check intervals (30 s otherwise); shows demo login |
+| `ALLOW_PRIVATE_TARGETS`        | api, worker | `true` locally, `false` in production                                       | Allows monitoring localhost/private IPs (local demo-target)    |
+| `API_PORT` (or `PORT`)         | api         | `4000`                                                                      | HTTP port                                                      |
+| `CLIENT_ORIGIN`                | api         | `http://localhost:5173`                                                     | CORS + Socket.io allowed origin                                |
+| `JWT_ACCESS_SECRET`            | api         | 32+ random chars                                                            | Signs access tokens                                            |
+| `JWT_REFRESH_SECRET`           | api         | 32+ random chars, different                                                 | Signs refresh tokens                                           |
+| `ACCESS_TOKEN_TTL`             | api         | `15m`                                                                       | Access token lifetime                                          |
+| `REFRESH_TOKEN_TTL_DAYS`       | api         | `7`                                                                         | Refresh token lifetime                                         |
+| `BCRYPT_COST`                  | api         | `12`                                                                        | Password hashing work factor                                   |
+| `AUTH_RATE_LIMIT_MAX`          | api         | `20`                                                                        | Login/register attempts per IP per 15 min                      |
+| `TRUST_PROXY`                  | api         | `false` (`true` on Render)                                                  | Real client IPs behind a proxy                                 |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | api         | empty                                                                       | Enables "Sign in with Google" (both needed)                    |
+| `GITHUB_CLIENT_ID` / `_SECRET` | api         | empty                                                                       | Enables "Sign in with GitHub" (both needed)                    |
+| `WORKER_HEALTH_PORT`           | worker      | `4002`                                                                      | Worker `/health` port                                          |
+| `AGENDA_MAX_CONCURRENCY`       | worker      | `20`                                                                        | Checks a worker runs in parallel                               |
+| `DASHBOARD_URL`                | api, worker | `http://localhost:5173`                                                     | Links in alerts                                                |
+| `APP_URL`                      | api, worker | empty → `DASHBOARD_URL`                                                     | Public web app URL: checker User-Agent, OAuth callback URLs    |
+| `SMTP_HOST` … `SMTP_PASS`      | api, worker | empty                                                                       | Email delivery; empty = Ethereal test inbox                    |
+| `ALERT_FROM_EMAIL`             | api, worker | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                         |
+| `SEED_DISCORD_WEBHOOK_URL`     | seed        | empty                                                                       | Creates a Discord channel when seeding                         |
+| `SEED_SLACK_WEBHOOK_URL`       | seed        | empty                                                                       | Creates a Slack channel when seeding                           |
+| `SEED_ALERT_EMAIL`             | seed        | empty                                                                       | Email channel target (default: the demo user)                  |
+| `SEED_DEMO_TARGET_URL`         | seed        | empty → `http://localhost:4011/`                                            | Demo-target URL to monitor (set to the deployed one in prod)   |
+| `SEED_API_URL`                 | seed        | empty → `http://localhost:4000/api/v1`                                      | API URL written to the demo file for the agent and heartbeat   |
+| `DEMO_TARGET_PORT`             | demo-target | `4011`                                                                      | Port (4001 is often taken by VS Code)                          |
+| `PULSEBOARD_AGENT_KEY`         | demo-target | empty → seed file                                                           | Agent key for the demo-target's own agent                      |
+| `PULSEBOARD_ENDPOINT`          | demo-target | empty → seed file                                                           | PulseBoard API base URL for the agent (`…/api/v1`)             |
+| `HEARTBEAT_URL`                | heartbeat   | empty → seed file                                                           | Ping URL used by the demo heartbeat script                     |
+| `VITE_API_URL`                 | client      | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                   |
+| `VITE_SOCKET_URL`              | client      | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)          |
 
 ## Testing
 
@@ -262,6 +289,8 @@ connection string.
 - `MONGODB_URI` (both API and worker): the Atlas string.
 - `CLIENT_ORIGIN` and `DASHBOARD_URL`: your Vercel URL, e.g. `https://pulseboard.vercel.app`.
 - SMTP settings (optional; without them, emails go to Ethereal).
+- OAuth credentials (optional): `GOOGLE_CLIENT_*` / `GITHUB_CLIENT_*`, see
+  [Sign in with Google / GitHub](#sign-in-with-google--github-optional).
 
 JWT secrets are generated by Render. Background workers have no free plan on Render
 (`starter`); the demo-target runs on the free plan.

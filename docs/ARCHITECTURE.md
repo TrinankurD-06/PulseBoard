@@ -279,6 +279,38 @@ flowchart LR
 - The client patches its query cache from events; while connected it doesn't poll at
   all, and falls back to 30 s polling if the socket drops.
 
+## Sign in with Google / GitHub
+
+Authorization code flow with PKCE. The provider redirects to the **client origin**, which proxies
+`/api` to the API (Vite in dev, Vercel rewrite in prod), so both cookies stay first-party. A
+provider is enabled only when its client id and secret are set.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser (client origin)
+    participant API as API /auth/oauth
+    participant P as Provider (Google / GitHub)
+    participant DB as MongoDB
+
+    B->>API: GET /:provider/start?next=/app/...
+    API-->>B: 302 to provider (state, code_challenge S256) + pb_oauth cookie (signed, 10 min)
+    B->>P: consent screen
+    P-->>B: 302 to APP_URL/api/v1/auth/oauth/:provider/callback?code&state
+    B->>API: GET /:provider/callback (+ pb_oauth cookie)
+    API->>API: verify state (constant time), clear pb_oauth
+    API->>P: POST token (code, code_verifier, client secret)
+    P-->>API: access token (used once, never stored)
+    API->>P: GET profile (GitHub: /user + /user/emails)
+    API->>DB: linked identity? else verified email → link? else create user + workspace
+    API->>DB: Session (same as login)
+    API-->>B: 302 /auth/callback?status=ok&next=... + pb_refresh cookie
+    B->>API: POST /auth/refresh → access token
+```
+
+Any failure redirects to `/auth/callback?status=error&code=OAUTH_…` without creating a session.
+An unverified provider email never links to or creates an account (D89).
+
 ## Data model
 
 ```mermaid
@@ -296,6 +328,12 @@ erDiagram
     MONITOR ||--o{ AGENT_REPORT : "time-series, 7 days"
     STATUS_PAGE }o--o{ MONITOR : shows
 
+    USER {
+        string name
+        string email
+        string passwordHash "optional, select false"
+        array identities "provider, providerId, email, linkedAt"
+    }
     MEMBERSHIP {
         ObjectId workspaceId
         ObjectId userId
@@ -377,6 +415,9 @@ Indexes and the reasoning behind each are listed in [DECISIONS.md](DECISIONS.md)
 
 - Access token (15 min) in memory; refresh token (7 days) in an httpOnly, path-scoped
   cookie, rotated on every use with reuse detection. Only token hashes are stored.
+- OAuth sign-in: state + PKCE (S256) in a signed, 10-minute, path-scoped cookie; provider tokens
+  are used once and never stored; accounts are linked by **verified** email only; `next` is
+  restricted to same-origin relative paths; no token ever appears in a URL.
 - RBAC (`viewer < member < owner`) on every workspace route; non-members get 404.
 - SSRF: monitor URLs are checked when saved **and** at connect time (custom DNS lookup),
   including every redirect hop; webhook URLs must be real Discord/Slack hosts.

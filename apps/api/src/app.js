@@ -41,6 +41,8 @@ export function createApp({
   agenda = null,
   alertSenders = createAlertSenders({ ...alertSenderConfig(env), logger }),
   getRealtimeStatus,
+  // fetch used to talk to OAuth providers (tests pass a fake).
+  oauthFetch = globalThis.fetch,
 }) {
   const app = express();
 
@@ -59,7 +61,12 @@ export function createApp({
       autoLogging: { ignore: (req) => req.url === '/health' },
       // Keep request logs to one readable line; headers would mostly be noise.
       serializers: {
-        req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+        // OAuth callbacks carry a one-time code in the query: log the path only.
+        req: (req) => ({
+          id: req.id,
+          method: req.method,
+          url: req.url.includes('/auth/oauth/') ? req.url.split('?')[0] : req.url,
+        }),
         res: (res) => ({ statusCode: res.statusCode }),
       },
     }),
@@ -89,7 +96,7 @@ export function createApp({
 
   const api = express.Router();
   api.use('/meta', metaRouter({ env, schemas: monitorSchemas }));
-  api.use('/auth', authRouter({ env, tokens, logger }));
+  api.use('/auth', authRouter({ env, tokens, logger, oauthFetch }));
   api.use('/public', publicRouter({ publicCache }));
   // Heartbeat pings: public, the token in the URL is the authentication.
   api.use('/ping', pingRouter({ processCheckResult }));

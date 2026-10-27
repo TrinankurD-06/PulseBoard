@@ -31,6 +31,58 @@ export function createAuthService({ env, tokens, logger }) {
     return { accessToken: tokens.signAccessToken(userId), refreshToken };
   }
 
+  /**
+   * Creates a user, their personal workspace and the owner membership
+   * atomically: a half-registered user without a workspace would land on an
+   * empty app. Used by password registration and first OAuth sign-in.
+   */
+  async function createUserWithWorkspace(fields) {
+    const session = await User.startSession();
+    let user;
+    try {
+      await session.withTransaction(async () => {
+        [user] = await User.create([fields], { session });
+        await createWorkspaceWithOwner(
+          { name: `${fields.name.split(' ')[0]}'s workspace`, ownerId: user._id },
+          session,
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+    return user;
+  }
+
+  /**
+   * Finds or creates the user for a provider profile. Order: an already linked
+   * identity wins; else a user with the same email is linked, but only when the
+   * provider says the email is verified; else a new user is created. An
+   * unverified email never links or creates anything.
+   */
+  async function resolveOAuthUser(provider, profile) {
+    const thisIdentity = { $elemMatch: { provider, providerId: profile.providerId } };
+    const linked = await User.findOne({ identities: thisIdentity });
+    if (linked) return linked;
+
+    if (!profile.email || !profile.emailVerified) {
+      throw new AppError(403, 'OAUTH_EMAIL_UNVERIFIED', 'The provider has not verified this email');
+    }
+    const identity = { provider, providerId: profile.providerId, email: profile.email };
+
+    // The $not guard keeps a concurrent second callback from linking the same account twice.
+    const existing = await User.findOneAndUpdate(
+      { email: profile.email, identities: { $not: thisIdentity } },
+      { $push: { identities: { ...identity, linkedAt: new Date() } } },
+      { returnDocument: 'after' },
+    );
+    if (existing) return existing;
+    const raced = await User.findOne({ identities: thisIdentity });
+    if (raced) return raced;
+
+    const name = (profile.name?.trim() || profile.email.split('@')[0]).slice(0, 80);
+    return createUserWithWorkspace({ name, email: profile.email, identities: [identity] });
+  }
+
   async function revokeFamily(familyId) {
     await Session.updateMany({ familyId, revokedAt: null }, { revokedAt: new Date() });
   }
@@ -41,28 +93,14 @@ export function createAuthService({ env, tokens, logger }) {
         throw conflict('An account with this email already exists', { fields: ['email'] });
       }
       const passwordHash = await bcrypt.hash(password, env.BCRYPT_COST);
-
-      // User, personal workspace and owner membership are created atomically:
-      // a half-registered user without a workspace would land on an empty app.
-      const session = await User.startSession();
-      let user;
-      try {
-        await session.withTransaction(async () => {
-          [user] = await User.create([{ name, email, passwordHash }], { session });
-          await createWorkspaceWithOwner(
-            { name: `${name.split(' ')[0]}'s workspace`, ownerId: user._id },
-            session,
-          );
-        });
-      } finally {
-        await session.endSession();
-      }
-
+      const user = await createUserWithWorkspace({ name, email, passwordHash });
       return { user, ...(await issueTokens(user._id, meta)) };
     },
 
     async login({ email, password }, meta) {
       const user = await User.findOne({ email }).select('+passwordHash');
+      // A user who signed up with Google/GitHub has no hash: they are compared
+      // against the dummy hash too, so they get the same generic error.
       const matches = await bcrypt.compare(password, user?.passwordHash ?? (await dummyHash()));
       if (!user || !matches) throw invalidCredentials();
       return { user, ...(await issueTokens(user._id, meta)) };
@@ -105,8 +143,15 @@ export function createAuthService({ env, tokens, logger }) {
       );
     },
 
+    /** Signs in (or up) with a verified provider profile; same tokens as login. */
+    async oauthSignIn(provider, profile, meta) {
+      const user = await resolveOAuthUser(provider, profile);
+      return { user, ...(await issueTokens(user._id, meta)) };
+    },
+
     async me(userId) {
-      const user = await User.findById(userId);
+      // passwordHash is loaded only so toJSON can report hasPassword; it is never serialised.
+      const user = await User.findById(userId).select('+passwordHash');
       if (!user) throw unauthorized('User no longer exists');
       const memberships = await Membership.find({ userId })
         .sort({ createdAt: 1 })

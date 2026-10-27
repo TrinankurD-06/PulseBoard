@@ -26,6 +26,46 @@ describe('models', () => {
     expect(json.email).toBe('ada@example.com');
   });
 
+  it('allows users without a password (OAuth-only) and exposes only provider names', async () => {
+    const user = await User.create({
+      name: 'Ada',
+      email: 'ada@example.com',
+      identities: [{ provider: 'github', providerId: '42', email: 'ada@example.com' }],
+    });
+    const json = user.toJSON();
+    expect(json).toMatchObject({ providers: ['github'], hasPassword: false });
+    expect(json.identities).toBeUndefined();
+    expect(JSON.stringify(json)).not.toContain('42');
+
+    // A partial load (e.g. populate 'name email') adds neither field.
+    const partial = (await User.findById(user._id).select('name email')).toJSON();
+    expect(partial.providers).toBeUndefined();
+    expect(partial.hasPassword).toBeUndefined();
+  });
+
+  it('links one provider account to at most one user; users without identities never collide', async () => {
+    await User.create({ name: 'A', email: 'a@example.com', passwordHash: 'x' });
+    await User.create({ name: 'B', email: 'b@example.com', passwordHash: 'x' });
+    const identity = { provider: 'google', providerId: 'g-1' };
+    await User.create({ name: 'C', email: 'c@example.com', identities: [identity] });
+    await expect(
+      User.create({ name: 'D', email: 'd@example.com', identities: [identity] }),
+    ).rejects.toMatchObject({ code: 11000 });
+    // The same id at a different provider is a different account.
+    await User.create({
+      name: 'E',
+      email: 'e@example.com',
+      identities: [{ provider: 'github', providerId: 'g-1' }],
+    });
+    await expect(
+      User.create({
+        name: 'F',
+        email: 'f@example.com',
+        identities: [{ provider: 'x', providerId: '1' }],
+      }),
+    ).rejects.toThrow(/provider/);
+  });
+
   it('rejects a duplicate membership for the same user and workspace', async () => {
     const membership = { workspaceId: oid(), userId: oid(), role: 'member' };
     await Membership.create(membership);
