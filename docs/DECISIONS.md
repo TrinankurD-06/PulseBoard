@@ -1125,3 +1125,20 @@ exactly the wiring that differs between types.
   again when read back from the cookie.
 - **Failures are redirects, not JSON**, because start and callback are browser navigations. That
   includes the rate limit (twice the login budget per IP, since one sign-in is two requests).
+
+### D90. Orange dark brand and a yellow-to-red heat ramp for charts
+
+- **Dark brand is a full orange** (600 = #f97316, hover 700 = #ea580c, links 400 = #fb923c)
+  instead of the pale orange of D88. Near-black text on it stays at 5:1 or better. Dark primary
+  buttons carry a yellow → orange → red gradient (the chart ramp); light mode keeps the green
+  brand.
+- **Charts use one heat ramp** (`--color-heat-low/mid/high`): yellow, orange, red, re-stepped
+  per mode (deeper in light for contrast on white). Single-series lines and areas get a vertical
+  gradient measured against the visible axis, so colour follows the value: slow responses and
+  high error rates are red, a quiet line near zero is yellow. Lines whose own range is tiny get
+  a solid colour, because an objectBoundingBox gradient on a zero-height shape is not painted.
+- **Ordered series take steps of the same ramp** (p50/p95/p99, and DNS → TCP → TLS → TTFB →
+  download), darkening monotonically; they also keep their dashes, legend and table view, so
+  identity never depends on hue alone.
+- **Status colours are untouched.** Uptime bars, status dots and badges still mean green = up,
+  amber = degraded, red = down; the heat ramp is only for measurements.

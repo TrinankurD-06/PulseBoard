@@ -47,17 +47,23 @@
   --color-status-paused: #a8a29e;
   --color-status-none: #ead8c8;
 
-  /* Chart tokens (light). Series/timing colours are the first five slots of a
-     categorical palette validated for colour-vision deficiency on these
-     surfaces; dark mode below uses the same hues re-stepped for dark surfaces. */
-  --color-series-1: #2a78d6;
-  --color-series-2: #eb6834;
-  --color-series-3: #1baf7a;
-  --color-timing-dns: #2a78d6;
-  --color-timing-tcp: #eb6834;
-  --color-timing-tls: #1baf7a;
-  --color-timing-ttfb: #eda100;
-  --color-timing-download: #e87ba4;
+  /* Chart tokens (light). Charts use a yellow → red "heat" ramp: single-series
+     lines and areas get a vertical gradient (low values yellow, high values
+     red, see HeatGradient.jsx); ordered series (p50/p95/p99, request timing
+     phases) take steps of the same ramp, darkening monotonically so they still
+     separate without colour. Steps are deepened in light mode for contrast on
+     white and re-stepped for dark surfaces below. */
+  --color-heat-low: #d9a000;
+  --color-heat-mid: #ef7a00;
+  --color-heat-high: #d42a1f;
+  --color-series-1: #ef7a00;
+  --color-series-2: #e2531a;
+  --color-series-3: #c0262d;
+  --color-timing-dns: #e3b000;
+  --color-timing-tcp: #f29100;
+  --color-timing-tls: #ea6510;
+  --color-timing-ttfb: #d63a1c;
+  --color-timing-download: #a51d2d;
   --color-chart-surface: #ffffff;
   --color-chart-grid: #f5dcc7;
   --color-chart-axis: #856d5c;
@@ -65,18 +71,18 @@
 
 /* Dark steps of the same tokens (selected, not an automatic flip). */
 :root.dark {
-  /* Pale orange brand on black: 600 is the button fill, 400 the link text. */
+  /* Orange brand on black: 600 is the button fill, 400 the link text. */
   --color-brand-50: #fff7ed;
-  --color-brand-100: #ffeedb;
-  --color-brand-200: #ffdcb8;
-  --color-brand-300: #ffcb96;
-  --color-brand-400: #ffbd7f;
-  --color-brand-500: #ffb36b;
-  --color-brand-600: #f9a05a;
-  --color-brand-700: #e88a45;
-  --color-brand-800: #c26a2e;
-  --color-brand-900: #7e4420;
-  --color-brand-950: #3f220f;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #fb8532;
+  --color-brand-600: #f97316;
+  --color-brand-700: #ea580c;
+  --color-brand-800: #c2410c;
+  --color-brand-900: #7c2d12;
+  --color-brand-950: #431407;
   --color-on-brand: #120b06;
 
   --color-status-up: #22c55e;
@@ -85,14 +91,17 @@
   --color-status-pending: #fbbf24;
   --color-status-paused: #8a7b70;
   --color-status-none: #3a2e26;
-  --color-series-1: #3987e5;
-  --color-series-2: #d95926;
-  --color-series-3: #199e70;
-  --color-timing-dns: #3987e5;
-  --color-timing-tcp: #d95926;
-  --color-timing-tls: #199e70;
-  --color-timing-ttfb: #c98500;
-  --color-timing-download: #d55181;
+  --color-heat-low: #fde047;
+  --color-heat-mid: #fb8c1e;
+  --color-heat-high: #ef4444;
+  --color-series-1: #fb8c1e;
+  --color-series-2: #f4602a;
+  --color-series-3: #e0323a;
+  --color-timing-dns: #fde047;
+  --color-timing-tcp: #fbad2a;
+  --color-timing-tls: #f97a1f;
+  --color-timing-ttfb: #ee4a33;
+  --color-timing-download: #c42142;
   /* Cards are slate-900/60 over the black body. */
   --color-chart-surface: #0e0a08;
   --color-chart-grid: #2e231c;
@@ -127,11 +136,20 @@
   &:disabled {
     box-shadow: none;
   }
+  /* Dark mode: the orange fill becomes a yellow → orange → red gradient, the
+     same ramp as the charts. Dark text stays ≥ 5:1 across all of it. */
   &:where(.dark, .dark *) {
+    background-image: linear-gradient(135deg, #fbbf24, var(--color-brand-600) 55%, #ef4444);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.4),
       0 2px 0 var(--color-brand-800),
       0 0 18px -4px color-mix(in srgb, var(--color-brand-500) 45%, transparent);
+  }
+  &:where(.dark, .dark *):hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  &:where(.dark, .dark *):disabled {
+    background-image: none;
   }
   &:where(.dark, .dark *):active:not(:disabled) {
     box-shadow:

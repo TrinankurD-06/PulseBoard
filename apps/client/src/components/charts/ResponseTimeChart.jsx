@@ -8,8 +8,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useId } from 'react';
 import { formatMs } from '../../lib/format.js';
-import { axisProps, formatTick, gridProps, tooltipBoxClasses } from './chartTheme.js';
+import { axisProps, formatTick, gridProps, niceTicks, tooltipBoxClasses } from './chartTheme.js';
+import { heatColorAt, lineHeat, svgId } from './heat.js';
+import HeatGradient from './HeatGradient.jsx';
 
 /** A failed check (or bucket containing one): red marker with a surface ring. */
 function FailureDot({ cx, cy, payload }) {
@@ -49,21 +52,32 @@ function ChartTooltip({ active, payload }) {
 }
 
 /**
- * Response time over the selected range: one 2px line over a ~10% wash,
- * failed checks marked in red. Single series, so no legend box: the card
- * title names it.
+ * Response time over the selected range: one 2px line over a fading wash,
+ * both on the yellow → red heat ramp (slow is red), failed checks marked with
+ * a ringed dot. Single series, so no legend box: the card title names it.
  */
 export default function ResponseTimeChart({ points, rangeMs }) {
+  const id = svgId(useId(), 'rt');
   if (points.length === 0) {
     return <p className="py-16 text-center text-sm text-slate-500">No checks in this range yet.</p>;
   }
   // Failed checks have no response time; draw them on the baseline.
   const data = points.map((p) => ({ ...p, value: p.totalMs ?? 0 }));
+  const values = data.map((p) => p.value);
+  // Our own round ticks, so the ramp is measured against the axis the reader sees.
+  const ticks = niceTicks(Math.max(...values, 1));
+  const top = ticks[ticks.length - 1];
+  const heat = lineHeat(Math.min(...values), Math.max(...values), top);
+  const lineStroke = heat ? `url(#${id}-line)` : heatColorAt(Math.max(...values) / top);
 
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            {heat && <HeatGradient id={`${id}-line`} from={heat.from} to={heat.to} />}
+            <HeatGradient id={`${id}-area`} to={Math.max(...values) / top} fade />
+          </defs>
           <CartesianGrid {...gridProps} />
           <XAxis
             dataKey="t"
@@ -71,7 +85,15 @@ export default function ResponseTimeChart({ points, rangeMs }) {
             tickFormatter={(value) => formatTick(value, rangeMs)}
             minTickGap={48}
           />
-          <YAxis {...axisProps} axisLine={false} width={52} tickFormatter={(ms) => formatMs(ms)} />
+          <YAxis
+            {...axisProps}
+            axisLine={false}
+            width={52}
+            tickFormatter={(ms) => formatMs(ms)}
+            ticks={ticks}
+            domain={[0, top]}
+            interval={0}
+          />
           <Tooltip
             content={<ChartTooltip />}
             cursor={{ stroke: 'var(--color-chart-axis)', strokeWidth: 1 }}
@@ -80,14 +102,13 @@ export default function ResponseTimeChart({ points, rangeMs }) {
             type="monotone"
             dataKey="value"
             stroke="none"
-            fill="var(--color-series-1)"
-            fillOpacity={0.1}
+            fill={`url(#${id}-area)`}
             isAnimationActive={false}
           />
           <Line
             type="monotone"
             dataKey="value"
-            stroke="var(--color-series-1)"
+            stroke={lineStroke}
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"

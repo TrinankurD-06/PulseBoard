@@ -1,3 +1,7 @@
+import { useId } from 'react';
+import { svgId } from './heat.js';
+import HeatGradient from './HeatGradient.jsx';
+
 const WIDTH = 120;
 const HEIGHT = 32;
 const PAD = 3;
@@ -9,6 +13,7 @@ const PAD = 3;
  * numbers, so it carries a text summary instead of a tooltip.
  */
 export default function Sparkline({ points }) {
+  const id = svgId(useId(), 'spark');
   if (!points || points.length < 2) {
     return <div className="h-8" aria-hidden="true" />;
   }
@@ -20,6 +25,9 @@ export default function Sparkline({ points }) {
   const line = values.map((ms, i) => `${x(i).toFixed(1)},${y(ms).toFixed(1)}`).join(' ');
   const failures = points.filter((p) => !p.ok).length;
   const avg = Math.round(values.reduce((sum, ms) => sum + ms, 0) / values.length);
+  // Pinned to the plot (0 at the bottom, the max at the top), so a flat line
+  // still gets a colour and spikes turn red.
+  const plot = { bottom: HEIGHT - PAD, top: PAD };
 
   return (
     <svg
@@ -29,16 +37,19 @@ export default function Sparkline({ points }) {
       role="img"
       aria-label={`Last ${points.length} checks: average ${avg}ms${failures ? `, ${failures} failed` : ''}`}
     >
+      <defs>
+        <HeatGradient id={`${id}-line`} userSpace={plot} />
+        <HeatGradient id={`${id}-area`} userSpace={plot} fade />
+      </defs>
       <polyline
         points={`${PAD},${HEIGHT - PAD} ${line} ${WIDTH - PAD},${HEIGHT - PAD}`}
-        fill="var(--color-series-1)"
-        fillOpacity="0.1"
+        fill={`url(#${id}-area)`}
         stroke="none"
       />
       <polyline
         points={line}
         fill="none"
-        stroke="var(--color-series-1)"
+        stroke={`url(#${id}-line)`}
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"

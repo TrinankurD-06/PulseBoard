@@ -16,6 +16,9 @@ import {
   tooltipBoxClasses,
   yAxisWidth,
 } from './chartTheme.js';
+import { useId } from 'react';
+import { heatColorAt, lineHeat, svgId } from './heat.js';
+import HeatGradient from './HeatGradient.jsx';
 
 function ChartTooltip({ active, payload, series, format }) {
   if (!active || !payload?.length) return null;
@@ -75,6 +78,7 @@ export default function MetricLineChart({
   thresholds = [],
   emptyText = 'No reports in this range yet.',
 }) {
+  const id = svgId(useId(), 'metric');
   if (data.length === 0) {
     return <p className="py-16 text-center text-sm text-slate-500">{emptyText}</p>;
   }
@@ -87,6 +91,19 @@ export default function MetricLineChart({
   );
   const ticks = niceTicks(Math.max(dataMax, maxThreshold * 1.1));
   const width = yAxisWidth(ticks.map(format));
+  // A single series follows the yellow → red heat ramp by value; several
+  // series keep their own (ordered) ramp steps so they stay distinguishable.
+  const top = ticks[ticks.length - 1];
+  const singleValues =
+    series.length === 1 ? data.map((row) => row[series[0].key]).filter(Number.isFinite) : [];
+  const heat =
+    singleValues.length > 0
+      ? lineHeat(Math.min(...singleValues), Math.max(...singleValues), top)
+      : null;
+  const strokeOf = (s) => {
+    if (series.length !== 1 || singleValues.length === 0) return s.color;
+    return heat ? `url(#${id})` : heatColorAt(Math.max(...singleValues) / top);
+  };
 
   return (
     <div>
@@ -94,6 +111,11 @@ export default function MetricLineChart({
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            {heat && (
+              <defs>
+                <HeatGradient id={id} from={heat.from} to={heat.to} />
+              </defs>
+            )}
             <CartesianGrid {...gridProps} />
             <XAxis
               dataKey="t"
@@ -138,7 +160,7 @@ export default function MetricLineChart({
                 type="monotone"
                 dataKey={s.key}
                 name={s.label}
-                stroke={s.color}
+                stroke={strokeOf(s)}
                 strokeWidth={2}
                 strokeDasharray={s.dash}
                 strokeLinecap="round"
