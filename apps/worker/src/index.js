@@ -5,6 +5,7 @@ import {
   mongoose,
   mongoState,
 } from '@pulseboard/shared/db';
+import { dashboardUrlWarning } from '@pulseboard/shared/env';
 import { createLogger } from '@pulseboard/shared/logger';
 import { countOverdueJobs } from '@pulseboard/shared/scheduling';
 import { env } from './config/env.js';
@@ -16,6 +17,8 @@ const logger = createLogger({ name: 'worker' });
 // The standalone worker process. The same runner can also live inside the API
 // (RUN_MODE=combined, see apps/api/src/combined.js).
 async function main() {
+  const urlWarning = dashboardUrlWarning(env);
+  if (urlWarning) logger.warn(urlWarning);
   await connectMongo(env.MONGODB_URI, logger);
   await ensureCollections();
   const worker = await startWorker({ env, logger });

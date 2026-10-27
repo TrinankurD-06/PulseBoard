@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { connectMongo, disconnectMongo, ensureCollections, mongoose } from '@pulseboard/shared/db';
+import { dashboardUrlWarning } from '@pulseboard/shared/env';
 import { createLogger } from '@pulseboard/shared/logger';
 import {
   createAgenda,
@@ -16,6 +17,8 @@ import { createSocketServer } from './realtime/socketServer.js';
 const logger = createLogger({ name: 'api' });
 
 async function main() {
+  const urlWarning = dashboardUrlWarning(env);
+  if (urlWarning) logger.warn(urlWarning);
   await connectMongo(env.MONGODB_URI, logger);
   await ensureCollections();
 

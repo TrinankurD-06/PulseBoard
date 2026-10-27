@@ -71,9 +71,11 @@ export function createAlertChannelService({ senders, env }) {
      */
     async sendTest(workspaceId, channelId) {
       const channel = await findInWorkspace(workspaceId, channelId);
+      // A test has no monitor, so the alert links to this workspace's Alert channels page.
       const alert = buildAlert({
         kind: ALERT_KIND.TEST,
-        monitor: { _id: 'test', workspaceId, name: 'Test monitor', url: 'https://example.com' },
+        workspaceId,
+        monitor: { name: 'Test monitor', url: 'https://example.com' },
         dashboardUrl: env.DASHBOARD_URL,
       });
       try {

@@ -1,4 +1,5 @@
 import { ALERT_KIND, MONITOR_TYPES } from '../constants.js';
+import { alertChannelsLink, monitorLink } from './links.js';
 
 /** 3725 -> "1h 2m 5s". Used in alert text. */
 export function humanDuration(totalSeconds) {
@@ -16,12 +17,19 @@ export function humanDuration(totalSeconds) {
  * Builds a channel-agnostic description of an alert. Each sender (Discord,
  * Slack, email) only decides how to *format* it, so the content stays the
  * same everywhere.
+ *
+ * A real alert links to its monitor's page. A test alert has no monitor (the
+ * caller passes a placeholder), so it links to the workspace's Alert channels
+ * page instead; it needs `workspaceId`, a real monitor carries its own.
  */
-export function buildAlert({ kind, monitor, incident, dashboardUrl }) {
-  const link = `${dashboardUrl.replace(/\/$/, '')}/app/${monitor.workspaceId}/monitors/${monitor._id ?? monitor.id}`;
-  const base = { kind, monitorName: monitor.name, url: monitor.url, link };
+export function buildAlert({ kind, monitor, incident, dashboardUrl, workspaceId }) {
+  const isTest = kind === ALERT_KIND.TEST;
+  const link = isTest
+    ? alertChannelsLink(dashboardUrl, workspaceId ?? monitor?.workspaceId)
+    : monitorLink(dashboardUrl, monitor.workspaceId, monitor._id ?? monitor.id);
+  const base = { kind, monitorName: monitor?.name, url: monitor?.url, link };
 
-  if (kind === ALERT_KIND.TEST) {
+  if (isTest) {
     return {
       ...base,
       title: `Test alert from PulseBoard`,

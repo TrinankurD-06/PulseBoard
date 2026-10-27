@@ -1,4 +1,5 @@
 import { ALERT_KIND, NOTICE_KIND } from '../constants.js';
+import { monitorLink } from './links.js';
 
 const formatNumber = (value) => Number(value).toLocaleString('en-US');
 
@@ -18,7 +19,7 @@ function hostOf(url) {
  * details: { requests, budget, month, budgetAction, slowIntervalSec }
  */
 export function buildNotice({ noticeKind, monitor, details = {}, dashboardUrl }) {
-  const link = `${dashboardUrl.replace(/\/$/, '')}/app/${monitor.workspaceId}/monitors/${monitor._id ?? monitor.id}`;
+  const link = monitorLink(dashboardUrl, monitor.workspaceId, monitor._id ?? monitor.id);
   const base = {
     kind: ALERT_KIND.NOTICE,
     monitorName: monitor.name,

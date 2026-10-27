@@ -54,3 +54,25 @@ export const alertSenderConfig = (env) => ({
   from: env.ALERT_FROM_EMAIL,
   resendApiKey: env.RESEND_API_KEY || undefined,
 });
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * A warning when alert links would not work for the people receiving them, or
+ * null. In production "Open dashboard" must point at the public client URL;
+ * DASHBOARD_URL defaults to http://localhost:5173, so forgetting to set it on
+ * the host silently sends everyone to their own machine.
+ */
+export function dashboardUrlWarning(env) {
+  if (env.NODE_ENV !== 'production') return null;
+  let host;
+  try {
+    host = new URL(env.DASHBOARD_URL).hostname;
+  } catch {
+    return 'DASHBOARD_URL is not a valid URL: links in alerts will be broken.';
+  }
+  if (LOCAL_HOSTS.has(host)) {
+    return `DASHBOARD_URL points at ${host}: "Open dashboard" links in alerts will not work. Set it to the public client URL.`;
+  }
+  return null;
+}

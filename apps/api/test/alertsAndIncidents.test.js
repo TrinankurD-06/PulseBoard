@@ -10,7 +10,7 @@ let failDelivery = false;
 const alertSenders = {
   discord: async (target, alert) => {
     if (failDelivery) throw new Error('HTTP 404: Unknown Webhook');
-    sent.push({ target, title: alert.title });
+    sent.push({ target, title: alert.title, link: alert.link });
   },
   slack: async () => {},
   email: async () => ({ previewUrl: 'https://ethereal.email/message/xyz' }),
@@ -105,7 +105,18 @@ describe('alert channels', () => {
       .set(owner.auth);
     expect(res.status).toBe(200);
     expect(res.body.data.delivered).toBe(true);
-    expect(sent).toEqual([{ target: DISCORD, title: 'Test alert from PulseBoard' }]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ target: DISCORD, title: 'Test alert from PulseBoard' });
+  });
+
+  it('links a test alert to the Alert channels page, not to a monitor that does not exist', async () => {
+    const channel = await createChannel();
+    await request(app)
+      .post(ws(`/alert-channels/${channel.id}/test`))
+      .set(owner.auth);
+    // DASHBOARD_URL comes from the test env (http://localhost:5173).
+    expect(sent[0].link).toBe(`http://localhost:5173/app/${wid}/alerts`);
+    expect(sent[0].link).not.toContain('/monitors/');
   });
 
   it('reports a delivery failure as 502 with the reason', async () => {
