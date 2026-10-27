@@ -170,14 +170,14 @@ page wave driven by status only (the public endpoint exposes no latency), uptime
 - [x] **V1. Audit and plan**
 - [x] **V2. Tokens, fonts, ambient glow; old theme, light mode, grain removed** (D94). A transitional
       bridge keeps unrebuilt pages readable; it is deleted in V6.
-- [ ] **V3. Header line + nav + shell; primitives** (ring-dot, CTA, outline cards, pills, inputs, toasts,
+- [x] **V3. Header line + nav + shell; primitives** (D95) (ring-dot, CTA, outline cards, pills, inputs, toasts,
       modals, skeletons, empty states, Recharts theme)
-- [ ] **V4. Radial tick gauge + stepped cards** (gauge maths unit-tested)
-- [ ] **V5. Signal field** (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded)
+- [x] **V4. Radial tick gauge + stepped cards** (gauge maths unit-tested)
+- [x] **V5. Signal field** (built and tested, not yet mounted on pages) (WebGL + 2D fallback, live data, limits, reduced motion, lazy-loaded)
 - [ ] **V6. App pages** (+ Health deck restyle, remove the bridge and the `dark:` variant)
 - [ ] **V7. Landing + public status page**
 - [ ] **V8. QA** (screenshots 1440/390 in docs/screenshots, Lighthouse perf ≥ 85 / a11y ≥ 90)
 
 ## Resume note (UI v2)
 
-Next: V3.
+Next: V6 (pages) and V7 (landing, public status, auth), then V8 QA.

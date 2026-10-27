@@ -1,19 +1,20 @@
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 
-/** Brand fill with a pressable 3D edge; also used by links styled as primary buttons. */
-export const primaryButtonClasses = 'bg-brand-600 text-on-brand hover:bg-brand-700';
+/** Filled cream pill; also used by links styled as primary buttons. */
+export const primaryButtonClasses =
+  'bg-brand text-brand-ink hover:bg-fg transition-colors duration-200 ease-(--ease)';
 
 const VARIANTS = {
-  primary: `${primaryButtonClasses} disabled:bg-brand-600/50`,
+  primary: `${primaryButtonClasses} disabled:opacity-50 disabled:hover:bg-brand`,
   secondary:
-    'border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800',
-  danger: 'bg-red-600 text-white hover:bg-red-500 disabled:bg-red-600/50',
-  ghost:
-    'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+    'border border-line-strong bg-transparent text-fg hover:border-fg hover:bg-surface-2 disabled:opacity-50',
+  danger:
+    'border border-status-down/60 bg-transparent text-status-down hover:bg-status-down hover:text-brand-ink disabled:opacity-50',
+  ghost: 'text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-50',
 };
 
-const SIZES = { sm: 'h-8 px-3 text-sm', md: 'h-10 px-4 text-sm' };
+const SIZES = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-sm' };
 
 export default function Button({
   variant = 'primary',
@@ -30,7 +31,7 @@ export default function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed dark:focus-visible:ring-offset-black',
+        'inline-flex items-center justify-center gap-2 rounded-pill font-medium whitespace-nowrap transition-[color,background-color,border-color] duration-200 ease-(--ease) disabled:cursor-not-allowed',
         VARIANTS[variant],
         SIZES[size],
         className,

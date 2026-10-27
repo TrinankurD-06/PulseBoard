@@ -5,32 +5,32 @@ export const STATUS_STYLES = {
   up: {
     label: 'Up',
     dot: 'bg-status-up',
-    text: 'text-emerald-700 dark:text-emerald-400',
+    text: 'text-status-up',
     tone: 'green',
   },
   down: {
     label: 'Down',
     dot: 'bg-status-down',
-    text: 'text-red-600 dark:text-red-400',
+    text: 'text-status-down',
     tone: 'red',
   },
   pending: {
     label: 'Pending',
     dot: 'bg-status-pending',
-    text: 'text-amber-600 dark:text-amber-400',
+    text: 'text-status-degraded',
     tone: 'amber',
   },
   // Agent monitors: the agent stopped reporting but the app still answers.
   degraded: {
     label: 'Degraded',
-    dot: 'bg-status-pending',
-    text: 'text-amber-600 dark:text-amber-400',
+    dot: 'bg-status-degraded',
+    text: 'text-status-degraded',
     tone: 'amber',
   },
   paused: {
     label: 'Paused',
     dot: 'bg-status-paused',
-    text: 'text-slate-500 dark:text-slate-400',
+    text: 'text-muted',
     tone: 'neutral',
   },
 };

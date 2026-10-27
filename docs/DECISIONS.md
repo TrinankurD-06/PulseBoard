@@ -1279,3 +1279,26 @@ series would not line up between cards.
   `brand-*`, chart series/heat/timing tokens) are pointed at the new neutrals, the cream accent and
   text shades, and `dark:` is an always-true variant so the existing `dark:` classes keep applying.
   The bridge and the variant are deleted with the last page.
+
+### D95. Shell and primitives
+
+- **No sidebar.** `AppLayout` renders `HeaderLine` (wordmark, workspace switcher, a 1 px hairline, live
+  status, user menu with log out) and `TextNav` (13 px text links, active `text-fg`, others
+  `text-faint`). Below `md` the nav is a hairline bottom bar with short labels (Pages, Alerts, Usage) so
+  all seven fit at 390 px. Route, `NotFound` and permission handling are unchanged.
+- **Live status** comes from existing state only: `useRealtime().connected` and `useIncidents(wid,
+{ status: 'open', limit: 1 })` (its `pagination.total`). The wording lives in `lib/liveStatus.js`
+  (unit tested): "All systems normal" (pulsing `status-up` dot), "N incidents open", "Offline".
+- **Primitives keep their props.** `Button` variants/sizes are the same names (primary = cream pill,
+  secondary = hairline, danger = `status-down` hairline, ghost); `primaryButtonClasses`, `inputClasses`,
+  `Badge` tones (green/red/amber/blue/neutral) and `EmptyState`'s `icon` prop still work (the icon is
+  ignored; the ring-dot is the icon). New: `RingDotCta`, `Pill`/`PillGroup`, select and textarea
+  variants of `Field`. `Modal` keeps the native `<dialog>`; only the surface changed.
+- **Charts.** One theme in `chartTheme.js` (no axis lines, `--line` horizontal grid, 11 px mono
+  `text-faint` ticks, blurred outline tooltips, 1.5 px `--text` lines, `AreaGradient` 10% to
+  transparent). The heat ramp files are deleted; `svgId` moved to `chartTheme.js` (the Health deck
+  imports it from there). Timing phases are five `color-mix` tones from `--text` to `--text-faint`;
+  uptime bars use `status-*` with `--line` for no data. `STATUS_STYLES` text classes now use
+  `text-status-*`.
+- **Bridge.** The heat and timing bridge tokens are removed. `--color-series-*` stays because the agent
+  analytics page still uses it.

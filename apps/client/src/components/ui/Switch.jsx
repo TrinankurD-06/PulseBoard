@@ -1,6 +1,6 @@
 import { cn } from '../../lib/cn.js';
 
-/** Accessible on/off toggle (a button with role="switch"). */
+/** Accessible on/off toggle (a button with role="switch"): hairline track, cream dot when on. */
 export default function Switch({ checked, onChange, disabled, label }) {
   return (
     <button
@@ -11,14 +11,14 @@ export default function Switch({ checked, onChange, disabled, label }) {
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-brand-600' : 'bg-slate-300 dark:bg-slate-700',
+        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-pill border transition-colors duration-200 ease-(--ease) disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'border-brand bg-brand/15' : 'border-line-strong bg-transparent',
       )}
     >
       <span
         className={cn(
-          'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-0.5',
+          'inline-block h-3.5 w-3.5 rounded-pill transition-[transform,background-color] duration-200 ease-(--ease) motion-reduce:transition-none',
+          checked ? 'translate-x-6 bg-brand' : 'translate-x-1 bg-faint',
         )}
       />
     </button>

@@ -1,13 +1,23 @@
 import { forwardRef, useId } from 'react';
 import { cn } from '../../lib/cn.js';
 
+/** Bottom-border-only hairline input; focus turns the underline to the accent. */
 export const inputClasses =
-  'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
+  'block w-full rounded-none border-0 border-b border-line-strong bg-transparent px-0 py-2 text-sm text-fg placeholder:text-faint transition-colors duration-200 focus:border-brand focus:shadow-[0_1px_0_0_var(--accent)] focus:outline-none disabled:opacity-50 aria-[invalid=true]:border-status-down';
+
+/** Select: same underline, the native arrow replaced by a small chevron. */
+const selectClasses = cn(
+  inputClasses,
+  'cursor-pointer appearance-none bg-[length:12px] bg-[right_2px_center] bg-no-repeat pr-6 [&>option]:bg-bg [&>option]:text-fg',
+  "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%237c7b71' stroke-width='1.2'%3E%3Cpath d='M2 4.5l4 4 4-4'/%3E%3C/svg%3E\")]",
+);
+
+const textareaClasses = cn(inputClasses, 'min-h-20 resize-y leading-relaxed');
 
 /**
  * Label + input + validation message. Works with React Hook Form's register():
  * <Field label="Email" error={errors.email?.message} {...register('email')} />
- * Pass `as="select"` with <option> children for a select.
+ * Pass `as="select"` or `as="textarea"` for those variants.
  */
 const Field = forwardRef(function Field(
   { label, error, hint, as: Component = 'input', className, children, ...props },
@@ -15,10 +25,16 @@ const Field = forwardRef(function Field(
 ) {
   const id = useId();
   const messageId = `${id}-message`;
+  const control =
+    Component === 'select'
+      ? selectClasses
+      : Component === 'textarea'
+        ? textareaClasses
+        : inputClasses;
   return (
     <div className={className}>
       {label && (
-        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+        <label htmlFor={id} className="block text-xs text-faint">
           {label}
         </label>
       )}
@@ -27,10 +43,7 @@ const Field = forwardRef(function Field(
         ref={ref}
         aria-invalid={Boolean(error)}
         aria-describedby={error || hint ? messageId : undefined}
-        className={cn(
-          inputClasses,
-          error && 'border-red-500 focus:border-red-500 focus:ring-red-500/30',
-        )}
+        className={control}
         {...props}
       >
         {children}
@@ -38,10 +51,7 @@ const Field = forwardRef(function Field(
       {(error || hint) && (
         <p
           id={messageId}
-          className={cn(
-            'mt-1.5 text-xs',
-            error ? 'text-red-600 dark:text-red-400' : 'text-slate-500',
-          )}
+          className={cn('mt-1.5 text-xs', error ? 'text-status-down' : 'text-faint')}
         >
           {error || hint}
         </p>

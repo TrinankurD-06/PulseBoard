@@ -23,14 +23,14 @@ export function CopyButton({ text, label, onCopied }) {
   );
 }
 
-/** Dark code block with a copy button, for setup snippets. */
+/** Hairline code block with a copy button, for setup snippets. */
 export default function CodeBlock({ code, label, onCopied }) {
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-lg bg-slate-950 p-4 pr-24 text-xs leading-relaxed text-slate-100 dark:bg-black/40">
+      <pre className="overflow-x-auto rounded-card border border-line bg-surface p-4 pr-28 font-mono text-xs leading-relaxed text-muted">
         <code>{code}</code>
       </pre>
-      <div className="absolute top-2 right-2">
+      <div className="absolute top-2.5 right-2.5">
         <CopyButton text={code} label={`Copy ${label}`} onCopied={onCopied} />
       </div>
     </div>

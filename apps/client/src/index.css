@@ -107,18 +107,10 @@
   --color-brand-950: #2b2d1d;
   --color-on-brand: #0a0a09;
 
-  /* Chart tokens until the Recharts theme is rebuilt in phase 3. */
-  --color-heat-low: var(--text-faint);
-  --color-heat-mid: var(--text-muted);
-  --color-heat-high: var(--text);
+  /* Series tokens: still read by the agent analytics page until it is rebuilt. */
   --color-series-1: var(--text);
   --color-series-2: var(--text-muted);
   --color-series-3: var(--text-faint);
-  --color-timing-dns: var(--text);
-  --color-timing-tcp: color-mix(in oklab, var(--text) 75%, var(--bg));
-  --color-timing-tls: color-mix(in oklab, var(--text) 55%, var(--bg));
-  --color-timing-ttfb: color-mix(in oklab, var(--text) 38%, var(--bg));
-  --color-timing-download: color-mix(in oklab, var(--text) 24%, var(--bg));
   --color-chart-surface: var(--bg);
   --color-chart-grid: var(--line);
   --color-chart-axis: var(--text-faint);
@@ -216,4 +208,78 @@
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
+}
+
+/* -- Primitives ------------------------------------------------------------------ */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@utility animate-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklab, var(--text) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.8s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--status-up) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@utility animate-live-pulse {
+  animation: live-pulse 2.4s var(--ease) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-modal-in {
+  animation: modal-in var(--dur-enter) var(--ease) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+dialog.modal::backdrop {
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+  backdrop-filter: blur(8px);
+  animation: backdrop-in var(--dur-fast) var(--ease) both;
 }

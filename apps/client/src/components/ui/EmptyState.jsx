@@ -1,14 +1,16 @@
-export default function EmptyState({ icon: Icon, title, description, action }) {
+import RingDot from './RingDot.jsx';
+
+/**
+ * Thin headline, a muted line and the action (pass a RingDotCta). `icon` is
+ * accepted for backwards compatibility and ignored: the ring-dot is the icon.
+ */
+export default function EmptyState({ title, description, action }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 px-6 py-14 text-center dark:border-slate-700">
-      {Icon && (
-        <div className="mb-4 rounded-full bg-slate-100 p-3 dark:bg-slate-800">
-          <Icon className="h-6 w-6 text-slate-500" aria-hidden="true" />
-        </div>
-      )}
-      <h3 className="font-semibold">{title}</h3>
-      {description && <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>}
-      {action && <div className="mt-5">{action}</div>}
+    <div className="flex flex-col items-center justify-center rounded-card border border-dashed border-line px-6 py-16 text-center">
+      <RingDot className="mb-6" />
+      <h3 className="text-2xl font-light tracking-[-0.02em] text-fg">{title}</h3>
+      {description && <p className="mt-2 max-w-[38ch] text-sm text-muted">{description}</p>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   );
 }

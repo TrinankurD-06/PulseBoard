@@ -11,14 +11,14 @@ import { formatDuration } from '../../lib/format.js';
 export default function PingHistoryChart({ entries }) {
   const [active, setActive] = useState(null);
   if (entries.length === 0) {
-    return <p className="py-10 text-center text-sm text-slate-500">No pings yet.</p>;
+    return <p className="py-10 text-center text-sm text-muted">No pings yet.</p>;
   }
   const longest = Math.max(0, ...entries.map((e) => e.durationMs ?? 0));
   const hovered = active == null ? null : entries[active];
 
   return (
     <div className="relative">
-      <div className="flex h-20 items-end gap-[2px]" role="list" aria-label="Ping history">
+      <div className="flex h-20 items-end gap-[3px]" role="list" aria-label="Ping history">
         {entries.map((entry, i) => {
           const height =
             entry.ok && longest > 0 && entry.durationMs != null
@@ -39,7 +39,7 @@ export default function PingHistoryChart({ entries }) {
             >
               <span
                 className={cn(
-                  'w-full rounded-t-[2px] transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-brand-500',
+                  'w-full rounded-t-pill transition-opacity group-hover:opacity-80 group-focus-visible:ring-[1.5px] group-focus-visible:ring-brand',
                   entry.ok ? 'bg-status-up' : 'bg-status-down',
                 )}
                 style={{ height: `${height}%` }}
@@ -51,37 +51,38 @@ export default function PingHistoryChart({ entries }) {
 
       {hovered && (
         <div
-          className="pointer-events-none absolute bottom-full z-10 mb-2 w-48 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="pointer-events-none absolute bottom-full z-10 mb-2 w-48 -translate-x-1/2 rounded-card border border-line-strong bg-bg/80 px-3.5 py-2.5 text-xs text-muted backdrop-blur-md"
           style={{
             left: `clamp(6rem, ${((active + 0.5) / entries.length) * 100}%, calc(100% - 6rem))`,
           }}
           role="tooltip"
         >
-          <p className="font-medium">{new Date(hovered.t).toLocaleString()}</p>
+          <p className="text-fg">{new Date(hovered.t).toLocaleString()}</p>
           <p className="mt-1 flex items-center gap-1.5">
             <span
-              className={cn('h-2 w-2 rounded-full', hovered.ok ? 'bg-status-up' : 'bg-status-down')}
+              className={cn(
+                'h-1.5 w-1.5 rounded-pill',
+                hovered.ok ? 'bg-status-up' : 'bg-status-down',
+              )}
             />
             {hovered.label}
           </p>
           {hovered.durationMs != null && (
-            <p className="mt-1 text-slate-600 dark:text-slate-300">
-              Run took {formatDuration(hovered.durationMs / 1000)}
-            </p>
+            <p className="mt-1 text-muted">Run took {formatDuration(hovered.durationMs / 1000)}</p>
           )}
         </div>
       )}
 
-      <div className="mt-2 flex justify-between text-xs text-slate-500">
+      <div className="mt-2 flex justify-between text-xs text-muted">
         <span>Oldest</span>
         <span>Latest</span>
       </div>
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
         <li className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-status-up" /> Ping received
+          <span className="h-1.5 w-1.5 rounded-pill bg-status-up" /> Ping received
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-status-down" /> Missed or failed
+          <span className="h-1.5 w-1.5 rounded-pill bg-status-down" /> Missed or failed
         </li>
         {longest > 0 && <li>Bar height: run duration (jobs using /start)</li>}
       </ul>

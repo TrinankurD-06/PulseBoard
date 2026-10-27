@@ -10,31 +10,27 @@ import {
 } from 'recharts';
 import {
   axisProps,
+  cursorProps,
   formatTick,
   gridProps,
   niceTicks,
+  LINE_WIDTH,
   tooltipBoxClasses,
   yAxisWidth,
 } from './chartTheme.js';
-import { useId } from 'react';
-import { heatColorAt, lineHeat, svgId } from './heat.js';
-import HeatGradient from './HeatGradient.jsx';
 
 function ChartTooltip({ active, payload, series, format }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   return (
     <div className={tooltipBoxClasses}>
-      <p className="font-medium">{new Date(point.t).toLocaleString()}</p>
+      <p className="text-fg">{new Date(point.t).toLocaleString()}</p>
       {series.map((s) => (
-        <p
-          key={s.key}
-          className="mt-1 flex items-center gap-1.5 text-slate-600 dark:text-slate-300"
-        >
+        <p key={s.key} className="mt-1 flex items-center gap-1.5 text-muted">
           {series.length > 1 && (
             <span className="h-0.5 w-3 rounded" style={{ backgroundColor: s.color }} />
           )}
-          {s.label}: <span className="font-medium tabular-nums">{format(point[s.key])}</span>
+          {s.label}: <span className="font-mono text-fg tabular-nums">{format(point[s.key])}</span>
         </p>
       ))}
     </div>
@@ -44,7 +40,7 @@ function ChartTooltip({ active, payload, series, format }) {
 /** Legend for multi-series charts: a line swatch + label (dashes match the lines). */
 function Legend({ series }) {
   return (
-    <ul className="mb-2 flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300">
+    <ul className="mb-2 flex flex-wrap gap-4 text-xs text-muted">
       {series.map((s) => (
         <li key={s.key} className="flex items-center gap-1.5">
           <svg width="16" height="4" aria-hidden="true">
@@ -78,9 +74,8 @@ export default function MetricLineChart({
   thresholds = [],
   emptyText = 'No reports in this range yet.',
 }) {
-  const id = svgId(useId(), 'metric');
   if (data.length === 0) {
-    return <p className="py-16 text-center text-sm text-slate-500">{emptyText}</p>;
+    return <p className="py-16 text-center text-sm text-muted">{emptyText}</p>;
   }
   const maxThreshold = Math.max(0, ...thresholds.map((t) => t.value));
   // Round ticks from our own domain (Recharts would label the raw maximum,
@@ -91,19 +86,6 @@ export default function MetricLineChart({
   );
   const ticks = niceTicks(Math.max(dataMax, maxThreshold * 1.1));
   const width = yAxisWidth(ticks.map(format));
-  // A single series follows the yellow → red heat ramp by value; several
-  // series keep their own (ordered) ramp steps so they stay distinguishable.
-  const top = ticks[ticks.length - 1];
-  const singleValues =
-    series.length === 1 ? data.map((row) => row[series[0].key]).filter(Number.isFinite) : [];
-  const heat =
-    singleValues.length > 0
-      ? lineHeat(Math.min(...singleValues), Math.max(...singleValues), top)
-      : null;
-  const strokeOf = (s) => {
-    if (series.length !== 1 || singleValues.length === 0) return s.color;
-    return heat ? `url(#${id})` : heatColorAt(Math.max(...singleValues) / top);
-  };
 
   return (
     <div>
@@ -111,11 +93,6 @@ export default function MetricLineChart({
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-            {heat && (
-              <defs>
-                <HeatGradient id={id} from={heat.from} to={heat.to} />
-              </defs>
-            )}
             <CartesianGrid {...gridProps} />
             <XAxis
               dataKey="t"
@@ -136,19 +113,19 @@ export default function MetricLineChart({
             />
             <Tooltip
               content={<ChartTooltip series={series} format={format} />}
-              cursor={{ stroke: 'var(--color-chart-axis)', strokeWidth: 1 }}
+              cursor={cursorProps}
             />
             {thresholds.map((t) => (
               <ReferenceLine
                 key={t.label}
                 y={t.value}
-                stroke="var(--color-status-down)"
+                stroke="var(--status-down)"
                 strokeDasharray="4 4"
                 strokeWidth={1}
                 label={{
                   value: t.label,
                   position: 'insideTopRight',
-                  fill: 'var(--color-chart-axis)',
+                  fill: 'var(--text-faint)',
                   fontSize: 11,
                 }}
                 ifOverflow="extendDomain"
@@ -160,13 +137,13 @@ export default function MetricLineChart({
                 type="monotone"
                 dataKey={s.key}
                 name={s.label}
-                stroke={strokeOf(s)}
-                strokeWidth={2}
+                stroke={s.color}
+                strokeWidth={LINE_WIDTH}
                 strokeDasharray={s.dash}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 dot={false}
-                activeDot={{ r: 4, stroke: 'var(--color-chart-surface)', strokeWidth: 2 }}
+                activeDot={{ r: 3.5, stroke: 'var(--bg)', strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             ))}

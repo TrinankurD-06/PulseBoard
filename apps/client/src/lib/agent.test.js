@@ -192,7 +192,7 @@ describe('degraded status styling', () => {
   it('is amber with its own "Degraded" text label', () => {
     expect(statusStyle('degraded')).toBe(STATUS_STYLES.degraded);
     expect(STATUS_STYLES.degraded).toMatchObject({ label: 'Degraded', tone: 'amber' });
-    expect(STATUS_STYLES.degraded.text).toMatch(/amber/);
+    expect(STATUS_STYLES.degraded.text).toMatch(/status-degraded/);
   });
 
   it('counts as up in summaries (the app is reachable)', () => {

@@ -8,6 +8,7 @@ import { monitorKeys } from '../api/monitors.js';
 import { setRealtimeConnected } from '../api/realtimeState.js';
 import { getAccessToken } from '../api/tokenStore.js';
 import { useAuth } from '../auth/AuthContext.js';
+import { publishCheckEvent } from './checkEvents.js';
 import { createMetricsFolder } from './metricsLive.js';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -93,15 +94,18 @@ export function useRealtime() {
     socket.on('check:result', (payload) => {
       applyCheckResult(queryClient, payload);
       metricsFolder.push(payload);
+      publishCheckEvent('check:result', payload);
     });
 
     socket.on('incident:opened', (incident) => {
+      publishCheckEvent('incident:opened', incident);
       queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
       toast.error(`${monitorName(queryClient, incident.workspaceId, incident.monitorId)} is down`, {
         description: incident.cause,
       });
     });
     socket.on('incident:resolved', (incident) => {
+      publishCheckEvent('incident:resolved', incident);
       queryClient.invalidateQueries({ queryKey: incidentsKey(incident.workspaceId) });
       toast.success(
         `${monitorName(queryClient, incident.workspaceId, incident.monitorId)} is back up`,

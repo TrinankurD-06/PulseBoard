@@ -11,7 +11,7 @@ import {
 import { RANGES } from '../../api/analytics.js';
 import { formatMetricText, formatMetricValue, seriesDomain } from '../../lib/health.js';
 import { axisProps, formatTick, gridProps } from '../charts/chartTheme.js';
-import { svgId } from '../charts/heat.js';
+import { svgId } from '../charts/chartTheme.js';
 import { isolatedDot } from './isolatedDot.jsx';
 import { tooltipBox } from './tooltipStyles.js';
 

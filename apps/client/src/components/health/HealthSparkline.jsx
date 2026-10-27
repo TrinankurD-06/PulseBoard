@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatMetricText, seriesDomain } from '../../lib/health.js';
-import { svgId } from '../charts/heat.js';
+import { svgId } from '../charts/chartTheme.js';
 import { isolatedDot } from './isolatedDot.jsx';
 import { tooltipBox } from './tooltipStyles.js';
 

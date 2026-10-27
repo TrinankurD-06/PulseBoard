@@ -1,23 +1,25 @@
 import { cn } from '../../lib/cn.js';
 
-const TONES = {
-  neutral: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-  green: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400',
-  red: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400',
-  amber: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400',
-  blue: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400',
+// The dot carries the state; the label stays in the muted text colour.
+const DOTS = {
+  neutral: 'bg-status-paused',
+  green: 'bg-status-up',
+  red: 'bg-status-down',
+  amber: 'bg-status-degraded',
+  blue: 'bg-brand',
 };
 
+/** Dot + label. Tones keep their old names (green, red, amber, blue, neutral). */
 export default function Badge({ tone = 'neutral', className, children, ...props }) {
   return (
     <span
       {...props}
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-        TONES[tone],
+        'inline-flex items-center gap-1.5 text-xs whitespace-nowrap text-muted',
         className,
       )}
     >
+      <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-pill', DOTS[tone])} />
       {children}
     </span>
   );

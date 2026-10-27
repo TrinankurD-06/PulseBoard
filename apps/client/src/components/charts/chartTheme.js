@@ -1,9 +1,13 @@
 // Recharts props shared by every chart: recessive solid hairline grid, quiet
 // axes, and tick text in the axis token (never the series colour).
-export const AXIS_TICK = { fill: 'var(--color-chart-axis)', fontSize: 11 };
+export const AXIS_TICK = {
+  fill: 'var(--text-faint)',
+  fontSize: 11,
+  fontFamily: 'var(--font-mono)',
+};
 
 export const gridProps = {
-  stroke: 'var(--color-chart-grid)',
+  stroke: 'var(--line)',
   strokeWidth: 1,
   vertical: false,
 };
@@ -11,11 +15,20 @@ export const gridProps = {
 export const axisProps = {
   tick: AXIS_TICK,
   tickLine: false,
-  axisLine: { stroke: 'var(--color-chart-grid)' },
+  axisLine: false,
 };
 
 export const tooltipBoxClasses =
-  'rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900';
+  'rounded-card border border-line-strong bg-bg/80 px-3.5 py-2.5 text-xs text-muted backdrop-blur-md';
+
+/** Hover cursor: a single hairline. */
+export const cursorProps = { stroke: 'var(--line-strong)', strokeWidth: 1 };
+
+/** Line series: 1.5px in the text colour; the area wash fades from 10% to nothing. */
+export const LINE_STROKE = 'var(--text)';
+export const LINE_WIDTH = 1.5;
+export const AREA_TOP = 'color-mix(in oklab, var(--text) 10%, transparent)';
+export const AREA_BOTTOM = 'transparent';
 
 /** Tick label for a timestamp, appropriate to the visible range. */
 export function formatTick(value, rangeMs) {
@@ -49,3 +62,6 @@ export function yAxisWidth(labels, { charPx = 6.5, padding = 12, min = 40 } = {}
   const longest = Math.max(0, ...labels.map((label) => String(label).length));
   return Math.max(min, Math.ceil(longest * charPx) + padding);
 }
+
+/** An SVG-safe id from React's useId (which contains colons). */
+export const svgId = (reactId, prefix) => `${prefix}-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
