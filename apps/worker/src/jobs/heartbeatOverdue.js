@@ -1,11 +1,14 @@
 import { humanDuration } from '@pulseboard/shared/alerts';
 import {
   CHECK_SOURCES,
+  CHECK_STATE,
   HEARTBEAT_MAX_MISSED_PER_RUN,
   MISSED_PING_PREFIX,
   MONITOR_TYPES,
 } from '@pulseboard/shared/constants';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
+
+const ERROR_CODE = 'HEARTBEAT_MISSED';
 
 /** Why a missed period counts as a failure, shown in the UI and alerts. */
 export function missedPingMessage(monitor) {
@@ -46,11 +49,13 @@ export function createHeartbeatOverdueJob({ processCheckResult, logger }) {
         meta: { monitorId: monitor._id, workspaceId: monitor.workspaceId },
         ok: false,
         error,
+        errorCode: ERROR_CODE,
+        state: CHECK_STATE.FAILED,
         source: CHECK_SOURCES.HEARTBEAT,
       });
       await processCheckResult(
         monitor._id,
-        { ok: false, statusCode: null, error, totalMs: null, timings: null },
+        { ok: false, statusCode: null, error, errorCode: ERROR_CODE, totalMs: null, timings: null },
         dueAt,
       );
       missed += 1;

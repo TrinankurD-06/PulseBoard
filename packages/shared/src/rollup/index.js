@@ -9,15 +9,20 @@ import { addDays, downtimeWithin, utcDayStart } from '../uptime/index.js';
  * and upserts them with $merge (on the unique { monitorId, date } index).
  * Re-running it for the same day just overwrites the numbers: idempotent.
  */
-export function buildRollupPipeline(dayStart, { isFinal }) {
+export function buildRollupPipeline(dayStart, { isFinal, now = new Date() }) {
   const dayEnd = addDays(dayStart, 1);
+  // Watched time of the day: first counted result to the end of the day (or now).
+  const coveredEnd = { $min: [{ $literal: now }, { $literal: dayEnd }] };
+  const coveredStart = { $max: [{ $literal: dayStart }, '$firstAt'] };
   return [
-    { $match: { timestamp: { $gte: dayStart, $lt: dayEnd } } },
+    // Unknown results (checker offline) never count; old results have no state.
+    { $match: { timestamp: { $gte: dayStart, $lt: dayEnd }, state: { $ne: 'unknown' } } },
     {
       $group: {
         _id: '$meta.monitorId',
         workspaceId: { $first: '$meta.workspaceId' },
         totalChecks: { $sum: 1 },
+        firstAt: { $min: '$timestamp' },
         upChecks: { $sum: { $cond: ['$ok', 1, 0] } },
         avgResponseMs: { $avg: '$totalMs' },
         // $percentile needs MongoDB 7.0+; "approximate" is the only method it offers.
@@ -34,6 +39,12 @@ export function buildRollupPipeline(dayStart, { isFinal }) {
         upChecks: 1,
         avgResponseMs: { $round: ['$avgResponseMs', 1] },
         p95ResponseMs: { $round: [{ $arrayElemAt: ['$p95', 0] }, 1] },
+        coveredSec: {
+          $max: [
+            0,
+            { $round: [{ $divide: [{ $subtract: [coveredEnd, coveredStart] }, 1000] }, 0] },
+          ],
+        },
         isFinal: { $literal: isFinal },
       },
     },
@@ -57,7 +68,7 @@ export async function rollupDay(day, { isFinal = false, now = new Date() } = {})
   const dayStart = utcDayStart(day);
   const dayEnd = addDays(dayStart, 1);
 
-  await CheckResult.aggregate(buildRollupPipeline(dayStart, { isFinal }));
+  await CheckResult.aggregate(buildRollupPipeline(dayStart, { isFinal, now }));
 
   const incidents = await Incident.find(
     { startedAt: { $lt: dayEnd }, $or: [{ resolvedAt: null }, { resolvedAt: { $gt: dayStart } }] },

@@ -10,14 +10,15 @@ export const truncate = (text) =>
  * partial unique index (one open incident per monitor) rejects the insert, so
  * even a race between two workers can't create a duplicate.
  */
-export async function openIncident(monitor, { startedAt, cause, openedAt, message }) {
+export async function openIncident(monitor, { startedAt, cause, code = null, openedAt, message }) {
   try {
     return await Incident.create({
       monitorId: monitor._id,
       workspaceId: monitor.workspaceId,
       startedAt,
       cause: cause ? truncate(cause) : 'Unknown',
-      timeline: [{ at: openedAt, type: INCIDENT_EVENT.OPENED, message: truncate(message) }],
+      causeCode: code,
+      timeline: [{ at: openedAt, type: INCIDENT_EVENT.OPENED, message: truncate(message), code }],
     });
   } catch (err) {
     if (err?.code === 11000) return null;

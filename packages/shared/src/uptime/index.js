@@ -15,8 +15,10 @@ export const addDays = (date, days) => new Date(new Date(date).getTime() + days 
 export const dayKey = (date) => new Date(date).toISOString().slice(0, 10);
 
 /**
- * Uptime as a percentage with 3 decimals (99.954), or null when there is no
- * data. null is not 100%: "never checked" must not look like "perfect".
+ * Share of checks that passed, with 3 decimals (99.954), or null when there
+ * are none. This is a PASS RATE, not uptime: uptime comes from confirmed
+ * downtime only (uptimeFromDowntime), so failed checks that never opened an
+ * incident do not lower it.
  */
 export function uptimePercent(upChecks, totalChecks) {
   if (!totalChecks) return null;
@@ -24,26 +26,49 @@ export function uptimePercent(upChecks, totalChecks) {
 }
 
 /**
- * Combines daily rollups into one figure. Weighted by number of checks, NOT an
- * average of daily percentages (a day with 10 checks mustn't count as much as
- * a day with 8,640).
+ * Uptime = 100 x (1 - downtime / covered time), 3 decimals. null when nothing
+ * was covered: null is not 100%, "never watched" must not look like "perfect".
+ * Downtime is clamped to [0, coveredSec].
+ */
+export function uptimeFromDowntime(downtimeSec, coveredSec) {
+  if (!(coveredSec > 0)) return null;
+  const downtime = Math.min(Math.max(Number(downtimeSec) || 0, 0), coveredSec);
+  return Math.round((1 - downtime / coveredSec) * 100_000) / 1000;
+}
+
+/**
+ * Seconds a rollup covers: its stored coveredSec, or for legacy rows without
+ * one a full day when the row is final and has checks; otherwise null.
+ */
+export function rollupCoveredSec(rollup) {
+  if (typeof rollup?.coveredSec === 'number' && rollup.coveredSec > 0) return rollup.coveredSec;
+  if (rollup?.isFinal && rollup.totalChecks > 0) return DAY_MS / 1000;
+  return null;
+}
+
+/**
+ * Combines daily rollups into one figure. Uptime is total downtime over total
+ * covered time; rows with unknown coverage are skipped for uptime but still
+ * summed for the check counts.
  */
 export function combineRollups(rollups) {
-  const totals = rollups.reduce(
-    (acc, r) => ({
-      totalChecks: acc.totalChecks + (r.totalChecks ?? 0),
-      upChecks: acc.upChecks + (r.upChecks ?? 0),
-      downtimeSec: acc.downtimeSec + (r.downtimeSec ?? 0),
-    }),
-    { totalChecks: 0, upChecks: 0, downtimeSec: 0 },
-  );
-  return { ...totals, uptime: uptimePercent(totals.upChecks, totals.totalChecks) };
+  const totals = { totalChecks: 0, upChecks: 0, downtimeSec: 0, coveredSec: 0 };
+  for (const r of rollups) {
+    totals.totalChecks += r.totalChecks ?? 0;
+    totals.upChecks += r.upChecks ?? 0;
+    const covered = rollupCoveredSec(r);
+    if (covered == null) continue;
+    totals.coveredSec += covered;
+    totals.downtimeSec += Math.min(Math.max(r.downtimeSec ?? 0, 0), covered);
+  }
+  return { ...totals, uptime: uptimeFromDowntime(totals.downtimeSec, totals.coveredSec) };
 }
 
 /**
  * One entry per day for the last `days` days (oldest first, today last), so
  * the 90-day bar chart always has 90 bars. Days without a rollup get
- * `uptime: null` ("no data"), drawn grey rather than green.
+ * `uptime: null` ("no data"), drawn grey rather than green. `sample` is true
+ * for rollups created by the demo seed.
  */
 export function fillDailySeries(rollups, { days, today = new Date() }) {
   const byDay = new Map(rollups.map((r) => [dayKey(r.date), r]));
@@ -58,16 +83,21 @@ export function fillDailySeries(rollups, { days, today = new Date() }) {
         upChecks: 0,
         uptime: null,
         downtimeSec: 0,
+        coveredSec: null,
+        sample: false,
         avgResponseMs: null,
         p95ResponseMs: null,
       };
     }
+    const coveredSec = rollupCoveredSec(r);
     return {
       date,
       totalChecks: r.totalChecks,
       upChecks: r.upChecks,
-      uptime: uptimePercent(r.upChecks, r.totalChecks),
+      uptime: uptimeFromDowntime(r.downtimeSec ?? 0, coveredSec),
       downtimeSec: r.downtimeSec ?? 0,
+      coveredSec,
+      sample: Boolean(r.isSeed),
       avgResponseMs: r.avgResponseMs ?? null,
       p95ResponseMs: r.p95ResponseMs ?? null,
     };
@@ -96,6 +126,24 @@ export function downtimeWithin(incidents, start, end, now = new Date()) {
     if (to > from) totalMs += to - from;
   }
   return Math.round(totalMs / 1000);
+}
+
+/**
+ * Uptime of an arbitrary window [from, to) from incidents. Covered time runs
+ * from the later of `from` and `watchStart` (when we began watching the
+ * monitor) to the earlier of `to` and `now`; no coverage gives uptime null.
+ * Open incidents count until `now`.
+ */
+export function windowUptime({ incidents, from, to, now = new Date(), watchStart = null }) {
+  const start = Math.max(
+    new Date(from).getTime(),
+    watchStart ? new Date(watchStart).getTime() : -Infinity,
+  );
+  const end = Math.min(new Date(to).getTime(), new Date(now).getTime());
+  const coveredSec = Math.max(0, Math.round((end - start) / 1000));
+  const downtimeSec =
+    coveredSec > 0 ? downtimeWithin(incidents ?? [], new Date(start), new Date(end), now) : 0;
+  return { uptime: uptimeFromDowntime(downtimeSec, coveredSec), downtimeSec, coveredSec };
 }
 
 /** Colour band for an uptime figure; shared by chips, bars and the status page. */

@@ -17,6 +17,8 @@ const monitorUsageSchema = new mongoose.Schema(
     // "Sent once per month" markers for budget notices, set atomically (only if null).
     warnedAt: { type: Date, default: null },
     exceededAt: { type: Date, default: null },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
   },
   baseOptions,
 );

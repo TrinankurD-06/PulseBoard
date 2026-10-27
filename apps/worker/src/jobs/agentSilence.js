@@ -5,6 +5,7 @@ import {
   AGENT_SILENCE_PERIODS,
   AGENT_SILENCE_STATE,
   CHECK_SOURCES,
+  CHECK_STATE,
   MONITOR_STATUS,
   MONITOR_TYPES,
 } from '@pulseboard/shared/constants';
@@ -44,6 +45,7 @@ export function createAgentSilenceJob({
       ok: false,
       statusCode: null,
       error: `No report for ${silentSec} s`,
+      errorCode: 'AGENT_SILENT',
       totalMs: null,
       timings: null,
     };
@@ -52,15 +54,28 @@ export function createAgentSilenceJob({
       meta: { monitorId: monitor._id, workspaceId: monitor.workspaceId },
       ok: false,
       error: result.error,
+      errorCode: result.errorCode,
+      state: CHECK_STATE.FAILED,
       source: CHECK_SOURCES.AGENT,
     });
     await processCheckResult(monitor._id, result, now);
   }
 
-  /** Probes (or records a failure), then 'silent' unless a report arrived meanwhile. */
-  async function handleSilence(monitor, now, touch) {
+  /**
+   * Probes (or records a failure), then 'silent' unless a report arrived
+   * meanwhile. An inconclusive probe (checker offline) changes nothing: the
+   * monitor goes back to `previous` and is handled again on a later run.
+   */
+  async function handleSilence(monitor, now, touch, previous = REPORTING) {
     if (monitor.probeUrl) {
       const outcome = await prober.confirm(monitor._id, { touch });
+      if (outcome === 'inconclusive') {
+        await Monitor.updateOne(
+          { _id: monitor._id, silenceState: PROBING },
+          { $set: { silenceState: previous } },
+        );
+        return;
+      }
       if (outcome === 'reachable') await prober.markReachable(monitor._id, now);
     } else {
       await recordSilenceFailure(monitor, now);
@@ -160,7 +175,7 @@ export function createAgentSilenceJob({
       });
       if (claim.modifiedCount !== 1) continue;
       counts.reprobed += 1;
-      work.push(handleSilence(monitor, now, touch));
+      work.push(handleSilence(monitor, now, touch, SILENT));
     }
 
     // Monitors are handled in parallel: each probe sequence mostly waits.

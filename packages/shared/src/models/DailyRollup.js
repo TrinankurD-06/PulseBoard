@@ -12,6 +12,11 @@ const dailyRollupSchema = new mongoose.Schema(
     p95ResponseMs: { type: Number, default: null },
     downtimeSec: { type: Number, default: 0 },
     isFinal: { type: Boolean, default: false },
+    // Seconds of this day the monitor was being watched (first result to the end of the day, or to now).
+    // Uptime = 1 - downtimeSec / coveredSec. Missing on older rows: see uptime/index.js.
+    coveredSec: { type: Number, default: null },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
   },
   baseOptions,
 );

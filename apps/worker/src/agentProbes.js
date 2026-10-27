@@ -1,11 +1,12 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { probeTargetOf, silentSinceOf } from '@pulseboard/shared/agent';
-import { runHttpCheck } from '@pulseboard/shared/check';
+import { guardNetworkFailure, runHttpCheck } from '@pulseboard/shared/check';
 import {
   AGENT_PROBE_COUNT,
   AGENT_PROBE_SPACING_MS,
   AGENT_SILENCE_STATE,
   CHECK_SOURCES,
+  CHECK_STATE,
   JOB_NAMES,
   MONITOR_STATUS,
   NOTICE_KIND,
@@ -31,9 +32,12 @@ export function createAgentProber({
   logger,
   spacingMs = AGENT_PROBE_SPACING_MS,
   sleep = delay,
+  guard = guardNetworkFailure,
 }) {
   async function probeOnce(monitor, source = CHECK_SOURCES.PROBE) {
-    const result = await runHttpCheck(probeTargetOf(monitor), { allowPrivate, appUrl });
+    const result = await guard(
+      await runHttpCheck(probeTargetOf(monitor), { allowPrivate, appUrl }),
+    );
     const checkedAt = new Date();
     await recordUsage(monitor, result.requestsSent, checkedAt);
     if (result.headUnsupported && !monitor.headUnsupported) {
@@ -45,6 +49,9 @@ export function createAgentProber({
       ok: result.ok,
       statusCode: result.statusCode,
       error: result.error,
+      errorCode: result.errorCode ?? null,
+      state: result.state,
+      unknownReason: result.unknownReason ?? null,
       totalMs: result.totalMs,
       timings: result.timings,
       source,
@@ -58,7 +65,10 @@ export function createAgentProber({
    * meanwhile (or a pause) ends it. All failing = 3 failures for the engine,
    * which opens the incident. `touch` keeps the Agenda job's lock alive.
    *
-   * Returns 'reachable', 'unreachable' or 'aborted'.
+   * A probe that came back 'unknown' (the checker itself is offline) is
+   * inconclusive: nothing is fed to the engine and the sequence stops.
+   *
+   * Returns 'reachable', 'unreachable', 'inconclusive' or 'aborted'.
    */
   async function confirm(monitorId, { touch } = {}) {
     for (let attempt = 0; attempt < AGENT_PROBE_COUNT; attempt += 1) {
@@ -73,6 +83,7 @@ export function createAgentProber({
       }).lean();
       if (!monitor) return 'aborted';
       const { result, checkedAt } = await probeOnce(monitor);
+      if (result.state === CHECK_STATE.UNKNOWN) return 'inconclusive';
       await processCheckResult(monitor._id, result, checkedAt);
       if (result.ok) return 'reachable';
     }

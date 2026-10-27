@@ -1,5 +1,10 @@
-import { runHttpCheck } from '@pulseboard/shared/check';
-import { AGENT_SILENCE_STATE, CHECK_SOURCES, MONITOR_TYPES } from '@pulseboard/shared/constants';
+import { guardNetworkFailure, runHttpCheck } from '@pulseboard/shared/check';
+import {
+  AGENT_SILENCE_STATE,
+  CHECK_SOURCES,
+  CHECK_STATE,
+  MONITOR_TYPES,
+} from '@pulseboard/shared/constants';
 import { CheckResult, Monitor } from '@pulseboard/shared/models';
 import { needsCheckJob } from '@pulseboard/shared/scheduling';
 import { recordUsage } from '@pulseboard/shared/usage';
@@ -10,7 +15,10 @@ const noopEnforceBudget = async () => 'none';
 /**
  * Handler for the repeating `run-check` job:
  *   1. run the HTTP check and count the requests it sent (MonitorUsage)
- *   2. store the raw result in the time-series collection
+ *   2. store the raw result in the time-series collection; a network failure
+ *      is first checked against reference hosts (guardNetworkFailure): if the
+ *      checker itself is offline the result is 'unknown', stored and counted as
+ *      usage but NOT fed to the engine, adaptive interval or budget
  *   3. hand it to the incident engine, which updates the monitor's live
  *      fields and counters and opens/resolves incidents
  *   4. adaptive interval: decide the next interval and apply it to this job
@@ -28,6 +36,7 @@ export function createRunCheckJob({
   enforceBudget = noopEnforceBudget,
   logger,
   prober,
+  guard = guardNetworkFailure,
 }) {
   /**
    * External check of an agent monitor (U4): a HEAD to its probeUrl, stored
@@ -39,6 +48,8 @@ export function createRunCheckJob({
   async function runExternalCheck(monitor, job) {
     const { result } = await prober.probeOnce(monitor, CHECK_SOURCES.EXTERNAL);
     if (result.ok) return;
+    // Checker offline: inconclusive, retried on the next cycle.
+    if (result.state === CHECK_STATE.UNKNOWN) return;
     const before = await Monitor.findOneAndUpdate(
       { _id: monitor._id, isPaused: false, silenceState: { $ne: AGENT_SILENCE_STATE.PROBING } },
       { $set: { silenceState: AGENT_SILENCE_STATE.PROBING, lastProbeAt: new Date() } },
@@ -75,7 +86,7 @@ export function createRunCheckJob({
       return;
     }
 
-    const result = await runHttpCheck(monitor, { allowPrivate, appUrl });
+    const result = await guard(await runHttpCheck(monitor, { allowPrivate, appUrl }));
     const checkedAt = new Date();
 
     // Count what was actually sent to the customer (redirects and a HEAD->GET
@@ -92,10 +103,23 @@ export function createRunCheckJob({
       ok: result.ok,
       statusCode: result.statusCode,
       error: result.error,
+      errorCode: result.errorCode ?? null,
+      state: result.state,
+      unknownReason: result.unknownReason ?? null,
       totalMs: result.totalMs,
       timings: result.timings,
       source: CHECK_SOURCES.HTTP,
     });
+
+    // The checker was offline: we know nothing about the target. No incident
+    // engine, no adaptive interval, no budget check (the request still counted).
+    if (result.state === CHECK_STATE.UNKNOWN) {
+      logger.warn(
+        { monitorId, errorCode: result.errorCode, reason: result.unknownReason },
+        'Checker offline: result stored as unknown, not counted',
+      );
+      return;
+    }
     const { monitor: counted } = await processCheckResult(monitor._id, result, checkedAt);
 
     // Adaptive first, budget second: a budget slow-down must win over the

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { CHECK_RESULT_TTL_SEC, CHECK_SOURCES } from '../constants.js';
+import { CHECK_RESULT_TTL_SEC, CHECK_SOURCES, CHECK_STATE, UNKNOWN_REASONS } from '../constants.js';
 import { timingsSchema } from './Monitor.js';
 
 // Stored in a MongoDB time-series collection: documents are bucketed by
@@ -20,6 +20,13 @@ const checkResultSchema = new mongoose.Schema(
     // Where it came from: a scheduled check, a heartbeat ping, an agent report...
     // Older results have no source and are http checks.
     source: { type: String, enum: Object.values(CHECK_SOURCES), default: CHECK_SOURCES.HTTP },
+    // Machine-readable failure reason (ETIMEDOUT, ENOTFOUND, HTTP_503, KEYWORD_MISSING...); `error` is the message.
+    errorCode: { type: String, default: null },
+    // Missing means 'ok' or 'failed' per `ok` (older results). 'unknown' = the checker was offline.
+    state: { type: String, enum: Object.values(CHECK_STATE) },
+    unknownReason: { type: String, enum: [...Object.values(UNKNOWN_REASONS), null], default: null },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
   },
   {
     versionKey: false,

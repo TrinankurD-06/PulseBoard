@@ -7,6 +7,8 @@ const timelineEntrySchema = new mongoose.Schema(
     at: { type: Date, default: Date.now },
     type: { type: String, enum: Object.values(INCIDENT_EVENT), required: true },
     message: { type: String, maxlength: 500 },
+    // The failure's machine-readable code (on the 'opened' entry).
+    code: { type: String, default: null },
   },
   { _id: false },
 );
@@ -18,6 +20,9 @@ const incidentSchema = new mongoose.Schema(
     startedAt: { type: Date, required: true },
     resolvedAt: { type: Date, default: null },
     cause: { type: String, maxlength: 500 },
+    causeCode: { type: String, default: null },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
     durationSec: { type: Number, default: null },
     timeline: { type: [timelineEntrySchema], default: [] },
     // "channelId:kind" keys of alerts already delivered, so a retried or

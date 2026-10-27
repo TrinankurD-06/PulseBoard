@@ -31,6 +31,8 @@ const agentReportSchema = new mongoose.Schema(
     agentVersion: { type: String, default: null },
     hostname: { type: String, default: null },
     uptimeSec: { type: Number, default: null },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
   },
   {
     versionKey: false,

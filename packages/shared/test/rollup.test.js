@@ -79,6 +79,61 @@ describe('rollupDay', () => {
     expect(b).toMatchObject({ totalChecks: 2, upChecks: 1, isFinal: true });
   });
 
+  it('excludes unknown results (checker offline); old results without state still count', async () => {
+    await CheckResult.insertMany([
+      {
+        timestamp: at('07:00:00'),
+        meta: { monitorId: monitorB, workspaceId },
+        ok: false,
+        state: 'unknown',
+      },
+      {
+        timestamp: at('08:30:00'),
+        meta: { monitorId: monitorB, workspaceId },
+        ok: true,
+        state: 'ok',
+        totalMs: 50,
+      },
+    ]);
+    await rollupDay(at('12:00:00'), { now: at('23:00:00') });
+    const b = await DailyRollup.findOne({ monitorId: monitorB }).lean();
+    // 08:00 (old, no state) and 08:30 count; the unknown at 07:00 neither counts nor starts coverage.
+    expect(b).toMatchObject({ totalChecks: 2, upChecks: 2 });
+    expect(b.coveredSec).toBe(15 * 3600); // 08:00 to 23:00
+  });
+
+  it('a day with only unknown results gets no rollup', async () => {
+    const m = new mongoose.Types.ObjectId();
+    await CheckResult.insertMany([
+      {
+        timestamp: at('07:00:00', '05'),
+        meta: { monitorId: m, workspaceId },
+        ok: false,
+        state: 'unknown',
+      },
+    ]);
+    await rollupDay(at('12:00:00', '05'), { now: at('23:00:00', '05') });
+    expect(await DailyRollup.countDocuments({ monitorId: m })).toBe(0);
+  });
+
+  it('writes coveredSec: first result to now on the current day, to day end on a past day', async () => {
+    await rollupDay(at('12:00:00'), { now: at('12:00:00') });
+    const a = await DailyRollup.findOne({ monitorId: monitorA }).lean();
+    expect(a.coveredSec).toBe(2 * 3600); // 10:00 to 12:00
+    const b = await DailyRollup.findOne({ monitorId: monitorB }).lean();
+    expect(b.coveredSec).toBe(4 * 3600); // 08:00 to 12:00
+
+    await rollupDay(at('12:00:00'), { isFinal: true, now: at('00:00:05', '11') });
+    const final = await DailyRollup.findOne({ monitorId: monitorA }).lean();
+    expect(final.coveredSec).toBe(14 * 3600); // 10:00 to midnight
+  });
+
+  it('never writes a negative coveredSec when now is before the first result', async () => {
+    await rollupDay(at('12:00:00'), { now: at('05:00:00') });
+    const a = await DailyRollup.findOne({ monitorId: monitorA }).lean();
+    expect(a.coveredSec).toBe(0);
+  });
+
   it('does nothing for a day without checks', async () => {
     expect(await rollupDay(at('12:00:00', '01'))).toBe(0);
   });

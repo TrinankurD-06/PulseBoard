@@ -101,6 +101,22 @@ export const MAX_TIMEOUT_MS = 30_000;
 export const DEFAULT_EXPECTED_STATUS = Object.freeze({ min: 200, max: 399 });
 
 // Raw check results are kept for 7 days; older history comes from daily rollups.
+// A stored check is 'ok', 'failed', or 'unknown': the checker itself was offline, so
+// nothing is known about the target. Unknown results are kept (they draw "Checker
+// offline" gaps) but never count toward uptime, failed checks or incidents.
+export const CHECK_STATE = Object.freeze({ OK: 'ok', FAILED: 'failed', UNKNOWN: 'unknown' });
+export const UNKNOWN_REASONS = Object.freeze({ CHECKER_OFFLINE: 'checker_offline' });
+
+// Network errors after which the checker may itself be offline: before calling the
+// check failed it probes REFERENCE_HOSTS (see check/connectivity.js).
+export const NETWORK_ERROR_CODES = Object.freeze([
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'ECONNRESET',
+  'EAI_AGAIN',
+]);
+export const REFERENCE_HOSTS = Object.freeze(['https://1.1.1.1', 'https://www.cloudflare.com']);
+
 export const CHECK_RESULT_TTL_SEC = 7 * 24 * 60 * 60;
 
 export const JOB_NAMES = Object.freeze({

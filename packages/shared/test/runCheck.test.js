@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { runHttpCheck } from '../src/check/runCheck.js';
+import { errorCodeOf, runHttpCheck } from '../src/check/runCheck.js';
 
 // A local server with one route per scenario, listening dual-stack ('::') so both
 // 127.0.0.1 and localhost/::1 reach it. Private targets are allowed in these tests.
@@ -186,6 +186,49 @@ describe('runHttpCheck', () => {
     const named = await runHttpCheck({ ...target('/ok'), url: `http://localhost:${port}/ok` });
     expect(named.ok).toBe(false);
     expect(named.error).toMatch(/Blocked connection to private address/);
+  });
+});
+
+describe('runHttpCheck: error codes', () => {
+  it('has no code on success', async () => {
+    expect((await run('/ok')).errorCode).toBeNull();
+  });
+
+  it('HTTP_<status> for an unexpected status', async () => {
+    expect((await run('/500')).errorCode).toBe('HTTP_500');
+  });
+
+  it('KEYWORD_MISSING when the keyword is absent', async () => {
+    expect((await run('/ok', { keyword: 'degraded' })).errorCode).toBe('KEYWORD_MISSING');
+  });
+
+  it('ETIMEDOUT for the runner timeout', async () => {
+    expect((await run('/slow', { timeoutMs: 300 })).errorCode).toBe('ETIMEDOUT');
+  });
+
+  it('TOO_MANY_REDIRECTS', async () => {
+    expect((await run('/loop')).errorCode).toBe('TOO_MANY_REDIRECTS');
+  });
+
+  it('system codes pass through (ECONNRESET, ECONNREFUSED)', async () => {
+    expect((await run('/reset')).errorCode).toBe('ECONNRESET');
+    const refused = await runHttpCheck(
+      { ...target('/'), url: 'http://127.0.0.1:1/' },
+      { allowPrivate: true },
+    );
+    expect(refused.errorCode).toBe('ECONNREFUSED');
+  });
+
+  it('BLOCKED_TARGET for the SSRF guard', async () => {
+    expect((await runHttpCheck(target('/ok'))).errorCode).toBe('BLOCKED_TARGET');
+    const port = new URL(base).port;
+    const named = await runHttpCheck({ ...target('/ok'), url: `http://localhost:${port}/ok` });
+    expect(named.errorCode).toBe('BLOCKED_TARGET');
+  });
+
+  it('errorCodeOf falls back to REQUEST_FAILED', () => {
+    expect(errorCodeOf(new Error('x'))).toBe('REQUEST_FAILED');
+    expect(errorCodeOf({ code: 'EPIPE' })).toBe('EPIPE');
   });
 });
 

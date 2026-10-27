@@ -33,6 +33,13 @@ class CheckTimeoutError extends Error {
   }
 }
 
+class TooManyRedirectsError extends Error {
+  constructor(max) {
+    super(`Too many redirects (more than ${max})`);
+    this.code = 'TOO_MANY_REDIRECTS';
+  }
+}
+
 const now = () => process.hrtime.bigint();
 const msBetween = (from, to) => (from != null && to != null ? Number(to - from) / 1e6 : 0);
 const round1 = (value) => Math.round(value * 10) / 10;
@@ -168,11 +175,40 @@ export function describeNetworkError(err) {
 }
 
 /**
+ * Machine-readable code for a request that failed before a verdict: the Node
+ * or system code when there is one, ETIMEDOUT for our own timeout,
+ * BLOCKED_TARGET for the SSRF guard, TOO_MANY_REDIRECTS, else REQUEST_FAILED.
+ */
+export function errorCodeOf(err) {
+  switch (err?.code) {
+    case 'CHECK_TIMEOUT':
+      return 'ETIMEDOUT';
+    case 'UNSAFE_TARGET':
+      return 'BLOCKED_TARGET';
+    case undefined:
+    case null:
+    case '':
+      return 'REQUEST_FAILED';
+    default:
+      return String(err.code);
+  }
+}
+
+/** Code for a response that evaluateCheck rejected: its status or the keyword. */
+function verdictErrorCode(verdict, statusCode, { expectedStatus }) {
+  if (verdict.ok) return null;
+  if (statusCode < expectedStatus.min || statusCode > expectedStatus.max) {
+    return `HTTP_${statusCode}`;
+  }
+  return 'KEYWORD_MISSING';
+}
+
+/**
  * Runs one uptime check. Never throws: every outcome is returned as data.
  *
  * @param target  { url, method, timeoutMs, headers, expectedStatus, keyword, headUnsupported }
  * @param options { allowPrivate, appUrl }
- * @returns { ok, statusCode, error, totalMs, timings, sslExpiresAt,
+ * @returns { ok, statusCode, error, errorCode, totalMs, timings, sslExpiresAt,
  *            requestsSent, headUnsupported }
  *
  * totalMs covers the whole check including redirects; timings describe the
@@ -217,7 +253,7 @@ export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}
       if (REDIRECT_STATUSES.has(response.statusCode) && response.location) {
         redirects += 1;
         if (redirects > MAX_REDIRECTS) {
-          throw new Error(`Too many redirects (more than ${MAX_REDIRECTS})`);
+          throw new TooManyRedirectsError(MAX_REDIRECTS);
         }
         url = new URL(response.location, url);
         if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -235,6 +271,7 @@ export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}
         ok: verdict.ok,
         statusCode: response.statusCode,
         error: verdict.error,
+        errorCode: verdictErrorCode(verdict, response.statusCode, target),
         totalMs: round1(msBetween(started, now())),
         timings: response.timings,
         sslExpiresAt: response.sslExpiresAt,
@@ -247,6 +284,7 @@ export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}
       ok: false,
       statusCode: null,
       error: describeNetworkError(err),
+      errorCode: errorCodeOf(err),
       totalMs: round1(msBetween(started, now())),
       timings: null,
       sslExpiresAt: null,

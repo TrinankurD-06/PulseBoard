@@ -2,3 +2,4 @@
 export * from './evaluate.js';
 export * from './runCheck.js';
 export * from './ssrf.js';
+export * from './connectivity.js';

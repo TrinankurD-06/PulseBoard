@@ -30,12 +30,14 @@ describe('models', () => {
     const user = await User.create({
       name: 'Ada',
       email: 'ada@example.com',
-      identities: [{ provider: 'github', providerId: '42', email: 'ada@example.com' }],
+      identities: [
+        { provider: 'github', providerId: 'gh-provider-id-xq7', email: 'ada@example.com' },
+      ],
     });
     const json = user.toJSON();
     expect(json).toMatchObject({ providers: ['github'], hasPassword: false });
     expect(json.identities).toBeUndefined();
-    expect(JSON.stringify(json)).not.toContain('42');
+    expect(JSON.stringify(json)).not.toContain('gh-provider-id-xq7');
 
     // A partial load (e.g. populate 'name email') adds neither field.
     const partial = (await User.findById(user._id).select('name email')).toJSON();

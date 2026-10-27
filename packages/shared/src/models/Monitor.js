@@ -55,6 +55,8 @@ const monitorSchema = new mongoose.Schema(
     costPer1kRequests: { type: Number, default: null },
     currency: { type: String, enum: CURRENCIES, default: DEFAULT_CURRENCY },
     isPaused: { type: Boolean, default: false },
+    // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
+    isSeed: { type: Boolean, default: false },
     // Why it is paused: by a user, or automatically because the monthly budget ran out.
     pausedReason: { type: String, enum: [...Object.values(PAUSED_REASONS), null], default: null },
 
@@ -122,6 +124,7 @@ const monitorSchema = new mongoose.Schema(
     // not the moment the threshold was crossed.
     failingSince: { type: Date, default: null },
     failingCause: { type: String, default: null },
+    failingCauseCode: { type: String, default: null },
     recoveringSince: { type: Date, default: null },
 
     // Denormalised "latest check" fields. Time-series collections cannot be

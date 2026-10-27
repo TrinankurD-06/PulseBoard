@@ -50,6 +50,13 @@ export function buildCheckUpdate(result, checkedAt) {
         failingCause: {
           $cond: [{ $eq: ['$consecutiveFailures', 0] }, literal(result.error), '$failingCause'],
         },
+        failingCauseCode: {
+          $cond: [
+            { $eq: ['$consecutiveFailures', 0] },
+            literal(result.errorCode),
+            '$failingCauseCode',
+          ],
+        },
       };
 
   return [{ $set: { ...latest, ...streak } }];
@@ -110,6 +117,7 @@ export function createIncidentEngine({ agenda, logger }) {
       startedAt: monitor.failingSince ?? checkedAt,
       openedAt: checkedAt,
       cause,
+      code: monitor.failingCauseCode ?? null,
       message: openedMessage(monitor, cause),
     });
     if (!incident) return; // already open (safety net: unique index)
