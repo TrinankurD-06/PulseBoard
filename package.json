@@ -19,7 +19,8 @@
     "seed": "npm run seed -w @pulseboard/api",
     "seed:clear": "npm run seed:clear -w @pulseboard/api",
     "migrate": "npm run migrate -w @pulseboard/api",
-    "rollups:rebuild": "npm run rollups:rebuild -w @pulseboard/api"
+    "rollups:rebuild": "npm run rollups:rebuild -w @pulseboard/api",
+    "seed:demo-incidents": "npm run seed:demo-incidents -w @pulseboard/api --"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

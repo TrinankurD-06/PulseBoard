@@ -253,3 +253,13 @@ Fixes the monitor page showing a 30-day gauge of 100.0 next to a 24-hour card of
 - [x] Gate: 940 tests (agent 24, shared 299, API 289, client 233, demo-target 22, worker 72), ESLint and Prettier clean,
       client build OK.
 - [x] `npm run rollups:rebuild` run on the live database (28 Oct): 12 rollups over 2 days (27 and 28 Oct) recalculated.
+
+---
+
+# Demo incident monitor (28 Oct)
+
+- [x] `npm run seed:demo-incidents` adds one fictional monitor, "Demo Checkout API", with 5 resolved incidents
+      (503, timeout, missing keyword with a failed-then-retried alert, refused, 500), 24 h of checks, 30 days of
+      rollups and usage to the demo account's workspace. Additive (removes nothing), everything flagged `isSeed`
+      ("Sample data"), removed by `npm run seed:clear`, replaced if run twice. Not scheduled, so no real checks or alerts.
+- [x] Run on the live database for demo@pulseboard.dev / "Acme Inc.".

@@ -11,7 +11,8 @@
     "seed": "node scripts/seed.js",
     "seed:clear": "node scripts/seed-clear.js",
     "migrate": "node scripts/migrate.js",
-    "rollups:rebuild": "node scripts/rollups-rebuild.js"
+    "rollups:rebuild": "node scripts/rollups-rebuild.js",
+    "seed:demo-incidents": "node scripts/seed-demo-incidents.js"
   },
   "dependencies": {
     "@pulseboard/shared": "^0.1.0",
