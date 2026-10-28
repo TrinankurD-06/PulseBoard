@@ -252,4 +252,4 @@ Fixes the monitor page showing a 30-day gauge of 100.0 next to a 24-hour card of
 - [x] `npm run rollups:rebuild` (`rebuildAllRollups`).
 - [x] Gate: 940 tests (agent 24, shared 299, API 289, client 233, demo-target 22, worker 72), ESLint and Prettier clean,
       client build OK.
-- [ ] **Run `npm run rollups:rebuild` once on the live database** (not run yet; it rewrites stored rollups).
+- [x] `npm run rollups:rebuild` run on the live database (28 Oct): 12 rollups over 2 days (27 and 28 Oct) recalculated.
