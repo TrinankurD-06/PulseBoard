@@ -1,6 +1,6 @@
 import { AREA_BOTTOM, AREA_TOP } from './chartTheme.js';
 
-/** Vertical wash for area fills: --text at 10% fading to transparent. Goes inside <defs>. */
+/** Vertical wash for area fills: --series at 14% fading to transparent. Goes inside <defs>. */
 export default function AreaGradient({ id, userSpace }) {
   const props = userSpace
     ? { gradientUnits: 'userSpaceOnUse', x1: 0, x2: 0, y1: userSpace.top, y2: userSpace.bottom }

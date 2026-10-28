@@ -66,8 +66,8 @@ export default function HealthAreaChart({ series, unit, range }) {
           >
             <defs>
               <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--text)" stopOpacity={0.1} />
-                <stop offset="100%" stopColor="var(--text)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--series)" stopOpacity={0.18} />
+                <stop offset="100%" stopColor="var(--series)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid {...gridProps} />

@@ -31,7 +31,7 @@ const light = tokens(":root[data-theme='light']");
 describe('theme tokens', () => {
   it('the light theme overrides every colour token the dark theme defines', () => {
     const colourTokens = Object.keys(dark).filter((name) =>
-      /^(bg|surface|line|text|accent|glow|status|field)/.test(name),
+      /^(bg|surface|line|text|accent|glow|status|field|series)/.test(name),
     );
     for (const name of colourTokens) expect(light, name).toHaveProperty(name);
   });
@@ -49,6 +49,7 @@ describe('theme tokens', () => {
         'status-up',
         'status-down',
         'status-degraded',
+        'series',
       ])('%s reads at 4.5:1 on the page', (token) => {
         expect(contrast(theme[token], theme.bg)).toBeGreaterThanOrEqual(4.5);
       });

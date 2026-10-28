@@ -7,7 +7,7 @@ export const THEME_KEY = 'pulseboard-theme';
 export const THEMES = ['dark', 'light'];
 
 // Browser chrome colour per theme (the --bg token of each).
-export const THEME_COLORS = { dark: '#0a0a09', light: '#f6f3ea' };
+export const THEME_COLORS = { dark: '#0a0a09', light: '#fbf3e8' };
 
 export function isTheme(value) {
   return THEMES.includes(value);

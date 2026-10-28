@@ -50,7 +50,7 @@ export default function TickGauge({
   const filled = filledTickCount(value, max);
   const lit = Math.round(filled * progress);
   const down = gaugeState({ value, target, direction: thresholdDirection }) === 'down';
-  const litColor = down ? 'var(--status-down)' : 'var(--text)';
+  const litColor = down ? 'var(--status-down)' : 'var(--series)';
   const dotColor = down ? 'var(--status-down)' : 'var(--accent)';
 
   const safeValue = Number.isFinite(value) ? value : 0;

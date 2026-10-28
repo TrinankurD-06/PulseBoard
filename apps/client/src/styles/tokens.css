@@ -21,6 +21,8 @@
   --glow-2: rgba(78, 92, 48, 0.25);
   /* How the signal field's dots combine: add light on black, or ink on paper. */
   --field-blend: add;
+  /* Main data colour: gauge ticks, chart lines. Ink on dark; a vivid green on light. */
+  --series: #ecead6;
 
   /* Status colours carry meaning only, never decoration. */
   --status-up: #b9dd8e;
@@ -43,28 +45,29 @@
   --dur-gauge: 800ms;
 }
 
-/* Light: warm paper, ink text, a deep moss accent. The pairs below are checked
+/* Light: warm paper, ink text, a vivid green accent. The pairs below are checked
    for contrast (text >= 4.5:1 on --bg) in src/styles/tokens.test.js. */
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f6f3ea;
-  --surface: rgba(27, 26, 21, 0.03);
-  --surface-2: rgba(27, 26, 21, 0.06);
-  --line: rgba(27, 26, 21, 0.14);
-  --line-strong: rgba(27, 26, 21, 0.34);
-  --text: #1b1a15;
-  --text-muted: #58574b;
-  --text-faint: #6b6a5d;
-  --accent: #3f6212;
-  --accent-ink: #f6f3ea;
-  --glow: rgba(150, 168, 88, 0.3);
-  --glow-2: rgba(196, 160, 96, 0.22);
+  --bg: #fbf3e8;
+  --surface: rgba(120, 70, 20, 0.045);
+  --surface-2: rgba(120, 70, 20, 0.08);
+  --line: rgba(90, 50, 15, 0.16);
+  --line-strong: rgba(90, 50, 15, 0.36);
+  --text: #1c1814;
+  --text-muted: #5c5448;
+  --text-faint: #6e6558;
+  --accent: #17803d;
+  --accent-ink: #fbf3e8;
+  --glow: rgba(54, 176, 96, 0.34);
+  --glow-2: rgba(255, 150, 90, 0.3);
   --field-blend: normal;
+  --series: #17803d;
 
-  --status-up: #3f7d1a;
-  --status-down: #c4301f;
-  --status-degraded: #8f5f00;
-  --status-paused: #8c8b7e;
-  --status-pending: #8c8b7e;
+  --status-up: #17803d;
+  --status-down: #d02a1c;
+  --status-degraded: #a15c00;
+  --status-paused: #9a8f80;
+  --status-pending: #9a8f80;
 }

@@ -64,7 +64,7 @@ describe('storage and apply', () => {
     applyTheme('light');
     expect(root.dataset.theme).toBe('light');
     expect(root.style.colorScheme).toBe('light');
-    expect(meta.content).toBe('#f6f3ea');
+    expect(meta.content).toBe('#fbf3e8');
     applyTheme('dark');
     expect(meta.content).toBe('#0a0a09');
   });

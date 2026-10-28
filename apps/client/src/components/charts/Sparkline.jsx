@@ -79,7 +79,7 @@ export default function Sparkline({ points }) {
               x2={x(start)}
               y1={y(values[start])}
               y2={y(values[start])}
-              stroke="var(--text)"
+              stroke="var(--series)"
               strokeWidth="3"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
@@ -98,7 +98,7 @@ export default function Sparkline({ points }) {
             <polyline
               points={line}
               fill="none"
-              stroke="var(--text)"
+              stroke="var(--series)"
               strokeWidth="1.25"
               strokeLinecap="round"
               strokeLinejoin="round"

@@ -223,7 +223,7 @@ Committed locally (`ea6b976`, `3249801`, `1526e82`, `bde8ac3`); not pushed.
 
 Decision D102. Nothing pushed.
 
-- [x] Light tokens under `[data-theme='light']` (warm paper, ink, deep moss accent); contrast tested in both themes.
+- [x] Light tokens under `[data-theme='light']` (peach paper, ink, vivid green accent, `--series` for gauges and chart lines); contrast tested in both themes.
 - [x] Theme provider and `ThemeToggle` (app header, public/auth headers, error pages); stored choice, else the OS
       preference; inline script in `index.html` prevents a flash.
 - [x] Signal field blends normally in light (`--field-blend`), recoloured live on a theme change; toasts follow the theme.

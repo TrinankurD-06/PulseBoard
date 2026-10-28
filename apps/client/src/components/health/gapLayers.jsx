@@ -52,7 +52,7 @@ export function segmentLayers({
       key={key}
       type="monotone"
       dataKey={key}
-      stroke="var(--text)"
+      stroke="var(--series)"
       strokeWidth={strokeWidth}
       fill={`url(#${gradientId})`}
       connectNulls={false}
@@ -68,7 +68,7 @@ export function segmentLayers({
         type="monotone"
         dataKey={dotKey}
         stroke="none"
-        dot={{ r: dotRadius, fill: 'var(--text)', stroke: 'none' }}
+        dot={{ r: dotRadius, fill: 'var(--series)', stroke: 'none' }}
         activeDot={activeDot}
         isAnimationActive={false}
       />,

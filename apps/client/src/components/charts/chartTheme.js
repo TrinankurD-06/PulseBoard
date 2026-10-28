@@ -25,9 +25,9 @@ export const tooltipBoxClasses =
 export const cursorProps = { stroke: 'var(--line-strong)', strokeWidth: 1 };
 
 /** Line series: 1.5px in the text colour; the area wash fades from 10% to nothing. */
-export const LINE_STROKE = 'var(--text)';
+export const LINE_STROKE = 'var(--series)';
 export const LINE_WIDTH = 1.5;
-export const AREA_TOP = 'color-mix(in oklab, var(--text) 10%, transparent)';
+export const AREA_TOP = 'color-mix(in oklab, var(--series) 14%, transparent)';
 export const AREA_BOTTOM = 'transparent';
 
 /** Tick label for a timestamp, appropriate to the visible range. */

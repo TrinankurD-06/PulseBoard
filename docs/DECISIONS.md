@@ -1483,8 +1483,9 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Supersedes the "dark only" part of D94.** The design is still dark by default in spirit, but a visitor can now
   switch to a warm paper light theme with the sun/moon button (app header, public and auth headers, error pages).
 - **Tokens only.** `tokens.css` keeps the dark values on `:root` and overrides the colour tokens under
-  `:root[data-theme='light']`: paper `#f6f3ea`, ink `#1b1a15`, a deep moss accent `#3f6212` with paper-coloured text on
-  it, status colours darkened to read as text on paper. No component carries a theme-specific class. A test
+  `:root[data-theme='light']`: peach-tinted paper `#fbf3e8`, ink `#1c1814`, a vivid green accent `#17803d` with paper-coloured text
+  on it, status colours darkened to read as text on paper, and stronger peach and green glows. A `--series` token (ink in
+  dark, green in light) colours gauge ticks and chart lines, so light mode is not just black on white. No component carries a theme-specific class. A test
   (`tokens.test.js`) checks that light overrides every colour token and that text, accent and status colours reach
   4.5:1 on the page in both themes.
 - **Which theme shows.** A stored choice (`localStorage`, key `pulseboard-theme`) wins; with none, the operating
