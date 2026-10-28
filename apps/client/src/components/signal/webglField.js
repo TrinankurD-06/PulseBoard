@@ -86,7 +86,7 @@ void main() {
 }
 `;
 
-// Soft round dot; premultiplied colour, blended additively.
+// Soft round dot; premultiplied colour, blended additively (dark) or over (light).
 const FRAGMENT = `
 precision mediump float;
 varying vec4 vColor;
@@ -114,7 +114,8 @@ function compile(gl, type, source) {
  * or the shaders fail (the caller then mounts the 2D fallback on a new canvas).
  * Returns { kind, points, resize(w, h, dpr, opts), draw(sim), restore(), destroy() }.
  */
-export function createWebglField(canvas, colors) {
+export function createWebglField(canvas, initialColors) {
+  let colors = initialColors;
   const gl = canvas.getContext('webgl', {
     alpha: true,
     premultipliedAlpha: true,
@@ -152,15 +153,22 @@ export function createWebglField(canvas, colors) {
       uDown: gl.getUniformLocation(program, 'uDown[0]'),
     };
     gl.useProgram(program);
+    applyColors();
+    buffer = gl.createBuffer();
+    gl.enable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 0);
+    if (grid) upload();
+  }
+
+  // Colour uniforms and the blend mode: premultiplied dots add up on a dark page
+  // and are laid over one another on a light page.
+  function applyColors() {
+    gl.useProgram(program);
     gl.uniform3fv(gl.getUniformLocation(program, 'uFar'), colors.far);
     gl.uniform3fv(gl.getUniformLocation(program, 'uNear'), colors.near);
     gl.uniform3fv(gl.getUniformLocation(program, 'uAccent'), colors.accent);
     gl.uniform3fv(gl.getUniformLocation(program, 'uDownCol'), colors.down);
-    buffer = gl.createBuffer();
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-    gl.clearColor(0, 0, 0, 0);
-    if (grid) upload();
+    gl.blendFunc(gl.ONE, colors.additive === false ? gl.ONE_MINUS_SRC_ALPHA : gl.ONE);
   }
 
   function upload() {
@@ -217,6 +225,11 @@ export function createWebglField(canvas, colors) {
       gl.uniform3fv(loc.uRip, sim.ripples);
       gl.uniform1fv(loc.uDown, sim.bins);
       gl.drawArrays(gl.POINTS, 0, count);
+    },
+    /** A theme change: new colours and blend mode, applied on the next draw. */
+    setColors(next) {
+      colors = next;
+      if (program && !gl.isContextLost()) applyColors();
     },
     /** After webglcontextrestored: every GL object is gone, so rebuild them. */
     restore() {

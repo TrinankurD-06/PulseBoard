@@ -1,9 +1,10 @@
 import { Toaster } from 'sonner';
+import { useTheme } from '../lib/ThemeContext.jsx';
 
 // Bottom-centre pills: hairline, blurred background, state shown by a
 // coloured icon rather than a rich-colour fill.
 const VARS = {
-  // Lifted a little off the near-black page so the pill reads as a layer.
+  // Lifted a little off the page so the pill reads as a layer.
   '--normal-bg': 'color-mix(in oklab, var(--bg) 88%, var(--text) 12%)',
   '--normal-border': 'var(--line-strong)',
   '--normal-text': 'var(--text)',
@@ -19,9 +20,10 @@ const TOAST_CLASSES = {
 };
 
 export default function ThemedToaster() {
+  const { theme } = useTheme();
   return (
     <Toaster
-      theme="dark"
+      theme={theme}
       position="bottom-center"
       // Long enough to read a sentence (the default is 4 s).
       duration={6000}

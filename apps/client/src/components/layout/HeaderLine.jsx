@@ -5,6 +5,7 @@ import { useIncidents } from '../../api/incidents.js';
 import { cn } from '../../lib/cn.js';
 import { liveStatus } from '../../lib/liveStatus.js';
 import Logo from '../Logo.jsx';
+import ThemeToggle from '../ThemeToggle.jsx';
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 
 /** Pulsing dot + phrase: realtime connection and open incidents. */
@@ -93,6 +94,7 @@ export default function HeaderLine({ wid, connected }) {
       <WorkspaceSwitcher wid={wid} />
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
       <LiveStatus wid={wid} connected={connected} />
+      <ThemeToggle />
       <UserMenu />
     </header>
   );

@@ -258,7 +258,8 @@ const FALLBACK = {
 /**
  * Field colours from the design tokens: near dots are --text, far dots a moss
  * tone built from --glow lifted toward --accent and sunk toward --bg, crests
- * tint toward --accent, down regions use --status-down. `getVar(name)` returns
+ * tint toward --accent, down regions use --status-down. `additive` says whether
+ * dots add light (dark theme) or sit on top like ink (--field-blend: normal). `getVar(name)` returns
  * the raw custom property value (getComputedStyle(el).getPropertyValue).
  */
 export function readColors(getVar) {
@@ -268,7 +269,9 @@ export function readColors(getVar) {
   const glow = read('--glow', 'glow');
   const bg = read('--bg', 'bg');
   const far = glow.map((v, i) => mix(mix(v, accent[i], 0.3), bg[i], 0.2));
-  return { near: text, far, accent, down: read('--status-down', 'down') };
+  // Light themes draw dark dots over paper, so they blend normally, not additively.
+  const additive = String(getVar('--field-blend') ?? '').trim() !== 'normal';
+  return { near: text, far, accent, down: read('--status-down', 'down'), additive };
 }
 
 /**

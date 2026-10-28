@@ -194,5 +194,44 @@ page wave driven by status only (the public endpoint exposes no latency), uptime
 ## Resume note
 
 Everything above is deployed and pushed. Optional follow-ups: the Lighthouse pass, a light/dark toggle
-(the design is dark-only on purpose, D94), confirm dialogs in the new style instead of `window.confirm`
+(done, see "Light theme" below), confirm dialogs in the new style instead of `window.confirm`
 for deletes, and making two timing-sensitive tests more robust (they failed once each under load).
+
+---
+
+# Uptime accuracy, errors and sample data (D101, 28 Oct)
+
+Committed locally (`ea6b976`, `3249801`, `1526e82`, `bde8ac3`); not pushed.
+
+- [x] **Uptime from confirmed downtime.** `100 x (1 - incident downtime / time watched)`; failed checks that never
+      opened an incident no longer lower it. A monitor with no results shows "no data", not 100 %. Same maths on the
+      monitor page, 90-day bars, Health deck, dashboard gauge (new `GET /monitors/uptime-summary`) and public page.
+- [x] **Checker-offline state.** A network failure is probed against two reference hosts; if both fail the result is
+      `unknown` / `checker_offline`, kept out of incidents, adaptive intervals, budgets and every count, and drawn as a
+      gap labelled "Checker offline".
+- [x] **Recorded errors.** `errorCode` on every failed result, `causeCode` on incidents, shown in the timeline and the
+      Health deck's failed-checks panel.
+- [x] **Sample data.** Fake history only for four fictional demo monitors, all flagged `isSeed`; "Sample data" badges in
+      the UI; `npm run seed:clear` removes it. Migrations 004 (flag old fake history) and 005 (`coveredSec` backfill).
+- [x] Clean chart gaps (contiguous runs, no lines across gaps). Docs: D101, API.md, README.
+
+**To do on the live database:** run `npm run migrate` once (004, 005) so older data is flagged and backfilled.
+
+---
+
+# Light theme (28 Oct)
+
+Decision D102. Nothing pushed.
+
+- [x] Light tokens under `[data-theme='light']` (warm paper, ink, deep moss accent); contrast tested in both themes.
+- [x] Theme provider and `ThemeToggle` (app header, public/auth headers, error pages); stored choice, else the OS
+      preference; inline script in `index.html` prevents a flash.
+- [x] Signal field blends normally in light (`--field-blend`), recoloured live on a theme change; toasts follow the theme.
+- [x] Gate: client 227/227 tests, ESLint and Prettier clean, client build OK. Landing page checked in both themes in
+      headless Chrome.
+- [ ] **Not checked in a browser:** the logged-in app pages (dashboard, monitor detail, charts, modals) in light mode,
+      since they need the API and a database. Worth a click-through.
+
+## Resume note (light theme)
+
+Done except the click-through above. The alert email is still dark-only on purpose.

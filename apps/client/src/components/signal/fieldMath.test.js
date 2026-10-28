@@ -245,3 +245,11 @@ describe('colours', () => {
     expect(c.accent).toHaveLength(3);
   });
 });
+
+describe('colours by theme', () => {
+  it('adds light by default and blends normally when the token says so', () => {
+    expect(readColors(() => '').additive).toBe(true);
+    expect(readColors((name) => (name === '--field-blend' ? ' add ' : '')).additive).toBe(true);
+    expect(readColors((name) => (name === '--field-blend' ? ' normal ' : '')).additive).toBe(false);
+  });
+});

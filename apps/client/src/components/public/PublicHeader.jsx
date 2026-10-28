@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Logo from '../Logo.jsx';
+import ThemeToggle from '../ThemeToggle.jsx';
 import RingDotCta from '../ui/RingDotCta.jsx';
 
 /**
@@ -26,6 +27,7 @@ export default function PublicHeader({ cta = true }) {
             Get started
           </RingDotCta>
         )}
+        <ThemeToggle />
       </nav>
     </header>
   );

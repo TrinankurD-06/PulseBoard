@@ -6,6 +6,7 @@ import { errorLayout, workspaceFromPath } from '../lib/errorLayout.js';
 import { AppShellContext } from './layout/appShellContext.js';
 import AppShell from './layout/AppShell.jsx';
 import Logo from './Logo.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
 import PublicHeader from './public/PublicHeader.jsx';
 import FullPageSpinner from './ui/FullPageSpinner.jsx';
 import RingDotCta from './ui/RingDotCta.jsx';
@@ -101,6 +102,7 @@ function PlainError({ code, title, message, action }) {
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center px-5 py-5 sm:px-8">
         <Logo />
+        <ThemeToggle className="ml-auto" />
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 sm:px-8">
         <ErrorContent code={code} title={title} message={message} action={action} />

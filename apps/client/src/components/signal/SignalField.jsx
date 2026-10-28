@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '../../lib/ThemeContext.jsx';
 import { signalLabel } from '../../lib/signal.js';
 import { createCanvasField } from './canvasField.js';
 import { STILL_PHASE, createSimulation, readColors } from './fieldMath.js';
@@ -44,6 +45,8 @@ export default function SignalField({
   const [mode, setMode] = useState('webgl');
   const targetRef = useRef({ amplitude, speed, regions });
   const wakeRef = useRef(null);
+  const engineRef = useRef(null);
+  const { theme } = useTheme();
   const regionKey = regionsKey(regions);
 
   // Latest inputs go into a ref: changing them never rebuilds the renderer.
@@ -52,6 +55,17 @@ export default function SignalField({
     wakeRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amplitude, speed, regionKey]);
+
+  // A theme change repaints with the new tokens; the renderer is kept (a WebGL
+  // context cannot be recreated on the same canvas).
+  useEffect(() => {
+    const engine = engineRef.current;
+    const host = hostRef.current;
+    if (!engine || !host) return;
+    const styles = getComputedStyle(host);
+    engine.setColors(readColors((name) => styles.getPropertyValue(name)));
+    wakeRef.current?.();
+  }, [theme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,6 +83,7 @@ export default function SignalField({
       return () => window.clearTimeout(fallback);
     }
     host.dataset.engine = engine.kind;
+    engineRef.current = engine;
 
     const sim = createSimulation();
     sim.setTarget(targetRef.current);
@@ -196,6 +211,7 @@ export default function SignalField({
       canvas.removeEventListener('webglcontextrestored', onRestored);
       wakeRef.current = null;
       if (pulseRef) pulseRef.current = null;
+      engineRef.current = null;
       engine.destroy();
     };
   }, [mode, density, pulseRef]);

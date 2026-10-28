@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import AuthProvider from './auth/AuthProvider.jsx';
 import AmbientGlow from './components/ambient/AmbientGlow.jsx';
+import { ThemeProvider } from './lib/ThemeContext.jsx';
 import ThemedToaster from './components/ThemedToaster.jsx';
 import './index.css';
 
@@ -21,14 +22,16 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AmbientGlow />
-          <App />
-          <ThemedToaster />
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <AmbientGlow />
+            <App />
+            <ThemedToaster />
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );

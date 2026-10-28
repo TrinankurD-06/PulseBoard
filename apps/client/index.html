@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" style="color-scheme: dark">
+<html lang="en" data-theme="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,6 +13,22 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
     <title>PulseBoard</title>
+    <script>
+      // Sets the theme before first paint so there is no flash. Keep in step with src/lib/theme.js.
+      (function () {
+        var theme = 'dark';
+        try {
+          var stored = localStorage.getItem('pulseboard-theme');
+          if (stored === 'light' || stored === 'dark') theme = stored;
+          else if (matchMedia('(prefers-color-scheme: light)').matches) theme = 'light';
+        } catch (e) {}
+        var root = document.documentElement;
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+        if (theme === 'light')
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f6f3ea');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

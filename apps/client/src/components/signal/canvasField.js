@@ -6,7 +6,8 @@ import { fieldPoint, generateGrid, gridDims, pointColor, selectPointBudget } fro
 const FALLBACK_SHARE = 0.35;
 
 /** Returns { kind, points, resize, draw, restore, destroy }, or null without a 2D context. */
-export function createCanvasField(canvas, colors) {
+export function createCanvasField(canvas, initialColors) {
+  let colors = initialColors;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
@@ -60,7 +61,7 @@ export function createCanvasField(canvas, colors) {
       if (!count) return;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalCompositeOperation = colors.additive === false ? 'source-over' : 'lighter';
       for (let i = 0; i < count; i += 1) {
         const o = i * 3;
         fieldPoint(grid[o], grid[o + 1], grid[o + 2], sim, point);
@@ -70,6 +71,10 @@ export function createCanvasField(canvas, colors) {
         const s = point.size * 0.85; // matches the soft dot's visible core
         ctx.fillRect(point.sx * width - s / 2, point.sy * height - s / 2, s, s);
       }
+    },
+    setColors(next) {
+      colors = next;
+      styles.clear();
     },
     restore() {},
     destroy() {

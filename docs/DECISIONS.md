@@ -1252,6 +1252,8 @@ series would not line up between cards.
 
 ### D94. Dark only, new tokens and an ambient light system
 
+> Update: a light theme was added later (D102).
+
 - **Supersedes the theme parts of D88, D90 and D91** (peach/orange, heat ramp, yellow editorial
   tokens, film grain, halftone, status orb, light mode). Kept from D91: React 19, the shadcn/ui
   foundations (`tsx: false`, `@/components/shadcn`, `cn`) and the `@/` alias.
@@ -1475,3 +1477,23 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **A test bug found on the way.** A "flaky" model test asserted that the JSON contained no `42`; the JSON
   holds a random ObjectId and timestamps, so `42` appeared by chance in many runs. It now uses a distinctive
   provider id.
+
+### D102. A light theme, beside the dark one
+
+- **Supersedes the "dark only" part of D94.** The design is still dark by default in spirit, but a visitor can now
+  switch to a warm paper light theme with the sun/moon button (app header, public and auth headers, error pages).
+- **Tokens only.** `tokens.css` keeps the dark values on `:root` and overrides the colour tokens under
+  `:root[data-theme='light']`: paper `#f6f3ea`, ink `#1b1a15`, a deep moss accent `#3f6212` with paper-coloured text on
+  it, status colours darkened to read as text on paper. No component carries a theme-specific class. A test
+  (`tokens.test.js`) checks that light overrides every colour token and that text, accent and status colours reach
+  4.5:1 on the page in both themes.
+- **Which theme shows.** A stored choice (`localStorage`, key `pulseboard-theme`) wins; with none, the operating
+  system's `prefers-color-scheme` decides, and the page follows it live until the visitor chooses. An inline script in
+  `index.html` sets `data-theme` before first paint, so there is no flash; `lib/theme.js` holds the same logic.
+  The browser chrome colour (`theme-color`) and `color-scheme` follow the theme.
+- **The signal field.** Its dots add light on black, which is invisible on paper. A `--field-blend` token (`add` in
+  dark, `normal` in light) switches the WebGL blend function (`ONE, ONE` to `ONE, ONE_MINUS_SRC_ALPHA`) and the 2D
+  fallback's composite operation, so light mode draws dark dots over the paper. A theme change calls `setColors` on
+  the running renderer; it is not rebuilt, because a WebGL context cannot be recreated on the same canvas.
+- **Toasts** follow the theme (sonner's `theme` prop). The alert email stays dark (D100): email clients do not run our
+  CSS, so it cannot follow the visitor's choice.
