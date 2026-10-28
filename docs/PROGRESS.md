@@ -235,3 +235,21 @@ Decision D102. Nothing pushed.
 ## Resume note (light theme)
 
 Done except the click-through above. The alert email is still dark-only on purpose.
+
+---
+
+# One uptime formula (D103, 28 Oct)
+
+Fixes the monitor page showing a 30-day gauge of 100.0 next to a 24-hour card of 99.95 with a dip.
+
+- [x] `computeUptimeFromParts` / `computeUptime`: `1 - confirmed incident downtime / watched time`, leaving out paused
+      time (new `Monitor.pauses`, written on every pause and resume) and checker-offline time. Check-count
+      `uptimePercent` removed.
+- [x] Used by the tiles, Health deck card and sparkline, dashboard and public gauges, 90-day bars, status pages,
+      rollups (`rollupDay`) and the metrics endpoint. Today is computed live; the card covers exactly the selected range.
+- [x] Cut, never rounded: 100 only when downtime is exactly 0; one `formatUptime` (2 decimals) and `uptimeGaugeProps`.
+- [x] Card label shows its range; gauge stays at 30 days and says so; change reads `±0.00%` / percentage points.
+- [x] `npm run rollups:rebuild` (`rebuildAllRollups`).
+- [x] Gate: 940 tests (agent 24, shared 299, API 289, client 233, demo-target 22, worker 72), ESLint and Prettier clean,
+      client build OK.
+- [ ] **Run `npm run rollups:rebuild` once on the live database** (not run yet; it rewrites stored rollups).

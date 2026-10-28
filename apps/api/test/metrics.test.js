@@ -2,6 +2,7 @@ import { MISSED_PING_PREFIX } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
 import { AgentReport, CheckResult, Incident, Monitor } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
+import { truncateTo } from '@pulseboard/shared/uptime';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -158,10 +159,11 @@ describe('GET /monitors/:mid/metrics (http)', () => {
     for (const m of data.metrics) expect(m.series).toHaveLength(96);
 
     const uptime = metric(data, 'uptime');
-    const coveredSec = (NOW - grid.from) / 1000;
-    const expected = Math.round((1 - 600 / coveredSec) * 10_000) / 100;
+    // The card covers exactly the selected range (24 h) ending now: 10 min of 24 h, cut to 2 decimals.
+    const expected = truncateTo((1 - 600 / 86_400) * 100, 2);
     expect(uptime).toMatchObject({ label: 'Uptime', unit: '%', value: expected, previous: 100 });
-    expect(uptime.change).toBe(Math.round((expected - 100) * 10) / 10);
+    // The change is in percentage points between the figures as shown: 99.30 - 100.
+    expect(uptime.change).toBe(Number((expected - 100).toFixed(2)));
     expect(metric(data, 'failed')).toMatchObject({ value: 16.67, previous: 0, change: null });
     const avg = metric(data, 'avgResponse');
     expect(avg).toMatchObject({ value: 145, previous: 100, change: 45 });

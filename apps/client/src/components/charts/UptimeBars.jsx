@@ -1,4 +1,4 @@
-import { uptimeLevel } from '@pulseboard/shared/uptime';
+import { formatUptime, uptimeLevel } from '@pulseboard/shared/uptime';
 import { useState } from 'react';
 import { cn } from '../../lib/cn.js';
 import { formatDuration } from '../../lib/format.js';
@@ -27,7 +27,7 @@ export default function UptimeBars({ days }) {
         {days.map((day, i) => {
           const level = LEVELS[uptimeLevel(day.uptime)];
           const description = `${formatDay(day.date)}: ${
-            day.uptime == null ? 'no data' : `${day.uptime}% uptime`
+            day.uptime == null ? 'no data' : `${formatUptime(day.uptime)}% uptime`
           }`;
           return (
             <div
@@ -70,7 +70,7 @@ export default function UptimeBars({ days }) {
           </p>
           {hovered.uptime != null && (
             <p className="mt-1 text-muted">
-              {hovered.uptime}% uptime · {hovered.totalChecks.toLocaleString()} checks
+              {formatUptime(hovered.uptime)}% uptime · {hovered.totalChecks.toLocaleString()} checks
               <br />
               Downtime: {hovered.downtimeSec ? formatDuration(hovered.downtimeSec) : 'none'}
             </p>

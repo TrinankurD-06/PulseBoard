@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUptime } from '../../api/analytics.js';
+import { uptimeGaugeProps } from '../../lib/uptimeLevels.js';
 import { errorMessage } from '../../api/http.js';
 import { useIncidents } from '../../api/incidents.js';
 import {
@@ -47,7 +48,7 @@ import NotFound from '../NotFound.jsx';
 function MonitorHero({ wid, monitor, phrase, badges, actions }) {
   const { data: uptime } = useUptime(wid, monitor.id);
   // The 30-day figure from the API (confirmed downtime); no fallback to shorter windows.
-  const value = uptime?.d30 ?? null;
+  const gauge = uptimeGaugeProps(uptime?.d30);
   return (
     <>
       <Link
@@ -69,11 +70,11 @@ function MonitorHero({ wid, monitor, phrase, badges, actions }) {
         {uptime ? (
           <div className="min-w-0">
             <TickGauge
-              value={value}
+              value={gauge.value}
               target={99.9}
               label="Uptime"
               caption="Last 30 days"
-              decimals={value != null && (value >= 99.95 || value < 99) ? 1 : 2}
+              decimals={gauge.decimals}
               size={272}
             />
             {uptime.includesSampleData && (

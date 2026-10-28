@@ -24,7 +24,9 @@
     "./usage": "./src/usage/index.js",
     "./adaptive": "./src/adaptive/index.js",
     "./budget": "./src/budget/index.js",
-    "./agent": "./src/agent/index.js"
+    "./agent": "./src/agent/index.js",
+    "./uptime/compute": "./src/uptime/compute.js",
+    "./pauses": "./src/pauses/index.js"
   },
   "scripts": {
     "test": "vitest run",

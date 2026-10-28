@@ -57,6 +57,14 @@ const monitorSchema = new mongoose.Schema(
     isPaused: { type: Boolean, default: false },
     // Created by `npm run seed` as sample data; `npm run seed:clear` deletes these.
     isSeed: { type: Boolean, default: false },
+    // Pause history, newest last (capped): uptime leaves paused time out of both downtime and watched
+    // time. `to` is null while the pause is still on. See pauses/index.js.
+    pauses: {
+      type: [
+        { _id: false, from: { type: Date, required: true }, to: { type: Date, default: null } },
+      ],
+      default: [],
+    },
     // Why it is paused: by a user, or automatically because the monthly budget ran out.
     pausedReason: { type: String, enum: [...Object.values(PAUSED_REASONS), null], default: null },
 

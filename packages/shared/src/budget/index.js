@@ -1,6 +1,7 @@
 // Node-only budget helpers (use models). The pure maths is in ../adaptive.
 import { MONITOR_STATUS, PAUSED_REASONS } from '../constants.js';
 import { Monitor } from '../models/Monitor.js';
+import { closePause } from '../pauses/index.js';
 
 /**
  * Removes an active budget restriction (budget-pause or budget-slow) from a
@@ -41,6 +42,7 @@ export async function liftBudgetRestriction(monitorId, scheduler) {
     { returnDocument: 'after' },
   ).lean();
   if (!lifted) return false;
+  if (pausedByBudget) await closePause(monitor._id, new Date());
 
   if (!lifted.isPaused) await scheduler.scheduleMonitor(lifted);
   return true;

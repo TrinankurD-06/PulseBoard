@@ -1,6 +1,6 @@
 import { DailyRollup, Incident, Monitor } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
-import { addDays, utcDayStart } from '@pulseboard/shared/uptime';
+import { addDays, uptimeFromDowntime, utcDayStart } from '@pulseboard/shared/uptime';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTtlCache } from '../src/lib/ttlCache.js';
@@ -150,10 +150,16 @@ describe('GET /public/status/:slug', () => {
     expect(res.headers['cache-control']).toBe('public, max-age=30');
     const body = res.body.data;
     expect(body).toMatchObject({ title: 'Acme Status', overall: 'partial_outage' });
-    expect(body.monitors.map((m) => [m.name, m.status, m.uptime90])).toEqual([
-      ['API', 'up', 99.5], // 864 s down of 172,800 s covered
-      ['Website', 'down', null],
+    // Yesterday (864 s down of 86,400 watched) plus today computed live up to now; the stale
+    // rollup for today is ignored. Today's watched time comes from the clock.
+    const sinceMidnight = Math.round((Date.now() - utcDayStart(new Date()).getTime()) / 1000);
+    const expectedUptime90 = uptimeFromDowntime(864, 86_400 + sinceMidnight);
+    expect(body.monitors.map((m) => [m.name, m.status])).toEqual([
+      ['API', 'up'],
+      ['Website', 'down'],
     ]);
+    expect(body.monitors[0].uptime90).toBeCloseTo(expectedUptime90, 1);
+    expect(body.monitors[1].uptime90).toBeNull();
     expect(body.monitors[0].days).toHaveLength(90);
     expect(body.incidents).toHaveLength(1);
     expect(body.incidents[0]).toMatchObject({

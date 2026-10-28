@@ -13,6 +13,7 @@ import {
 } from '@pulseboard/shared/constants';
 import { monthKey } from '@pulseboard/shared/cost';
 import { resolveOpenIncident } from '@pulseboard/shared/incident';
+import { closePause, openPause } from '@pulseboard/shared/pauses';
 import {
   AgentReport,
   CheckResult,
@@ -293,6 +294,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
         pausedReason: PAUSED_REASONS.USER,
       });
       await monitor.save();
+      await openPause(monitor._id, new Date());
       await scheduler.cancelMonitor(monitor._id);
       // No checks run while paused, so an open incident could never recover on
       // its own. Close it now (no recovery alert: nothing actually recovered).
@@ -322,6 +324,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
           nextDueAt: heartbeatDueAt(monitor, now),
         });
         await monitor.save();
+        await closePause(monitor._id, now);
         return monitor;
       }
       if (isAgent(monitor)) {
@@ -338,6 +341,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
           silentNoticeAt: null,
         });
         await monitor.save();
+        await closePause(monitor._id, now);
         await syncAgentJob(monitor);
         return monitor;
       }
@@ -367,6 +371,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
         ? budgetSlowIntervalSec(monitor)
         : monitor.intervalSec;
       await monitor.save();
+      await closePause(monitor._id, now);
       await scheduler.scheduleMonitor(monitor);
       return monitor;
     },

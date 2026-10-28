@@ -1,8 +1,8 @@
 import { CHECK_STATE, MISSED_PING_PREFIX, MONITOR_TYPES } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
 import { AgentReport, CheckResult, Monitor } from '@pulseboard/shared/models';
-import { windowUptime } from '@pulseboard/shared/uptime';
-import { getIncidentsSince, getWatchStart } from './analytics.service.js';
+import { computeUptimeFromParts, truncateTo } from '@pulseboard/shared/uptime';
+import { loadUptimeInputs } from '@pulseboard/shared/uptime/compute';
 
 const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
 
@@ -56,6 +56,17 @@ export function changePercent(value, previous) {
   return roundTo(((value - previous) / Math.abs(previous)) * 100, 1);
 }
 
+/**
+ * Change of the uptime figure in percentage points (value minus previous), cut
+ * toward zero to 2 decimals: it is 0 only when the two figures are equal to the
+ * cent, and never rounded up to look better or worse than it is.
+ */
+export function uptimeChange(value, previous) {
+  if (value == null || previous == null) return null;
+  const delta = value - previous;
+  return Math.sign(delta) * truncateTo(Math.abs(delta), 2) || 0;
+}
+
 /** current / peak / low / average of a series, ignoring gaps (all null when there is no data). */
 export function summarizeSeries(values) {
   const present = values.filter((v) => v != null);
@@ -95,14 +106,17 @@ export function buildMetric({
   const value = current ? at(current, windowSec) : null;
   const before = previous ? at(previous, (grid.count * grid.bucketMs) / 1000) : null;
   const summary = summarizeSeries(raw);
-  const round = (v) => roundTo(v, decimals);
+  // Uptime is cut, not rounded, so a figure never reads 100 when there was downtime.
+  const isUptime = key === 'uptime';
+  const round = (v) => (isUptime ? truncateTo(v, decimals) : roundTo(v, decimals));
   return {
     key,
     label,
     unit,
     value: round(value),
     previous: round(before),
-    change: changePercent(value, before),
+    // The change compares the figures as shown, so value, previous and change always add up.
+    change: isUptime ? uptimeChange(round(value), round(before)) : changePercent(value, before),
     current: round(summary.current),
     peak: round(summary.peak),
     average: round(summary.average),
@@ -123,16 +137,25 @@ export function offlineBuckets(buckets) {
 }
 
 /**
- * Uptime documents for buildMetric, from incidents (confirmed downtime) over
- * the time we were watching: one per bucket, the current window and the
- * previous one. A window nothing was watched in has no document (null).
+ * Uptime documents for buildMetric, from the shared formula (confirmed
+ * incident downtime over watched time, leaving out paused and checker-offline
+ * time): one per bucket, the current window and the previous one. A window
+ * nothing was watched in has no document (null), which draws as a gap.
  */
-export function buildUptimeParts(grid, { incidents, watchStart, offline }) {
+export function buildUptimeParts(grid, { incidents, watchStart, exclusions = [], offline }) {
   const of = (from, to) => {
     if (!watchStart) return null; // never recorded anything: no figures
-    const { uptime } = windowUptime({ incidents, from, to, now: grid.now, watchStart });
+    const { uptime } = computeUptimeFromParts({
+      incidents,
+      from,
+      to,
+      now: grid.now,
+      watchStart,
+      exclusions,
+    });
     return uptime == null ? null : { uptime };
   };
+  const spanMs = grid.count * grid.bucketMs;
   const buckets = new Map();
   for (const start of grid.starts) {
     const doc = of(start, new Date(start.getTime() + grid.bucketMs));
@@ -140,8 +163,10 @@ export function buildUptimeParts(grid, { incidents, watchStart, offline }) {
   }
   return {
     buckets,
-    current: of(grid.from, grid.now),
-    previous: of(grid.prevFrom, grid.from),
+    // The card's figure covers exactly the selected range ending now (the same window the
+    // monitor page's 24h and 7d tiles use), not the bucket-aligned grid, so they always agree.
+    current: of(new Date(grid.now - spanMs), grid.now),
+    previous: of(new Date(grid.now - 2 * spanMs), new Date(grid.now - spanMs)),
     offline,
   };
 }
@@ -479,20 +504,20 @@ export async function getMetrics(monitorId, range, now = new Date()) {
   const grid = bucketGrid(range, now);
   const isHttp = monitor.type === MONITOR_TYPES.HTTP;
 
-  const [checks, latest, failures, incidents, watchStart] = await Promise.all([
+  const [checks, latest, failures, uptimeInputs] = await Promise.all([
     aggregateChecks(id, grid, { withTimings: isHttp }),
     CheckResult.findOne({ 'meta.monitorId': id }, { timestamp: 1 }).sort({ timestamp: -1 }).lean(),
     recentFailures(id, grid),
-    getIncidentsSince(id, grid.prevFrom, now),
-    getWatchStart(id),
+    loadUptimeInputs(id, new Date(now - 2 * grid.count * grid.bucketMs), now),
   ]);
+  const { incidents } = uptimeInputs;
   const live = buildLive(grid, latest?.timestamp, checks.buckets, checks.current);
   // Unknown results are not data: a window of only those has no figures (but is not "empty" history).
   const hasChecks = Boolean(checks.current || checks.previous);
   const includesSampleData =
     Boolean(checks.current?.seed || checks.previous?.seed) || incidents.some((i) => i.isSeed);
   // Uptime is confirmed downtime (incidents) over the time we were watching, never check pass rates.
-  const uptime = buildUptimeParts(grid, { incidents, watchStart, offline: checks.offline });
+  const uptime = buildUptimeParts(grid, { ...uptimeInputs, offline: checks.offline });
   const common = { type: monitor.type, grid, live, failures, includesSampleData };
 
   if (monitor.type === MONITOR_TYPES.HEARTBEAT) {

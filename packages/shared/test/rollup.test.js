@@ -116,22 +116,25 @@ describe('rollupDay', () => {
     expect(await DailyRollup.countDocuments({ monitorId: m })).toBe(0);
   });
 
-  it('writes coveredSec: first result to now on the current day, to day end on a past day', async () => {
+  it('writes coveredSec: watched time since the first result, to now on the current day, to day end on a past day', async () => {
     await rollupDay(at('12:00:00'), { now: at('12:00:00') });
     const a = await DailyRollup.findOne({ monitorId: monitorA }).lean();
-    expect(a.coveredSec).toBe(2 * 3600); // 10:00 to 12:00
+    expect(a.coveredSec).toBe(12 * 3600); // watched since 23:59:59 the day before: all of 00:00 to 12:00
     const b = await DailyRollup.findOne({ monitorId: monitorB }).lean();
     expect(b.coveredSec).toBe(4 * 3600); // 08:00 to 12:00
 
     await rollupDay(at('12:00:00'), { isFinal: true, now: at('00:00:05', '11') });
     const final = await DailyRollup.findOne({ monitorId: monitorA }).lean();
-    expect(final.coveredSec).toBe(14 * 3600); // 10:00 to midnight
+    expect(final.coveredSec).toBe(24 * 3600); // the whole day
   });
 
   it('never writes a negative coveredSec when now is before the first result', async () => {
     await rollupDay(at('12:00:00'), { now: at('05:00:00') });
+    // B's first result is at 08:00, after "now": nothing was watched yet.
+    const b = await DailyRollup.findOne({ monitorId: monitorB }).lean();
+    expect(b.coveredSec).toBe(0);
     const a = await DailyRollup.findOne({ monitorId: monitorA }).lean();
-    expect(a.coveredSec).toBe(0);
+    expect(a.coveredSec).toBe(5 * 3600);
   });
 
   it('does nothing for a day without checks', async () => {

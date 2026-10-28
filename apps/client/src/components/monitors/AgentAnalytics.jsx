@@ -1,3 +1,4 @@
+import { formatUptime } from '@pulseboard/shared/uptime';
 import { useState } from 'react';
 import { AGENT_RANGES, useAgentMetrics, useDailyUptime, useUptime } from '../../api/analytics.js';
 import { formatPercent, metricsSeries, metricsSummary } from '../../lib/agent.js';
@@ -126,7 +127,7 @@ export default function AgentAnalytics({ wid, monitor, now }) {
             rows: [...days].reverse().map((d) => ({
               key: d.date,
               date: d.date,
-              uptime: d.uptime == null ? 'No data' : `${d.uptime}%`,
+              uptime: d.uptime == null ? 'No data' : `${formatUptime(d.uptime)}%`,
               checks: d.totalChecks.toLocaleString(),
               downtime: d.downtimeSec ? formatDuration(d.downtimeSec) : '—',
             })),

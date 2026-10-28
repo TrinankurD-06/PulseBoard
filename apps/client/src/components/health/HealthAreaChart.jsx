@@ -23,7 +23,7 @@ function RingMarker({ cx, cy }) {
   );
 }
 
-function ChartTooltip({ active, payload, unit }) {
+function ChartTooltip({ active, payload, unit, metricKey }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   return (
@@ -34,7 +34,7 @@ function ChartTooltip({ active, payload, unit }) {
           ? OFFLINE_LABEL
           : point.v == null
             ? 'No data'
-            : formatMetricText(point.v, unit)}
+            : formatMetricText(point.v, unit, metricKey)}
       </p>
     </div>
   );
@@ -45,14 +45,14 @@ function ChartTooltip({ active, payload, unit }) {
  * (light stroke, faint fill) with sparse time ticks, a hover crosshair and gaps
  * where a bucket has no data.
  */
-export default function HealthAreaChart({ series, unit, range }) {
+export default function HealthAreaChart({ series, unit, metricKey, range }) {
   const id = svgId(useId(), 'area');
   const gaps = useGapSeries(series);
   const domain = seriesDomain(
     series.map((p) => p.v),
     unit,
   );
-  const ticks = (value) => formatMetricValue(value, unit).text;
+  const ticks = (value) => formatMetricValue(value, unit, metricKey).text;
 
   return (
     <div>
@@ -90,7 +90,7 @@ export default function HealthAreaChart({ series, unit, range }) {
               tickFormatter={ticks}
             />
             <Tooltip
-              content={<ChartTooltip unit={unit} />}
+              content={<ChartTooltip unit={unit} metricKey={metricKey} />}
               cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
               isAnimationActive={false}
             />

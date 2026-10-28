@@ -1,5 +1,6 @@
 // Pure helpers for the Health deck: value and change formatting, the
 // arrow/colour rule, selection fallback and keyboard index maths.
+import { formatUptime } from '@pulseboard/shared/uptime';
 import { formatCount } from './format.js';
 
 export const HEALTH_RANGES = ['1h', '24h', '7d'];
@@ -12,8 +13,10 @@ const trimmed = (value, digits) => String(Number(value.toFixed(digits)));
  * A metric value split into { text, unit } so the card can set the unit small:
  * 99.93 % · 182 ms · 1.42 s · 0.35 req/s · 1,204 pings. null is a dash.
  */
-export function formatMetricValue(value, unit) {
+export function formatMetricValue(value, unit, key) {
   if (value == null || Number.isNaN(value)) return { text: '—', unit: '' };
+  // Uptime has one formatter everywhere: cut to 2 decimals, "100" only when nothing was down.
+  if (key === 'uptime') return { text: formatUptime(value), unit: '%' };
   if (unit === 'ms') {
     return Math.abs(value) >= 1000
       ? { text: (value / 1000).toFixed(2), unit: 's' }
@@ -26,8 +29,8 @@ export function formatMetricValue(value, unit) {
 }
 
 /** "99.93%" as one string (tooltips, stats). */
-export function formatMetricText(value, unit) {
-  const { text, unit: u } = formatMetricValue(value, unit);
+export function formatMetricText(value, unit, key) {
+  const { text, unit: u } = formatMetricValue(value, unit, key);
   if (!u) return text;
   return u === '%' ? `${text}%` : `${text} ${u}`;
 }
@@ -48,14 +51,19 @@ export function formatChange(change, key) {
   if (change == null || Number.isNaN(change)) {
     return { text: '—', arrow: '', direction: 'none', bad: false };
   }
-  const rounded = Math.round(Math.abs(change) * 10) / 10;
-  if (rounded === 0) return { text: '0%', arrow: '', direction: 'flat', bad: false };
+  // Uptime changes are percentage points to 2 decimals; the rest are relative, to 1.
+  const digits = key === 'uptime' ? 2 : 1;
+  const rounded = Number(Math.abs(change).toFixed(digits));
+  if (rounded === 0) {
+    return { text: `±${(0).toFixed(digits)}%`, arrow: '', direction: 'flat', bad: false };
+  }
   const direction = change > 0 ? 'up' : 'down';
   const bad =
     (direction === 'up' && WORSE_WHEN_UP.has(key)) ||
     (direction === 'down' && WORSE_WHEN_DOWN.has(key));
   return {
-    text: `${rounded}%`,
+    // Uptime shows both decimals (-0.70%); the other changes drop a trailing zero (12%).
+    text: `${key === 'uptime' ? rounded.toFixed(2) : rounded}%`,
     arrow: direction === 'up' ? '↗' : '↘',
     direction,
     bad,

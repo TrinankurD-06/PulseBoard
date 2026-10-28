@@ -11,24 +11,24 @@ import {
   monthStart,
 } from '@pulseboard/shared/cost';
 import { mongoose } from '@pulseboard/shared/db';
-import {
-  AgentReport,
-  CheckResult,
-  DailyRollup,
-  Incident,
-  Monitor,
-} from '@pulseboard/shared/models';
+import { AgentReport, CheckResult, DailyRollup, Monitor } from '@pulseboard/shared/models';
 import { pingsThisMonth, reportsThisMonth, requestsThisMonth } from '@pulseboard/shared/usage';
 import {
   addDays,
   bucketSizeMs,
-  combineRollups,
+  combineWithToday,
   DAY_MS,
   fillDailySeries,
   uptimeFromDowntime,
   utcDayStart,
-  windowUptime,
+  withLiveToday,
 } from '@pulseboard/shared/uptime';
+import {
+  getIncidentsSince,
+  getWatchStart,
+  loadUptimeInputs,
+  uptimeInWindow,
+} from '@pulseboard/shared/uptime/compute';
 
 export const MAX_CHART_POINTS = 500;
 
@@ -83,34 +83,7 @@ export async function getUsage(monitorId, now = new Date()) {
   };
 }
 
-/**
- * When we started watching a monitor: its first stored result (raw results
- * live 7 days, so for an old monitor this is about a week ago, which is the
- * widest window computed from raw data). If no raw result is left, the
- * earliest daily rollup. null when there is neither: a monitor that has
- * produced nothing yet has no uptime to report ("no data", not 100%), which is
- * why the monitor's creation time is not used.
- */
-export async function getWatchStart(monitorId) {
-  const id = toObjectId(monitorId);
-  const first = await CheckResult.findOne({ 'meta.monitorId': id }, { timestamp: 1 })
-    .sort({ timestamp: 1 })
-    .lean();
-  if (first) return new Date(first.timestamp);
-  const rollup = await DailyRollup.findOne({ monitorId: id }, { date: 1 }).sort({ date: 1 }).lean();
-  return rollup ? new Date(rollup.date) : null;
-}
-
-/** Incidents of a monitor that overlap [from, now): what uptime windows are computed from. */
-export const getIncidentsSince = (monitorId, from, now) =>
-  Incident.find(
-    {
-      monitorId: toObjectId(monitorId),
-      startedAt: { $lt: now },
-      $or: [{ resolvedAt: null }, { resolvedAt: { $gt: from } }],
-    },
-    { startedAt: 1, resolvedAt: 1, isSeed: 1 },
-  ).lean();
+export { getIncidentsSince, getWatchStart };
 
 /** The rollup fields uptime needs (coveredSec and isFinal decide the covered time). */
 const UPTIME_FIELDS = {
@@ -125,59 +98,79 @@ const UPTIME_FIELDS = {
 };
 
 /**
- * Uptime % for the four windows shown on the monitor page, from confirmed
- * downtime (incidents) over the time we were watching: a failed check that
- * never opened an incident changes nothing.
- * 24h and 7d are computed from incidents directly (exact, open incidents count
- * up to now); 30/90 days come from daily rollups, because raw checks are only
- * kept for 7 days. Today's rollup is refreshed every 15 minutes.
+ * Uptime % for the four windows shown on the monitor page. Every figure is the
+ * one shared formula (confirmed incident downtime over watched time, leaving
+ * out paused and checker-offline time); a failed check that never opened an
+ * incident changes nothing.
+ * 24h and 7d come straight from incidents (exact, open incidents count up to
+ * now). 30d and 90d add up the final daily rollups, which are the same formula
+ * per day (raw checks are only kept for 7 days), plus today computed live, so
+ * they never lag the 15-minute rollup refresh.
  * `includesSampleData` is true when any rollup or incident used is seed data.
  */
 export async function getUptime(monitorId, now = new Date()) {
   const id = toObjectId(monitorId);
   const today = utcDayStart(now);
-  const [rollups, incidents, watchStart] = await Promise.all([
+  const [rollups, inputs] = await Promise.all([
     DailyRollup.find({ monitorId: id, date: { $gte: addDays(today, -89) } }, UPTIME_FIELDS).lean(),
-    getIncidentsSince(id, new Date(now - 7 * DAY_MS), now),
-    getWatchStart(id),
+    loadUptimeInputs(id, new Date(now - 7 * DAY_MS), now),
   ]);
-  // No start of watching means nothing was ever recorded: no data, not 100%.
   const window = (days) =>
-    watchStart
-      ? windowUptime({ incidents, from: new Date(now - days * DAY_MS), to: now, now, watchStart })
-          .uptime
-      : null;
-  const lastDays = (days) =>
-    combineRollups(rollups.filter((r) => r.date >= addDays(today, 1 - days)));
-
+    inputs.watchStart ? uptimeInWindow(inputs, new Date(now - days * DAY_MS), now).uptime : null;
+  const todayLive = inputs.watchStart ? uptimeInWindow(inputs, today, now) : null;
+  const lastDays = (days) => combineWithToday(rollups, todayLive, { days, today }).uptime;
   return {
     h24: window(1),
     d7: window(7),
-    d30: lastDays(30).uptime,
-    d90: lastDays(90).uptime,
-    includesSampleData: rollups.some((r) => r.isSeed) || incidents.some((i) => i.isSeed),
+    d30: lastDays(30),
+    d90: lastDays(90),
+    includesSampleData: rollups.some((r) => r.isSeed) || inputs.incidents.some((i) => i.isSeed),
   };
 }
 
+/** Today's uptime so far for each monitor (same formula as everything else), keyed by monitor id. */
+export async function getTodayLive(monitorIds, now = new Date()) {
+  const today = utcDayStart(now);
+  const entries = await Promise.all(
+    monitorIds.map(async (id) => {
+      const inputs = await loadUptimeInputs(id, today, now);
+      return [String(id), inputs.watchStart ? uptimeInWindow(inputs, today, now) : null];
+    }),
+  );
+  return new Map(entries);
+}
+
 /**
- * Uptime across every monitor of a workspace for the last `days` days (rollups,
- * today included): total downtime over total covered time, plus each monitor's
- * own figure. null when nothing was covered ("no data yet", not 100%).
+ * Uptime across every monitor of a workspace for the last `days` days: total
+ * downtime over total watched time, plus each monitor's own figure. Past days
+ * come from the rollups and today is computed live. null when nothing was
+ * covered ("no data yet", not 100%).
  */
 export async function getUptimeSummary(workspaceId, days, now = new Date()) {
   const monitors = await Monitor.find({ workspaceId: toObjectId(workspaceId) }, { _id: 1 }).lean();
-  const rollups = await DailyRollup.find(
-    {
-      monitorId: { $in: monitors.map((m) => m._id) },
-      date: { $gte: addDays(utcDayStart(now), 1 - days) },
-    },
-    UPTIME_FIELDS,
-  ).lean();
+  const today = utcDayStart(now);
+  const [rollups, live] = await Promise.all([
+    DailyRollup.find(
+      {
+        monitorId: { $in: monitors.map((m) => m._id) },
+        date: { $gte: addDays(today, 1 - days), $lt: today },
+      },
+      UPTIME_FIELDS,
+    ).lean(),
+    getTodayLive(
+      monitors.map((m) => m._id),
+      now,
+    ),
+  ]);
 
   let downtimeSec = 0;
   let coveredSec = 0;
   const perMonitor = monitors.map((monitor) => {
-    const own = combineRollups(rollups.filter((r) => String(r.monitorId) === String(monitor._id)));
+    const own = combineWithToday(
+      rollups.filter((r) => String(r.monitorId) === String(monitor._id)),
+      live.get(String(monitor._id)),
+      { days, today },
+    );
     downtimeSec += own.downtimeSec;
     coveredSec += own.coveredSec;
     return { id: String(monitor._id), uptime: own.uptime };
@@ -285,7 +278,8 @@ export async function getDailySeries(monitorId, days, now = new Date()) {
     monitorId: toObjectId(monitorId),
     date: { $gte: addDays(utcDayStart(now), 1 - days) },
   }).lean();
-  return fillDailySeries(rollups, { days, today: now });
+  const live = await getTodayLive([monitorId], now);
+  return withLiveToday(fillDailySeries(rollups, { days, today: now }), live.get(String(monitorId)));
 }
 
 /**

@@ -15,7 +15,7 @@ function RingMarker({ cx, cy }) {
   );
 }
 
-function SparkTooltip({ active, payload, unit }) {
+function SparkTooltip({ active, payload, unit, metricKey }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   if (point.v == null && !point.offline) return null;
@@ -25,7 +25,7 @@ function SparkTooltip({ active, payload, unit }) {
         {new Date(point.t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
       </span>{' '}
       <span className={point.offline ? 'text-muted' : 'text-fg'}>
-        {point.offline ? OFFLINE_LABEL : formatMetricText(point.v, unit)}
+        {point.offline ? OFFLINE_LABEL : formatMetricText(point.v, unit, metricKey)}
       </span>
     </div>
   );
@@ -37,7 +37,7 @@ function SparkTooltip({ active, payload, unit }) {
  * crosshair, a ring-dot marker and a small tooltip. aria-hidden: the card's text
  * carries the value.
  */
-export default function HealthSparkline({ series, unit }) {
+export default function HealthSparkline({ series, unit, metricKey }) {
   const id = svgId(useId(), 'spark');
   const gaps = useGapSeries(series);
   const domain = seriesDomain(
@@ -65,7 +65,7 @@ export default function HealthSparkline({ series, unit }) {
           <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} hide />
           <YAxis hide domain={yDomain} />
           <Tooltip
-            content={<SparkTooltip unit={unit} />}
+            content={<SparkTooltip unit={unit} metricKey={metricKey} />}
             cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
             position={{ y: 2 }}
             isAnimationActive={false}

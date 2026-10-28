@@ -249,17 +249,18 @@ verified; otherwise a new user (no password) with a personal workspace is create
 
 ### Scripts
 
-| Command                                        | What it does                                                      |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| `npm run dev`                                  | Runs API, worker, client and demo-target with live reload         |
-| `npm run seed`                                 | (Re)creates the demo account with sample data                     |
-| `npm run seed:clear`                           | Deletes all sample data (`isSeed`), keeps real monitors and data  |
-| `npm run migrate`                              | Applies pending schema migrations (idempotent)                    |
-| `npm run heartbeat -w @pulseboard/demo-target` | Demo cron job: pings the heartbeat (`--fail`, `--stop-after <n>`) |
-| `npm test`                                     | All test suites (shared, API, worker, client, demo-target, agent) |
-| `npm run test:coverage -w @pulseboard/shared`  | Coverage of the shared core logic                                 |
-| `npm run lint`                                 | ESLint across the monorepo                                        |
-| `npm run format`                               | Prettier across the monorepo                                      |
+| Command                                        | What it does                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`                                  | Runs API, worker, client and demo-target with live reload                |
+| `npm run seed`                                 | (Re)creates the demo account with sample data                            |
+| `npm run seed:clear`                           | Deletes all sample data (`isSeed`), keeps real monitors and data         |
+| `npm run migrate`                              | Applies pending schema migrations (idempotent)                           |
+| `npm run rollups:rebuild`                      | One-off: recalculates every daily rollup with the current uptime formula |
+| `npm run heartbeat -w @pulseboard/demo-target` | Demo cron job: pings the heartbeat (`--fail`, `--stop-after <n>`)        |
+| `npm test`                                     | All test suites (shared, API, worker, client, demo-target, agent)        |
+| `npm run test:coverage -w @pulseboard/shared`  | Coverage of the shared core logic                                        |
+| `npm run lint`                                 | ESLint across the monorepo                                               |
+| `npm run format`                               | Prettier across the monorepo                                             |
 
 ## Environment variables
 

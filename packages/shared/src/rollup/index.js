@@ -1,8 +1,9 @@
 // Daily rollups: compress a day of raw checks into one row per monitor.
 // Raw checks expire after 7 days; the 30/90-day uptime and the 90-day bars
 // are built from these rows. Node-only (uses models).
-import { CheckResult, DailyRollup, Incident } from '../models/index.js';
-import { addDays, downtimeWithin, utcDayStart } from '../uptime/index.js';
+import { CheckResult, DailyRollup } from '../models/index.js';
+import { loadUptimeInputs } from '../uptime/compute.js';
+import { addDays, computeUptimeFromParts, utcDayStart } from '../uptime/index.js';
 
 /**
  * Aggregation that turns one UTC day of check results into DailyRollup rows
@@ -61,8 +62,10 @@ export function buildRollupPipeline(dayStart, { isFinal, now = new Date() }) {
 
 /**
  * Recomputes the rollups of one UTC day: check counts and response times via
- * the aggregation above, then downtime from incidents overlapping the day
- * (more accurate than "failed checks x interval").
+ * the aggregation above, then downtime and watched time from the one shared
+ * uptime formula (confirmed incident downtime over watched time, without paused
+ * and checker-offline time). The aggregation's own coveredSec is only the
+ * starting value for a new row. Sample (seed) rows keep their numbers.
  */
 export async function rollupDay(day, { isFinal = false, now = new Date() } = {}) {
   const dayStart = utcDayStart(day);
@@ -70,35 +73,44 @@ export async function rollupDay(day, { isFinal = false, now = new Date() } = {})
 
   await CheckResult.aggregate(buildRollupPipeline(dayStart, { isFinal, now }));
 
-  const incidents = await Incident.find(
-    { startedAt: { $lt: dayEnd }, $or: [{ resolvedAt: null }, { resolvedAt: { $gt: dayStart } }] },
-    { monitorId: 1, startedAt: 1, resolvedAt: 1 },
+  const rollups = await DailyRollup.find(
+    { date: dayStart, isSeed: { $ne: true } },
+    { monitorId: 1 },
   ).lean();
-
-  const byMonitor = new Map();
-  for (const incident of incidents) {
-    const key = String(incident.monitorId);
-    byMonitor.set(key, [...(byMonitor.get(key) ?? []), incident]);
-  }
-  const rollups = await DailyRollup.find({ date: dayStart }, { monitorId: 1 }).lean();
   if (rollups.length === 0) return 0;
 
-  await DailyRollup.bulkWrite(
-    rollups.map((rollup) => ({
-      updateOne: {
-        filter: { _id: rollup._id },
-        update: {
-          $set: {
-            downtimeSec: downtimeWithin(
-              byMonitor.get(String(rollup.monitorId)) ?? [],
-              dayStart,
-              dayEnd,
-              now,
-            ),
-          },
-        },
-      },
-    })),
+  const updates = await Promise.all(
+    rollups.map(async (rollup) => {
+      const inputs = await loadUptimeInputs(rollup.monitorId, dayStart, now);
+      const { downtimeSec, coveredSec } = computeUptimeFromParts({
+        ...inputs,
+        from: dayStart,
+        to: dayEnd,
+      });
+      return {
+        updateOne: { filter: { _id: rollup._id }, update: { $set: { downtimeSec, coveredSec } } },
+      };
+    }),
   );
+  await DailyRollup.bulkWrite(updates);
   return rollups.length;
+}
+
+/**
+ * Recomputes every stored day with the current formula, oldest first (the
+ * one-off behind `npm run rollups:rebuild`). Days whose raw checks are gone
+ * (older than 7 days) keep their check counts and get their downtime and
+ * watched time recomputed from incidents and pause history.
+ */
+export async function rebuildAllRollups({ now = new Date(), onDay } = {}) {
+  const today = utcDayStart(now);
+  const days = await DailyRollup.distinct('date', { isSeed: { $ne: true } });
+  days.sort((a, b) => a - b);
+  let rows = 0;
+  for (const day of days) {
+    const count = await rollupDay(day, { isFinal: day < today, now });
+    rows += count;
+    onDay?.(day, count);
+  }
+  return { days: days.length, rows };
 }

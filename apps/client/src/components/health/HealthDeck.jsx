@@ -2,7 +2,12 @@ import { useId, useState } from 'react';
 import { errorMessage } from '../../api/http.js';
 import { useMetrics } from '../../api/metrics.js';
 import { cn } from '../../lib/cn.js';
-import { DEFAULT_HEALTH_RANGE, HEALTH_RANGES, resolveSelection } from '../../lib/health.js';
+import {
+  DEFAULT_HEALTH_RANGE,
+  HEALTH_RANGES,
+  RANGE_TEXT,
+  resolveSelection,
+} from '../../lib/health.js';
 import DetailPanel from './DetailPanel.jsx';
 import MetricCard from './MetricCard.jsx';
 import { onGroupKeyDown } from './groupKeys.js';
@@ -158,6 +163,7 @@ export default function HealthDeck({ wid, monitorId }) {
                 key={m.key}
                 deckId={deckId}
                 metric={m}
+                rangeText={RANGE_TEXT[range]}
                 selected={m.key === key}
                 tabbable={m.key === key}
                 onSelect={setSelected}

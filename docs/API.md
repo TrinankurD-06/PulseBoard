@@ -475,6 +475,13 @@ heartbeat). A failed check that never opened an incident does not change uptime:
 monitor has `null` ("no data"), never 100 %. A check that failed with a network error while the
 checker itself was offline is stored as `state: "unknown"` and counts nowhere.
 
+**One formula, everywhere.** The gauge, the Uptime card and its sparkline, the 90-day bars, the status
+pages, the rollups and the metrics endpoint all use `computeUptimeFromParts` (`packages/shared/src/uptime`):
+time the monitor was paused and time the checker was offline are left out of both the downtime and the
+watched time. Figures are **cut, never rounded**: a figure is exactly `100` only when downtime is exactly
+0, so 99.9996 shows as `99.99`. Every surface prints it with the same `formatUptime`: 2 decimals, or
+`100`. Today is always computed live, so the figures do not lag the 15-minute rollup refresh.
+
 ### `GET /workspaces/:wid/monitors/:mid/uptime` (viewer)
 
 ```json
@@ -483,9 +490,10 @@ checker itself was offline is stored as `state: "unknown"` and counts nowhere.
 }
 ```
 
-Percentages with 3 decimals; `null` = no data. 24 h and 7 d are computed from incidents over the
-watched time (an open incident counts up to now); 30 d and 90 d from daily rollups (downtime over
-the seconds each day was covered). `includesSampleData` is `true` when any rollup or incident used
+Percentages cut to 3 decimals; `null` = no data. 24 h and 7 d are computed from incidents over the
+watched time (an open incident counts up to now); 30 d and 90 d add up the daily rollups of past days
+(the same formula per day) and today computed live. The metrics endpoint's `uptime` for `24h` and `7d`
+covers exactly the same window, so it equals `h24` and `d7` here. `includesSampleData` is `true` when any rollup or incident used
 was created by the demo seed (`isSeed`).
 
 ### `GET /workspaces/:wid/monitors/uptime-summary?days=30` (viewer)
@@ -703,7 +711,8 @@ Rounding: `%` 2 decimals, `ms` integers (agent `p95Latency`: 1 decimal), `req/s`
 **Uptime is confirmed downtime.** Every `uptime` figure (each bucket, the whole range, the previous
 range) is `100 × (1 − incident downtime ÷ time watched)`, so failed checks that never opened an
 incident do not change it; they show in `failed` and in `failures`. A window nothing was watched in
-has `null`.
+has `null`. Uptime values are cut to 2 decimals (never rounded up), and `change` for `uptime` is the
+difference in percentage points between the shown `value` and `previous` (`-0.70`), `0` when equal.
 
 **Checker offline.** Results with `state: "unknown"` (a network failure while the checker itself
 could not reach two reference hosts) are not counted anywhere: not in `failed`, not in uptime, not in

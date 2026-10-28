@@ -2,11 +2,13 @@ import { DailyRollup, Incident, Monitor, StatusPage } from '@pulseboard/shared/m
 import { overallStatus, publicMonitorStatus } from '@pulseboard/shared/statusPage';
 import {
   addDays,
-  combineRollups,
+  combineWithToday,
   DAY_MS,
   fillDailySeries,
   utcDayStart,
+  withLiveToday,
 } from '@pulseboard/shared/uptime';
+import { getTodayLive } from '../monitors/analytics.service.js';
 
 const DAYS = 90;
 const INCIDENT_WINDOW_DAYS = 30;
@@ -19,7 +21,7 @@ const MAX_INCIDENTS = 20;
  * This is a whitelist: only what's written here leaves the API. In particular
  * no monitor URLs (could be internal hosts), ids, workspace ids, headers or
  * error messages (could reveal infrastructure details). Uptime is confirmed
- * downtime over covered time (rollups), never check pass rates.
+ * downtime over watched time (past days from rollups, today live), never check pass rates.
  */
 export async function buildPublicStatus(slug, now = new Date()) {
   const page = await StatusPage.findOne({ slug, isPublic: true }).lean();
@@ -35,7 +37,7 @@ export async function buildPublicStatus(slug, now = new Date()) {
     .filter(Boolean);
   const ids = monitors.map((monitor) => monitor._id);
 
-  const [rollups, incidents] = await Promise.all([
+  const [rollups, incidents, live] = await Promise.all([
     DailyRollup.find(
       { monitorId: { $in: ids }, date: { $gte: addDays(utcDayStart(now), 1 - DAYS) } },
       {
@@ -59,6 +61,7 @@ export async function buildPublicStatus(slug, now = new Date()) {
       .sort({ startedAt: -1 })
       .limit(MAX_INCIDENTS)
       .lean(),
+    getTodayLive(ids, now),
   ]);
 
   const nameOf = new Map(monitors.map((monitor) => [String(monitor._id), monitor.name]));
@@ -69,11 +72,12 @@ export async function buildPublicStatus(slug, now = new Date()) {
     overall: overallStatus(monitors.map((monitor) => monitor.status)),
     monitors: monitors.map((monitor) => {
       const own = rollups.filter((rollup) => rollup.monitorId.equals(monitor._id));
+      const todayLive = live.get(String(monitor._id));
       return {
         name: monitor.name,
         status: publicMonitorStatus(monitor.status),
-        uptime90: combineRollups(own).uptime,
-        days: fillDailySeries(own, { days: DAYS, today: now }).map(
+        uptime90: combineWithToday(own, todayLive, { days: DAYS, today: now }).uptime,
+        days: withLiveToday(fillDailySeries(own, { days: DAYS, today: now }), todayLive).map(
           ({ date, uptime, downtimeSec, totalChecks }) => ({
             date,
             uptime,

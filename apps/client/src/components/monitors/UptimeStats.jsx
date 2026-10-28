@@ -1,4 +1,4 @@
-import { uptimeLevel } from '@pulseboard/shared/uptime';
+import { formatUptime, uptimeLevel } from '@pulseboard/shared/uptime';
 import { cn } from '../../lib/cn.js';
 import Card from '../ui/Card.jsx';
 import SampleBadge from '../ui/SampleBadge.jsx';
@@ -30,7 +30,7 @@ export default function UptimeStats({ uptime }) {
             <Card key={key} className="p-5">
               <p className="text-xs text-faint">{label}</p>
               <p className="mt-3 text-4xl leading-none font-light tracking-[-0.03em] text-fg tabular-nums">
-                {value == null ? '—' : value}
+                {formatUptime(value)}
                 {value != null && <span className="ml-0.5 text-lg text-muted">%</span>}
               </p>
               <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">

@@ -1,3 +1,4 @@
+import { formatUptime } from '@pulseboard/shared/uptime';
 import { useDailyUptime, useRecentChecks, useUptime } from '../../api/analytics.js';
 import { formatDuration } from '../../lib/format.js';
 import { pingHistory } from '../../lib/heartbeat.js';
@@ -78,7 +79,7 @@ export default function HeartbeatAnalytics({ wid, monitorId, side }) {
           rows: [...days].reverse().map((d) => ({
             key: d.date,
             date: d.date,
-            uptime: d.uptime == null ? 'No data' : `${d.uptime}%`,
+            uptime: d.uptime == null ? 'No data' : `${formatUptime(d.uptime)}%`,
             checks: d.totalChecks.toLocaleString(),
             downtime: d.downtimeSec ? formatDuration(d.downtimeSec) : '—',
           })),

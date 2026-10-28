@@ -1498,3 +1498,37 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   the running renderer; it is not rebuilt, because a WebGL context cannot be recreated on the same canvas.
 - **Toasts** follow the theme (sonner's `theme` prop). The alert email stays dark (D100): email clients do not run our
   CSS, so it cannot follow the visitor's choice.
+
+### D103. One uptime formula, cut not rounded, with paused and offline time left out
+
+- **The bug.** The monitor page showed a 30-day gauge of `100.0` next to a 24-hour card of `99.95` with a dip.
+  The causes: the gauge came from daily rollups (refreshed every 15 minutes, rounded to one decimal, so
+  99.96 printed as 100.0) while the card came from incidents over a bucket-aligned window, and the rollup
+  and card ranges were different windows anyway.
+- **One function.** `computeUptimeFromParts` in `packages/shared/src/uptime` is
+  `1 − confirmed incident downtime ÷ watched time` over a window, where watched time runs from the later of the
+  window start and when we began watching to the earlier of the window end and now, minus **exclusions**: paused
+  time and time the checker itself was offline. `computeUptime(monitorId, from, to)` loads what it needs
+  (`uptime/compute.js`). The tiles, the Health deck card and sparkline, the dashboard and public gauges, the
+  90-day bars, the status pages, the rollups and the metrics endpoint all go through it. The check-count
+  `uptimePercent` was deleted.
+- **Pause history.** `Monitor.pauses` (`{ from, to }`, newest last, capped at 200) is written by `openPause` and
+  `closePause` on every pause and resume, including the automatic budget pause. A monitor already paused before
+  this existed counts as paused since its last result.
+- **Offline time.** Each `unknown` result stands for one check interval and is excluded. Raw results live 7 days,
+  so older offline time is known only through the rollups, whose `coveredSec` already leaves it out.
+- **Watching starts** at the earlier of the first result the checker could judge and the start of coverage of the
+  oldest past rollup, so a 30-day window is not cut to the 7 days of raw results.
+- **Rollups use it too.** `rollupDay` writes `downtimeSec` and `coveredSec` from the formula; sample (seed) rows keep
+  their numbers. 30 d and 90 d are the final rollups of past days plus today computed live.
+- **Cut, never rounded.** `uptimeFromDowntime` truncates to 3 decimals and is exactly 100 only when downtime is 0; the
+  shared `formatUptime` prints 2 truncated decimals or `100`. The gauges use the same text (`uptimeGaugeProps`).
+- **Ranges are labelled.** The monitor-page gauge stays at 30 days and says so; the Uptime card follows the selected
+  range and its label reads "Uptime · last 24h". Its figure covers exactly that range ending now (not the
+  bucket-aligned grid), so it equals the 24 h and 7 d tiles. A sparkline bucket is the same formula over the bucket,
+  so single failed checks never dip it, and a bucket with nothing watched is a gap.
+- **Change label.** For uptime, the change is percentage points between the displayed figures (`-0.70%`); no change
+  reads `±0.00%` instead of `0%`.
+- **`npm run rollups:rebuild`** recomputes every stored day with the formula (days without raw results keep their
+  counts and get their downtime and watched time recomputed from incidents and pause history). Run it once after
+  upgrading.

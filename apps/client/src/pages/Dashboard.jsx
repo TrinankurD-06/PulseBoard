@@ -17,6 +17,7 @@ import { useNow } from '../hooks/useNow.js';
 import { useSignalFeed } from '../hooks/useSignalFeed.js';
 import { formatDuration, formatMs } from '../lib/format.js';
 import { isOperational } from '../lib/status.js';
+import { uptimeGaugeProps } from '../lib/uptimeLevels.js';
 
 const UPTIME_TARGET = 99.9;
 
@@ -65,6 +66,7 @@ export default function Dashboard() {
 
   const newButton = canEdit && <RingDotCta to={`/app/${wid}/monitors/new`}>New monitor</RingDotCta>;
   const uptime = uptimeSummary?.uptime ?? null;
+  const gauge = uptimeGaugeProps(uptime);
   const side = monitors
     ? `${workspace.name} · ${monitors.length} monitor${monitors.length === 1 ? '' : 's'}`
     : workspace.name;
@@ -98,13 +100,13 @@ export default function Dashboard() {
         <>
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-12">
             <TickGauge
-              value={uptime}
+              value={gauge.value}
               target={UPTIME_TARGET}
               label="Uptime"
               caption={
                 uptime == null ? 'Nothing has been covered yet' : 'Last 30 days, all monitors'
               }
-              decimals={uptime != null && (uptime >= 99.95 || uptime < 99) ? 1 : 2}
+              decimals={gauge.decimals}
               emptyText={summaryPending ? '…' : 'No data yet'}
               size={300}
             />

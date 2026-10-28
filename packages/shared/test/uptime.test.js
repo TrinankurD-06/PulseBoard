@@ -2,28 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   bucketSizeMs,
   combineRollups,
+  combineWithToday,
+  computeUptimeFromParts,
+  formatUptime,
+  mergeIntervals,
+  truncateTo,
+  withLiveToday,
   dayKey,
   downtimeWithin,
   fillDailySeries,
   rollupCoveredSec,
   uptimeFromDowntime,
   uptimeLevel,
-  uptimePercent,
   utcDayStart,
   windowUptime,
 } from '../src/uptime/index.js';
-
-describe('uptimePercent', () => {
-  it('returns a percentage with 3 decimals', () => {
-    expect(uptimePercent(8640, 8640)).toBe(100);
-    expect(uptimePercent(8636, 8640)).toBe(99.954);
-    expect(uptimePercent(1, 3)).toBe(33.333);
-  });
-
-  it('returns null (not 100) when there is no data', () => {
-    expect(uptimePercent(0, 0)).toBeNull();
-  });
-});
 
 describe('uptimeFromDowntime', () => {
   it('is 100 x (1 - downtime / covered)', () => {
@@ -33,7 +26,7 @@ describe('uptimeFromDowntime', () => {
   });
 
   it('an incident of N seconds in a day lowers uptime by N/86400', () => {
-    expect(uptimeFromDowntime(90, 86400)).toBe(99.896);
+    expect(uptimeFromDowntime(90, 86400)).toBe(99.895);
   });
 
   it('is null when nothing was covered', () => {
@@ -182,7 +175,7 @@ describe('windowUptime', () => {
     });
     expect(result.downtimeSec).toBe(3600 + 3600);
     expect(result.coveredSec).toBe(21600);
-    expect(result.uptime).toBe(66.667);
+    expect(result.uptime).toBe(66.666);
   });
 
   it('is null when the window has no coverage', () => {
@@ -242,5 +235,172 @@ describe('uptimeLevel', () => {
     expect(uptimeLevel(99.95)).toBe('good');
     expect(uptimeLevel(99.5)).toBe('degraded');
     expect(uptimeLevel(97)).toBe('bad');
+  });
+});
+
+const MIN = 60 * 1000;
+const HOUR = 60 * MIN;
+const NOW = new Date('2026-10-28T12:00:00Z');
+const hoursAgo = (h) => new Date(NOW.getTime() - h * HOUR);
+
+describe('truncation, never rounding up', () => {
+  it('truncates instead of rounding', () => {
+    expect(truncateTo(99.999, 2)).toBe(99.99);
+    expect(truncateTo(99.9999, 2)).toBe(99.99);
+    expect(truncateTo(98.95, 2)).toBe(98.95); // float noise must not cost a digit
+  });
+
+  it('uptimeFromDowntime is 100 only when downtime is exactly 0', () => {
+    expect(uptimeFromDowntime(0, 86400)).toBe(100);
+    // 1 second in 90 days: 99.99998 would round to 100, it must stay below.
+    expect(uptimeFromDowntime(1, 90 * 86400)).toBeLessThan(100);
+    expect(uptimeFromDowntime(1, 90 * 86400)).toBe(99.999);
+  });
+
+  it('formatUptime prints 2 truncated decimals, "100" only for a perfect figure, "—" for none', () => {
+    expect(formatUptime(100)).toBe('100');
+    expect(formatUptime(99.9996)).toBe('99.99');
+    expect(formatUptime(99.96)).toBe('99.96');
+    expect(formatUptime(99.999)).toBe('99.99');
+    expect(formatUptime(99.9)).toBe('99.90');
+    expect(formatUptime(98.958)).toBe('98.95');
+    expect(formatUptime(null)).toBe('—');
+    // Whatever downtime there was, a figure from the formula never prints as 100.
+    for (const downtime of [1, 30, 900, 5000]) {
+      expect(formatUptime(uptimeFromDowntime(downtime, 90 * 86400))).not.toBe('100');
+    }
+  });
+});
+
+describe('computeUptimeFromParts (the one formula)', () => {
+  const watchStart = hoursAgo(24 * 40);
+
+  it('failed checks that never opened an incident leave uptime at 100%', () => {
+    const r = computeUptimeFromParts({
+      incidents: [],
+      from: hoursAgo(24),
+      to: NOW,
+      now: NOW,
+      watchStart,
+    });
+    expect(r.uptime).toBe(100);
+    expect(r.downtimeSec).toBe(0);
+  });
+
+  it('a 15-minute incident in a 24h range gives 98.95%', () => {
+    const incidents = [
+      { startedAt: hoursAgo(5), resolvedAt: new Date(hoursAgo(5).getTime() + 15 * MIN) },
+    ];
+    const r = computeUptimeFromParts({
+      incidents,
+      from: hoursAgo(24),
+      to: NOW,
+      now: NOW,
+      watchStart,
+    });
+    expect(r.downtimeSec).toBe(900);
+    expect(r.coveredSec).toBe(86400);
+    expect(formatUptime(r.uptime)).toBe('98.95');
+  });
+
+  it('counts only the overlap of an incident with the range, and open incidents until now', () => {
+    const incidents = [
+      { startedAt: hoursAgo(26), resolvedAt: hoursAgo(23) }, // 1 h inside the 24h range
+      { startedAt: hoursAgo(1), resolvedAt: null }, // open: 1 h until now
+    ];
+    const r = computeUptimeFromParts({
+      incidents,
+      from: hoursAgo(24),
+      to: NOW,
+      now: NOW,
+      watchStart,
+    });
+    expect(r.downtimeSec).toBe(2 * 3600);
+  });
+
+  it('leaves paused time out of both downtime and watched time', () => {
+    const incidents = [{ startedAt: hoursAgo(10), resolvedAt: hoursAgo(9) }];
+    // Paused from 12 h ago to 6 h ago: covers the incident's whole hour.
+    const exclusions = [[hoursAgo(12).getTime(), hoursAgo(6).getTime()]];
+    const r = computeUptimeFromParts({
+      incidents,
+      from: hoursAgo(24),
+      to: NOW,
+      now: NOW,
+      watchStart,
+      exclusions,
+    });
+    expect(r.coveredSec).toBe(18 * 3600);
+    expect(r.downtimeSec).toBe(0);
+    expect(r.uptime).toBe(100);
+  });
+
+  it('leaves checker-offline time out too, and a window that is all offline has no uptime', () => {
+    const exclusions = [[hoursAgo(3).getTime(), NOW.getTime()]];
+    const r = computeUptimeFromParts({
+      incidents: [],
+      from: hoursAgo(3),
+      to: NOW,
+      now: NOW,
+      watchStart,
+      exclusions,
+    });
+    expect(r.coveredSec).toBe(0);
+    expect(r.uptime).toBeNull();
+  });
+
+  it('watching starts at the later of from and watchStart', () => {
+    const late = computeUptimeFromParts({
+      incidents: [],
+      from: hoursAgo(24),
+      to: NOW,
+      now: NOW,
+      watchStart: hoursAgo(2),
+    });
+    expect(late.coveredSec).toBe(2 * 3600);
+  });
+
+  it('merges overlapping intervals', () => {
+    expect(
+      mergeIntervals([
+        [5, 8],
+        [1, 3],
+        [2, 4],
+        [8, 9],
+        [7, 7],
+      ]),
+    ).toEqual([
+      [1, 4],
+      [5, 9],
+    ]);
+  });
+});
+
+describe('rollups plus today', () => {
+  const today = utcDayStart(NOW);
+  const day = (offset, downtimeSec) => ({
+    date: new Date(today.getTime() - offset * 86400_000),
+    totalChecks: 100,
+    upChecks: 100,
+    downtimeSec,
+    coveredSec: 86400,
+    isFinal: true,
+  });
+
+  it('adds past final days to today live; a stale rollup for today is ignored', () => {
+    const rollups = [day(1, 864), day(2, 0), { ...day(0, 0), isFinal: false }];
+    const live = { downtimeSec: 0, coveredSec: 43200, uptime: 100 };
+    const r = combineWithToday(rollups, live, { days: 30, today: NOW });
+    expect(r.coveredSec).toBe(2 * 86400 + 43200);
+    expect(r.downtimeSec).toBe(864);
+  });
+
+  it('puts the live figures on the last bar', () => {
+    const series = fillDailySeries([day(1, 0)], { days: 3, today: NOW });
+    const live = { uptime: 98.5, downtimeSec: 600, coveredSec: 40000 };
+    const out = withLiveToday(series, live);
+    expect(out[2]).toMatchObject({ uptime: 98.5, downtimeSec: 600 });
+    expect(out[1].uptime).toBe(100);
+    expect(withLiveToday(series, null)).toBe(series);
   });
 });

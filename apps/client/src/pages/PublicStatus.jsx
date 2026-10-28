@@ -1,5 +1,7 @@
+import { formatUptime, truncateTo } from '@pulseboard/shared/uptime';
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { uptimeGaugeProps } from '../lib/uptimeLevels.js';
 import { usePublicStatus } from '../api/statusPages.js';
 import UptimeBars from '../components/charts/UptimeBars.jsx';
 import UptimeLegend from '../components/charts/UptimeLegend.jsx';
@@ -57,7 +59,9 @@ function ComponentRow({ monitor }) {
       </div>
       <UptimeBars days={monitor.days} />
       <p className="mt-1 text-right text-[11px] text-faint">
-        {monitor.uptime90 == null ? 'No data yet' : `${monitor.uptime90}% uptime over 90 days`}
+        {monitor.uptime90 == null
+          ? 'No data yet'
+          : `${formatUptime(monitor.uptime90)}% uptime over 90 days`}
       </p>
     </li>
   );
@@ -99,7 +103,8 @@ function IncidentRow({ incident, now }) {
 function overallUptime(monitors) {
   const values = monitors.map((m) => m.uptime90).filter((v) => typeof v === 'number');
   if (values.length === 0) return null;
-  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
+  // Cut, not rounded: the page never claims more uptime than it measured.
+  return truncateTo(values.reduce((a, b) => a + b, 0) / values.length, 3);
 }
 
 /** /status/:slug: the public status page. No login; refreshes every 30s. */
@@ -189,13 +194,13 @@ export default function PublicStatus() {
         </div>
         {uptime != null && (
           <TickGauge
-            value={uptime}
+            value={uptimeGaugeProps(uptime).value}
             target={99.9}
             size={220}
-            decimals={2}
+            decimals={uptimeGaugeProps(uptime).decimals}
             label="Uptime"
             caption="last 90 days"
-            ariaLabel={`${uptime} percent uptime over the last 90 days`}
+            ariaLabel={`${formatUptime(uptime)} percent uptime over the last 90 days`}
           />
         )}
       </div>

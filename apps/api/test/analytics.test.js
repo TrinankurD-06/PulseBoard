@@ -1,7 +1,7 @@
 import { mongoose } from '@pulseboard/shared/db';
 import { CheckResult, DailyRollup, Incident, Monitor } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
-import { addDays, utcDayStart } from '@pulseboard/shared/uptime';
+import { addDays, uptimeFromDowntime, utcDayStart } from '@pulseboard/shared/uptime';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildTestApp, registerUser } from './helpers.js';
@@ -91,13 +91,27 @@ describe('GET /monitors/:mid/uptime', () => {
 
     const res = await get(`/${monitor._id}/uptime`);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({
-      h24: 95.833, // 1 - 3600 / 86400
-      d7: 99.306, // 1 - 3600 / (6 days watched)
-      d30: 83.333, // 1 - 21600 / (43200 + 86400)
-      d90: 50, // 1 - 108000 / 216000
-      includesSampleData: false,
-    });
+    const body = res.body.data;
+    expect(body).toMatchObject({ h24: 95.833, d7: 99.404, includesSampleData: false });
+    // d7: 1 - 3600 / 604800 (the 10-day-old rollup shows the monitor was watched the whole week),
+    // cut to 3 decimals; h24: 1 - 3600 / 86400.
+    // 30d and 90d: the past rollups plus today computed live (the stale rollup for
+    // today, 43,200 s watched, is ignored), so today's watched time and the part of
+    // the incident inside it come from the clock.
+    const now = Date.now();
+    const sinceMidnight = Math.round((now - today.getTime()) / 1000);
+    const incidentToday = Math.max(
+      0,
+      Math.round((now - 4 * HOUR - Math.max(now - 5 * HOUR, today.getTime())) / 1000),
+    );
+    expect(body.d30).toBeCloseTo(
+      uptimeFromDowntime(21_600 + incidentToday, 86_400 + sinceMidnight),
+      1,
+    );
+    expect(body.d90).toBeCloseTo(
+      uptimeFromDowntime(108_000 + incidentToday, 172_800 + sinceMidnight),
+      1,
+    );
   });
 
   it('is not lowered by failed checks that never opened an incident', async () => {
@@ -220,7 +234,9 @@ describe('GET /monitors/:mid/daily', () => {
       coveredSec: 86_400,
       sample: false,
     });
-    expect(res.body.data.at(-1).uptime).toBeNull();
+    // Today has no rollup yet but is computed live: the monitor was already being watched yesterday.
+    expect(res.body.data.at(-1).uptime).toBe(100);
+    expect(res.body.data.at(-3).uptime).toBeNull(); // before the first rollup: not watched
   });
 });
 

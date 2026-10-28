@@ -45,7 +45,11 @@ describe('formatChange', () => {
       direction: 'none',
       bad: false,
     });
-    expect(formatChange(0.02, 'p95')).toMatchObject({ text: '0%', arrow: '', direction: 'flat' });
+    expect(formatChange(0.02, 'p95')).toMatchObject({
+      text: '±0.0%',
+      arrow: '',
+      direction: 'flat',
+    });
   });
 
   it('only flags the clearly bad directions', () => {
@@ -109,5 +113,25 @@ describe('healthRows', () => {
     const [row] = healthRows([{ t: '2026-10-27T12:00:00.000Z', v: 0, offline: true }]);
     expect(row.offline).toBe(true);
     expect(row.v).toBeNull();
+  });
+});
+
+describe('uptime formatting is shared and never rounds up', () => {
+  it('cuts to 2 decimals and prints 100 only for a perfect figure', () => {
+    expect(formatMetricValue(99.99, '%', 'uptime')).toEqual({ text: '99.99', unit: '%' });
+    expect(formatMetricValue(99.9, '%', 'uptime')).toEqual({ text: '99.90', unit: '%' });
+    expect(formatMetricValue(100, '%', 'uptime')).toEqual({ text: '100', unit: '%' });
+    expect(formatMetricValue(null, '%', 'uptime')).toEqual({ text: '—', unit: '' });
+  });
+
+  it('an uptime change of nothing reads ±0.00%, a real one keeps 2 decimals', () => {
+    expect(formatChange(0, 'uptime')).toMatchObject({ text: '±0.00%', direction: 'flat' });
+    expect(formatChange(0.004, 'uptime')).toMatchObject({ text: '±0.00%', direction: 'flat' });
+    expect(formatChange(-0.7, 'uptime')).toMatchObject({
+      text: '0.70%',
+      direction: 'down',
+      bad: true,
+    });
+    expect(formatChange(null, 'uptime')).toMatchObject({ text: '—' });
   });
 });

@@ -13,7 +13,6 @@ import {
 import { rollupDay } from '@pulseboard/shared/rollup';
 import { AGENDA_COLLECTION, createAgenda } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
-import { uptimeFromDowntime } from '@pulseboard/shared/uptime';
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -245,9 +244,9 @@ describe.each(Object.keys(DRIVERS))('%s monitors', (type) => {
     const days = daily.body.data;
     expect(days).toHaveLength(90);
     expect(days.at(-1)).toMatchObject({ totalChecks: up + down });
-    // Downtime over covered time, the same as the rollup says: the failed checks changed nothing.
-    expect(days.at(-1).uptime).toBe(uptimeFromDowntime(rollup.downtimeSec, rollup.coveredSec));
-    expect(days.at(-1).uptime).toBeGreaterThan(99.9);
+    // Today is computed live (nothing was watched for a full second yet: no data or 100), and the
+    // failed checks changed nothing.
+    expect([null, 100]).toContain(days.at(-1).uptime);
     expect(days.slice(0, -1).every((day) => day.totalChecks === 0)).toBe(true);
   });
 
@@ -310,8 +309,11 @@ describe('all three types together', () => {
       'Checkout API',
     ]);
     for (const entry of res.body.data.monitors) {
-      expect(entry).toMatchObject({ status: 'up', uptime90: 100 });
-      expect(entry.days.at(-1)).toMatchObject({ totalChecks: 1, uptime: 100 });
+      expect(entry.status).toBe('up');
+      // Watched for under a second: no data yet, or a perfect 100, never a drop.
+      expect([null, 100]).toContain(entry.uptime90);
+      expect(entry.days.at(-1)).toMatchObject({ totalChecks: 1 });
+      expect([null, 100]).toContain(entry.days.at(-1).uptime);
     }
   });
 });

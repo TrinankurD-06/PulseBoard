@@ -1,3 +1,4 @@
+import { formatUptime } from '@pulseboard/shared/uptime';
 import { useState } from 'react';
 import {
   RANGES,
@@ -135,7 +136,7 @@ export default function MonitorAnalytics({ wid, monitorId, latestCheckCard }) {
           rows: [...days].reverse().map((d) => ({
             key: d.date,
             date: d.date,
-            uptime: d.uptime == null ? 'No data' : `${d.uptime}%`,
+            uptime: d.uptime == null ? 'No data' : `${formatUptime(d.uptime)}%`,
             checks: d.totalChecks.toLocaleString(),
             downtime: d.downtimeSec ? formatDuration(d.downtimeSec) : '—',
           })),

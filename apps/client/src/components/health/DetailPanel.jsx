@@ -13,11 +13,11 @@ const TIMING_KEYS = new Set(['p95', 'avgResponse']);
 // Cards whose detail lists the individual failed checks.
 const FAILURE_KEYS = new Set(['failed', 'missed']);
 
-function Stat({ label, value, unit }) {
+function Stat({ label, value, unit, metricKey }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-4 py-3">
       <dt className="text-[13px] text-faint">{label}</dt>
-      <dd className="font-mono text-[13px] text-fg">{formatMetricText(value, unit)}</dd>
+      <dd className="font-mono text-[13px] text-fg">{formatMetricText(value, unit, metricKey)}</dd>
     </div>
   );
 }
@@ -27,7 +27,7 @@ export default function DetailPanel({ deckId, metric, timings, failures, sample,
   const [view, setView] = useState('chart');
   const hasTimings = TIMING_KEYS.has(metric.key) && Boolean(timings?.length);
   const activeView = hasTimings ? view : 'chart';
-  const current = formatMetricValue(metric.current, metric.unit);
+  const current = formatMetricValue(metric.current, metric.unit, metric.key);
 
   return (
     <section
@@ -44,7 +44,7 @@ export default function DetailPanel({ deckId, metric, timings, failures, sample,
         </div>
         <p
           className="text-3xl leading-none font-light tracking-[-0.03em] text-fg tabular-nums"
-          aria-label={`Current ${formatMetricText(metric.current, metric.unit)}`}
+          aria-label={`Current ${formatMetricText(metric.current, metric.unit, metric.key)}`}
         >
           {current.text}
           {current.unit && <span className="ml-1 text-sm text-muted">{current.unit}</span>}
@@ -92,13 +92,18 @@ export default function DetailPanel({ deckId, metric, timings, failures, sample,
           {activeView === 'timings' ? (
             <TimingChart timings={timings} range={range} />
           ) : (
-            <HealthAreaChart series={metric.series} unit={metric.unit} range={range} />
+            <HealthAreaChart
+              series={metric.series}
+              unit={metric.unit}
+              metricKey={metric.key}
+              range={range}
+            />
           )}
         </div>
         <dl className="divide-y divide-line self-start rounded-card border border-line">
-          <Stat label="Peak" value={metric.peak} unit={metric.unit} />
-          <Stat label="Average" value={metric.average} unit={metric.unit} />
-          <Stat label="Low" value={metric.low} unit={metric.unit} />
+          <Stat label="Peak" value={metric.peak} unit={metric.unit} metricKey={metric.key} />
+          <Stat label="Average" value={metric.average} unit={metric.unit} metricKey={metric.key} />
+          <Stat label="Low" value={metric.low} unit={metric.unit} metricKey={metric.key} />
         </dl>
       </div>
 

@@ -9,8 +9,8 @@ import { cardLabelId } from './ids.js';
  * along the bottom edge. A radio of the deck's radiogroup (roving tabindex;
  * the deck handles the keys). The sparkline is decorative.
  */
-export default function MetricCard({ deckId, metric, selected, tabbable, onSelect }) {
-  const value = formatMetricValue(metric.value, metric.unit);
+export default function MetricCard({ deckId, metric, rangeText, selected, tabbable, onSelect }) {
+  const value = formatMetricValue(metric.value, metric.unit, metric.key);
   const change = formatChange(metric.change, metric.key);
 
   return (
@@ -33,6 +33,10 @@ export default function MetricCard({ deckId, metric, selected, tabbable, onSelec
       <div className="relative z-10 flex items-baseline gap-3 px-5 pt-4 pr-11">
         <span id={cardLabelId(deckId, metric.key)} className="text-sm text-muted">
           {metric.label}
+          {/* The card is for the selected range; the page gauge is fixed at 30 days. */}
+          {metric.key === 'uptime' && rangeText && (
+            <span className="text-faint"> · {rangeText}</span>
+          )}
         </span>
         <span
           className={cn(
@@ -58,7 +62,7 @@ export default function MetricCard({ deckId, metric, selected, tabbable, onSelec
         {value.unit && <span className="ml-1 text-sm text-muted">{value.unit}</span>}
       </p>
       <div className="absolute inset-x-0 bottom-0 h-16">
-        <HealthSparkline series={metric.series} unit={metric.unit} />
+        <HealthSparkline series={metric.series} unit={metric.unit} metricKey={metric.key} />
       </div>
     </div>
   );

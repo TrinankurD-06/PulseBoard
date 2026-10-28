@@ -7,6 +7,7 @@ import {
 } from '@pulseboard/shared/constants';
 import { monthKey } from '@pulseboard/shared/cost';
 import { resolveOpenIncident } from '@pulseboard/shared/incident';
+import { openPause } from '@pulseboard/shared/pauses';
 import { AlertChannel, Monitor } from '@pulseboard/shared/models';
 import { applyIntervalToRunningJob } from '@pulseboard/shared/scheduling';
 import { claimUsageMarker } from '@pulseboard/shared/usage';
@@ -57,6 +58,7 @@ export function createBudgetEnforcer({ agenda, db, scheduler, logger }) {
         },
       ).lean();
       if (!paused) return;
+      await openPause(monitor._id, at);
       // Removing the job from inside its own run is safe: Agenda ignores the
       // failed post-run save of a job that no longer exists.
       await scheduler.cancelMonitor(monitor._id);
