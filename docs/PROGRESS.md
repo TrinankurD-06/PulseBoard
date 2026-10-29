@@ -365,3 +365,22 @@ commented optional fallback), `render.yaml` (SMTP_* removed, `DEMO_READ_ONLY` an
 2. The daily reset (03:00 UTC) rebuilds only the sample "Demo Checkout API" monitor; real monitors are untouched.
 3. Not done: running any of this against the live database, and the Lighthouse run, styled delete confirmations and two flaky
    timing tests from earlier notes.
+
+---
+
+# Leftovers closed (29 Oct)
+
+Done directly, two tasks at a time, with memory kept well under the 95 % ceiling (65 to 66 % at the peak).
+
+- [x] **Lighthouse** (production build via `vite preview`, API on Atlas, mobile profile, public pages only): Landing 94 / 100 / 100,
+      Login 97 / 100 / 96, public status page 90 / 100 / 100 (performance / accessibility / best practices). Targets (performance 85,
+      accessibility 90) met; no fixes needed. Login's 96 is the expected 401 on the token refresh when nobody is signed in. The
+      logged-in pages were not measured (they need a session).
+- [x] **Styled delete confirmations** (`cdab1af`): `lib/confirm.js` (promise-based controller, 5 unit tests), `ConfirmProvider` and
+      `useConfirm()`, used for deleting a channel, a monitor and a status page, and removing a member. Cancel is focused first, Esc and
+      a click outside cancel. Checked in a browser with the DELETE requests intercepted: Esc and Enter on Cancel delete nothing, the
+      confirm click sends exactly one request, no `window.confirm` is left. 245 client tests.
+- [x] **Timing-sensitive tests: not reproduced, left unchanged.** Two rounds of the API (310), worker (77) and shared (315) suites ran
+      with 14 busy-loop processes saturating 16 cores: no failures. A suspect (`crossType.test.js`, which assumes under a second has
+      passed) still passed with a 2.5 s pause inserted, so it is not time-sensitive that way. If a failure shows up again, keep its
+      output (test name and assertion) before changing anything.
