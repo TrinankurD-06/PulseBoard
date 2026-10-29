@@ -200,7 +200,7 @@ export default function GithubImport() {
           )}
 
           {repos.length > 0 && (
-            <div className="sticky bottom-0 z-10 mt-8 -mx-1 border-t border-line bg-bg px-1 py-4">
+            <div className="sticky bottom-[calc(3rem+env(safe-area-inset-bottom))] z-10 mt-8 -mx-1 border-t border-line bg-bg/90 px-1 py-4 backdrop-blur-md md:bottom-0">
               <StatusPageOption
                 value={statusPage}
                 onChange={setStatusPage}

@@ -406,8 +406,10 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
 - [x] **Import from GitHub, frontend** (`fee8391`): review screen at `/app/:wid/import/github`, entry points on the dashboard, helpers with 17 tests.
 - [x] README: feature bullet, "Import from GitHub" section, `GITHUB_TOKEN_ENCRYPTION_KEY` in the env table.
 - Gate: agent 49, shared 346, API 339, client 262, demo-target 23, worker 77 tests; ESLint, Prettier and both builds clean.
-- [ ] **Not done:** the review screen has not been looked at in a browser (the first attempt was blocked waiting for the heavy-process lock, then
-      memory was held down), and nothing was run against the real GitHub API. Look at it dark and light at 1440 and 390 px, with a real
-      GitHub sign-in, before relying on it.
+- [x] **Review screen checked in a browser** (dark and light, 1440 and 390 px, every API call mocked): dashboard button and empty state, loading,
+      grouped list with source badges and Live / Redirect / Down labels, already-monitored row disabled, select all, the status-page option,
+      the import request (monitored URL left out), result view, include forks, and the 409 / 429 (retry time read from `error.details.resetAt`) /
+      502 / empty states; no page errors. Found and fixed one defect: on phones the sticky Import bar sat under the bottom navigation. Memory stayed under 80 %.
+- [ ] **Still not done:** nothing has run against the real GitHub API yet. Sign in with GitHub on the live site and try the import once.
 - Known limits: users who signed in with GitHub before this feature have no stored token and are asked to sign in again; the 10-minute cache
   is per API process.
