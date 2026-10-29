@@ -2,7 +2,7 @@ import { appUrlOf } from '@pulseboard/shared/env';
 import { Router } from 'express';
 import { AppError } from '../../../lib/errors.js';
 import { createOAuthLimiter } from '../../../middleware/rateLimits.js';
-import { buildAuthorizeUrl, enabledProviders, exchangeCode, OAuthError } from './providers.js';
+import { buildAuthorizeUrl, enabledProviders, exchangeToken, OAuthError } from './providers.js';
 import {
   createPkce,
   createState,
@@ -101,15 +101,18 @@ export function oauthRouter({ env, auth, logger, setRefreshCookie, fetchImpl = g
     if (!code) return fail(res, 'OAUTH_PROVIDER_ERROR');
 
     try {
-      const accessToken = await exchangeCode(
+      const { accessToken, scope } = await exchangeToken(
         provider,
         { code, codeVerifier: stored.codeVerifier, redirectUri: redirectUriFor(provider.id) },
         fetchImpl,
       );
       const profile = await provider.fetchProfile(accessToken, fetchImpl);
-      const session = await auth.oauthSignIn(provider.id, profile, {
-        userAgent: req.headers['user-agent'],
-      });
+      const session = await auth.oauthSignIn(
+        provider.id,
+        profile,
+        { userAgent: req.headers['user-agent'] },
+        { accessToken, scope },
+      );
       setRefreshCookie(res, session.refreshToken);
       return finish(res, { status: 'ok', next: stored.next });
     } catch (err) {

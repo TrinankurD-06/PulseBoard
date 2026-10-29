@@ -1570,3 +1570,43 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - The demo module lives in `packages/shared/src/demo` so the seed script and the worker share one implementation.
 - **Known limit.** Turning `DEMO_READ_ONLY` back to `false` and re-seeding does not delete the old Viewer workspace (only
   workspaces the demo user owns are removed when the flag is off), so it is left behind as an orphan.
+
+### D106. Import from GitHub
+
+- **Problem:** adding monitors for every deployed project by hand is slow, and people forget some. The user's public
+  repositories already say where their sites live.
+- **GitHub API, not scraping.** Candidates come from the REST API: the repo's `homepage`, the GitHub Pages URL, the
+  latest deployment status `environment_url` per environment, and README links (hosting domains or links labelled
+  "demo", "live" or "website"). This is deterministic, needs no HTML parsing of github.com, is allowed by GitHub's terms
+  and has a documented rate limit. No AI is involved: extraction, ranking (deployment > homepage > pages > readme),
+  dedupe and classification are pure functions in `packages/shared/src/github`, unit-tested on their own.
+- **Probing** uses the normal check runner (HEAD, 5 s, SSRF guard, falling back to GET when a server rejects HEAD).
+  `runHttpCheck` now also returns `finalUrl` (the URL after redirects) so a candidate that ends on another site is shown
+  as `redirect`, not `live`. `GITHUB_*` failures use the existing error shape.
+- **Minimal scopes.** Login still asks only for `read:user` and `user:email`. Public repos need no scope at all, and
+  `repo` would expose private code, so it is never requested. Private repositories are out of scope. The token is sent
+  with the request only for the higher rate limit (5,000/h instead of 60/h per IP).
+- **How the token is stored.** To call GitHub later (not only at sign-in) the access token must be kept. It is
+  encrypted with AES-256-GCM (`node:crypto`, random 96-bit IV, auth tag, format `v1.<iv>.<tag>.<data>`) on the GitHub
+  identity (`tokenEnc`, plus `tokenScope`, `tokenUpdatedAt` and `login`), and overwritten at every GitHub sign-in. The key
+  is derived with HKDF-SHA256 from the optional `GITHUB_TOKEN_ENCRYPTION_KEY` (32+ characters), else from
+  `JWT_REFRESH_SECRET`, so existing deployments work without new config; use a dedicated key to be able to rotate the
+  JWT secret independently. `identities` is already stripped from every user JSON, and the token is never logged or put
+  in an error. If the key changes or the token is revoked, the user gets `409 GITHUB_NOT_LINKED` ("sign in with GitHub
+  again"); users who signed in before this feature have no stored token and get the same answer.
+- **Caching: 10 minutes, per user and forks flag, in this process** (`createTtlCache`, 200 entries). A scan costs
+  roughly 3 to 4 GitHub requests per repo plus the probes, so repeated opens of the dialog must not repeat it. The cache
+  holds the scan only; "already monitored" is computed per request, per workspace. Concurrent identical requests share
+  one scan. Limits of an in-process cache: each API instance has its own, it is lost on restart, and a deployment with
+  several instances may scan once per instance. A partial scan (rate limit reached) is not cached.
+- **Rate limits.** `X-RateLimit-Remaining` and `X-RateLimit-Reset` are read from every answer. The client stops sending
+  at 2 requests left. If that happens while listing repos the answer is `429 GITHUB_RATE_LIMITED` with `resetAt`; during
+  enrichment the scan stops politely and returns what it has with `partial: true`.
+- **Limits:** the 60 most recently pushed repos (100 per GitHub page, 3 pages read before filtering), 4 candidates per
+  repo, 120 probes per scan, 50 URLs per import, README read up to 200,000 characters. Not looked at: private repos,
+  organisation repos the user does not own (`type=owner`), non-README docs, deployments by tools that do not report
+  `environment_url`.
+- **Import** reuses the monitor service (create schema, SSRF guard, scheduler): monitors are HTTP, HEAD, every 300 s,
+  adaptive on, named after the repo (the name comes from the cached scan; otherwise the hostname). Member role or above.
+  It also requires a GitHub-linked user so the feature behaves the same on both endpoints. The optional status page
+  either creates a public page (random slug suffix) or appends to an existing one, checked before anything is created.

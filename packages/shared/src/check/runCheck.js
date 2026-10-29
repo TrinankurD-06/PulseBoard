@@ -209,7 +209,7 @@ function verdictErrorCode(verdict, statusCode, { expectedStatus }) {
  * @param target  { url, method, timeoutMs, headers, expectedStatus, keyword, headUnsupported }
  * @param options { allowPrivate, appUrl }
  * @returns { ok, statusCode, error, errorCode, totalMs, timings, sslExpiresAt,
- *            requestsSent, headUnsupported }
+ *            requestsSent, headUnsupported, finalUrl }
  *
  * totalMs covers the whole check including redirects; timings describe the
  * final hop (the response that was evaluated). requestsSent counts every
@@ -277,6 +277,7 @@ export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}
         sslExpiresAt: response.sslExpiresAt,
         requestsSent,
         headUnsupported,
+        finalUrl: url.href,
       };
     }
   } catch (err) {
@@ -290,6 +291,7 @@ export async function runHttpCheck(target, { allowPrivate = false, appUrl } = {}
       sslExpiresAt: null,
       requestsSent,
       headUnsupported,
+      finalUrl: url.href,
     };
   }
 }

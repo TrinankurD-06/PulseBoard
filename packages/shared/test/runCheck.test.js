@@ -151,6 +151,11 @@ describe('runHttpCheck', () => {
     expect(await run('/redirect')).toMatchObject({ ok: true, statusCode: 200 });
   });
 
+  it('reports the final URL after redirects (also when the check fails)', async () => {
+    expect((await run('/redirect')).finalUrl).toBe(`${base}/ok`);
+    expect((await run('/500')).finalUrl).toBe(`${base}/500`);
+  });
+
   it('gives up after 3 redirects', async () => {
     expect(await run('/loop')).toMatchObject({
       ok: false,

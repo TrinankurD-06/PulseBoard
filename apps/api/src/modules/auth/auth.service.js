@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Membership, Session, User } from '@pulseboard/shared/models';
 import bcrypt from 'bcrypt';
 import { AppError, conflict, unauthorized } from '../../lib/errors.js';
+import { createTokenCrypto } from '../../lib/tokenCrypto.js';
 import { hashToken } from '../../lib/tokens.js';
 import { createWorkspaceWithOwner, toWorkspaceDto } from '../workspaces/workspaces.service.js';
 
@@ -13,6 +14,7 @@ const invalidSession = () =>
   new AppError(401, 'INVALID_REFRESH_TOKEN', 'Session expired. Please log in again.');
 
 export function createAuthService({ env, tokens, logger }) {
+  const tokenCrypto = createTokenCrypto(env);
   // Compared against when the email doesn't exist, so "unknown email" and
   // "wrong password" take the same time and can't be told apart (user enumeration).
   let dummyHashPromise;
@@ -83,6 +85,24 @@ export function createAuthService({ env, tokens, logger }) {
     return createUserWithWorkspace({ name, email: profile.email, identities: [identity] });
   }
 
+  /**
+   * Keeps the latest GitHub access token, encrypted, on the GitHub identity
+   * (overwritten at every GitHub sign-in). Never logged, never in any response.
+   */
+  async function storeGithubToken(userId, profile, { accessToken, scope }) {
+    await User.updateOne(
+      { _id: userId, 'identities.provider': 'github' },
+      {
+        $set: {
+          'identities.$.tokenEnc': tokenCrypto.encrypt(accessToken),
+          'identities.$.tokenScope': scope ?? '',
+          'identities.$.tokenUpdatedAt': new Date(),
+          ...(profile.login && { 'identities.$.login': profile.login }),
+        },
+      },
+    );
+  }
+
   async function revokeFamily(familyId) {
     await Session.updateMany({ familyId, revokedAt: null }, { revokedAt: new Date() });
   }
@@ -144,8 +164,11 @@ export function createAuthService({ env, tokens, logger }) {
     },
 
     /** Signs in (or up) with a verified provider profile; same tokens as login. */
-    async oauthSignIn(provider, profile, meta) {
+    async oauthSignIn(provider, profile, meta, credential) {
       const user = await resolveOAuthUser(provider, profile);
+      if (provider === 'github' && credential?.accessToken) {
+        await storeGithubToken(user._id, profile, credential);
+      }
       return { user, ...(await issueTokens(user._id, meta)) };
     },
 

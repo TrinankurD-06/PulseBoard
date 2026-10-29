@@ -36,6 +36,13 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().trim().default(''),
   GITHUB_CLIENT_ID: z.string().trim().default(''),
   GITHUB_CLIENT_SECRET: z.string().trim().default(''),
+  // Optional key for encrypting stored GitHub access tokens; empty = derived from
+  // JWT_REFRESH_SECRET. Any long random string works (it goes through HKDF).
+  GITHUB_TOKEN_ENCRYPTION_KEY: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || value.length >= 32, 'Use at least 32 characters')
+    .default(''),
   ...alertEnvFields,
   ...demoEnvFields,
 });

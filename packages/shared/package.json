@@ -27,7 +27,8 @@
     "./agent": "./src/agent/index.js",
     "./uptime/compute": "./src/uptime/compute.js",
     "./pauses": "./src/pauses/index.js",
-    "./demo": "./src/demo/index.js"
+    "./demo": "./src/demo/index.js",
+    "./github": "./src/github/index.js"
   },
   "scripts": {
     "test": "vitest run",

@@ -18,13 +18,20 @@ const userJsonOptions = {
   },
 };
 
-// A linked OAuth account. No provider tokens are stored: we only need to know
-// who the person is at sign-in, never to call the provider on their behalf.
+// A linked OAuth account. Google tokens are never stored. For GitHub the last
+// access token is kept ENCRYPTED (AES-256-GCM, see apps/api/src/lib/tokenCrypto.js)
+// so "Import from GitHub" can list public repos later; it is overwritten on every
+// GitHub sign-in. The whole identities array is stripped from toJSON below.
 const identitySchema = new mongoose.Schema(
   {
     provider: { type: String, enum: OAUTH_PROVIDERS, required: true },
     providerId: { type: String, required: true },
     email: { type: String, lowercase: true, trim: true },
+    // GitHub only: the username (for /users/{login}/repos) and the encrypted token.
+    login: { type: String, trim: true },
+    tokenEnc: { type: String },
+    tokenScope: { type: String },
+    tokenUpdatedAt: { type: Date },
     linkedAt: { type: Date, default: Date.now },
   },
   { _id: false },

@@ -37,7 +37,9 @@ httpOnly cookie (`pb_refresh`, path `/api/v1/auth`) that the browser sends autom
 | 409  | `BUDGET_EXCEEDED`                                              | Resume of a monitor paused by its budget, still over   |
 | 413  | `PAYLOAD_TOO_LARGE`                                            | Body over 100 kB                                       |
 | 429  | `RATE_LIMITED`                                                 | Rate limit hit (see below)                             |
-| 502  | `ALERT_DELIVERY_FAILED`                                        | Test alert couldn't be delivered                       |
+| 409  | `GITHUB_NOT_LINKED`                                            | GitHub import without a (usable) GitHub sign-in        |
+| 429  | `GITHUB_RATE_LIMITED`                                          | GitHub's rate limit hit (`details.resetAt`)            |
+| 502  | `ALERT_DELIVERY_FAILED`, `GITHUB_UNAVAILABLE`                  | Test alert undelivered; GitHub unreachable             |
 | 500  | `INTERNAL`                                                     | Unexpected error (details are logged, not returned)    |
 
 OAuth sign-in failures (`OAUTH_NOT_CONFIGURED`, `OAUTH_DENIED`, `OAUTH_STATE_INVALID`,
@@ -205,6 +207,9 @@ with the verifier, reads the profile, then picks the user:
 2. else the provider says the email is **verified** and a user has that email → link to them;
 3. else create a user (name from the profile, no password) with a personal workspace, as
    registration does.
+
+For GitHub it also keeps the access token, encrypted, for [Import from GitHub](#import-from-github) (never returned
+by any endpoint).
 
 It then sets the `pb_refresh` cookie exactly as login does, clears `pb_oauth`, and redirects:
 
@@ -1000,6 +1005,126 @@ labels "Sample data".
 
 `overall`: `operational` | `partial_outage` | `major_outage` | `no_data` (paused monitors ignored).
 A `degraded` monitor is shown as `up`. No URLs, ping tokens, agent keys or probe URLs, for any type.
+
+---
+
+## Import from GitHub
+
+Finds the live sites behind a user's **public** GitHub repositories and turns the chosen ones
+into monitors. Deterministic (GitHub metadata and README links, no AI). Both endpoints need the
+**member** role **and** a user who signed in with GitHub: any other user gets
+`409 GITHUB_NOT_LINKED`. The GitHub sign-in asks for the same minimal scopes as before
+(`read:user`, `user:email`; no `repo`, so private repositories are out of reach). Its access token
+is kept encrypted (see D106) and used only for these requests.
+
+### `GET /workspaces/:wid/github/candidates?forks=true|false` (member)
+
+`forks` defaults to `false`. Lists the user's most recently pushed public repositories (up to 60,
+archived ones skipped, forks only with `forks=true`) and, per repo, the candidate URLs from:
+
+1. `deployment`: the latest deployment status `environment_url` per environment (preview
+   environments ignored);
+2. `homepage`: the repo's homepage field;
+3. `pages`: the GitHub Pages URL (`has_pages`);
+4. `readme`: README links on vercel.app, netlify.app, onrender.com, github.io, herokuapp.com,
+   pages.dev, fly.dev or railway.app, or labelled "demo", "live" or "website".
+
+URLs are normalised and deduped (same site from several sources keeps the best source in the order
+above); github.com, badge services, images and localhost are dropped; at most 4 per repo and 120
+probed per request. Each is probed with the monitor check runner (HEAD, 5 s timeout, SSRF guard).
+Repos without candidates are omitted.
+
+```json
+{
+  "data": {
+    "githubLogin": "ada",
+    "fetchedAt": "2026-10-29T10:00:00.000Z",
+    "cached": false,
+    "partial": false,
+    "rateLimit": { "remaining": 3920, "resetAt": "2026-10-29T10:42:00.000Z" },
+    "repos": [
+      {
+        "repo": "ada/shop",
+        "name": "shop",
+        "htmlUrl": "https://github.com/ada/shop",
+        "isFork": false,
+        "candidates": [
+          {
+            "url": "https://shop.vercel.app/",
+            "finalUrl": "https://shop.vercel.app/",
+            "source": "deployment",
+            "status": "live",
+            "statusCode": 200,
+            "monitored": true,
+            "monitorId": "66f…"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`status`: `live` = answered 2xx/3xx and ended on the same site; `redirect` = ended on a different
+host or path (see `finalUrl`); `down` = error, timeout, blocked by the SSRF guard, or 4xx/5xx
+(`statusCode` is `null` when there was no answer). `monitored` is computed per workspace against
+the normalised monitor URLs (scheme, a leading `www.` and a trailing slash are ignored; the
+candidate's `url` and `finalUrl` are both compared); `monitorId` is present only when `true`.
+
+Results are cached in memory for 10 minutes per user and `forks` value (`cached: true` on a hit,
+with the original `fetchedAt`). GitHub's rate limit is read from every answer. If it runs out
+during the scan the response is still `200` with `partial: true` and `rateLimit.remaining` at its
+floor: what was gathered so far is returned and not cached. `rateLimit` is `null` when GitHub sent
+no limit headers.
+
+| Status | `code`                | When                                                                                                                  |
+| ------ | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`    | `forks` is not `true` or `false`                                                                                      |
+| 403    | `FORBIDDEN`           | Viewer                                                                                                                |
+| 404    | `NOT_FOUND`           | Not a member of the workspace                                                                                         |
+| 409    | `GITHUB_NOT_LINKED`   | No GitHub sign-in, no stored token (signed in before this feature), or GitHub rejects it: "Sign in with GitHub again" |
+| 429    | `GITHUB_RATE_LIMITED` | The repo list itself was refused; `error.details.resetAt` says when to retry                                          |
+| 502    | `GITHUB_UNAVAILABLE`  | GitHub unreachable or answered with an error                                                                          |
+
+### `POST /workspaces/:wid/github/import` (member)
+
+```json
+{
+  "urls": ["https://shop.vercel.app/", "https://ada.github.io/site"],
+  "statusPage": { "mode": "create", "title": "My projects" }
+}
+```
+
+`urls`: 1 to 50. `statusPage` is optional: `{ "mode": "create", "title"?: string }` (a public page
+titled "GitHub projects" by default, slug from the title plus a random suffix) or
+`{ "mode": "extend", "id": "<status page id>" }` (appends to an existing page of this workspace; `404`
+if unknown, `400` before anything is created if it would pass 50 monitors).
+
+Each URL is re-validated with the normal HTTP monitor schema and the SSRF guard, then created with
+name = the repo name (from this user's cached candidates, else the hostname), `method: "HEAD"`,
+`intervalSec: 300`, `adaptive: true`, and scheduled like any new monitor. One bad URL does not stop
+the rest.
+
+`201`:
+
+```json
+{
+  "data": {
+    "created": [{ "id": "66f…", "name": "shop", "url": "https://shop.vercel.app/" }],
+    "skipped": [
+      { "url": "https://old.example.com", "reason": "already_monitored" },
+      { "url": "not a url", "reason": "invalid" },
+      { "url": "http://10.0.0.5/", "reason": "blocked" }
+    ],
+    "statusPage": { "id": "66f…", "slug": "my-projects-3fa9c1", "title": "My projects", "added": 1 }
+  }
+}
+```
+
+`already_monitored` also covers a URL repeated within the request (the first one is created).
+`statusPage` is present only when requested and at least one monitor was created. Errors: `400
+VALIDATION_ERROR` (empty list, more than 50, unknown `statusPage.mode`), `403`, `404`, `409
+GITHUB_NOT_LINKED` as above.
 
 ---
 

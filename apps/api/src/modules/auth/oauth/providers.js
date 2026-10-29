@@ -80,6 +80,7 @@ export const PROVIDERS = {
       const primary = Array.isArray(emails) ? emails.find((entry) => entry?.primary) : null;
       return {
         providerId: String(user.id),
+        login: user.login ? String(user.login) : null,
         email: primary?.email ? String(primary.email).toLowerCase() : null,
         emailVerified: primary?.verified === true,
         name: user.name || user.login || null,
@@ -117,8 +118,11 @@ export function buildAuthorizeUrl(provider, { redirectUri, state, codeChallenge 
   return url.toString();
 }
 
-/** Exchanges the authorization code (plus the PKCE verifier) for an access token. */
-export async function exchangeCode(provider, { code, codeVerifier, redirectUri }, fetchImpl) {
+/**
+ * Exchanges the authorization code (plus the PKCE verifier) for { accessToken,
+ * scope } (scope as granted by the provider, if it says).
+ */
+export async function exchangeToken(provider, { code, codeVerifier, redirectUri }, fetchImpl) {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
@@ -137,5 +141,10 @@ export async function exchangeCode(provider, { code, codeVerifier, redirectUri }
   if (!token?.access_token) {
     throw providerError(`Token exchange failed${token?.error ? `: ${token.error}` : ''}`);
   }
-  return token.access_token;
+  return { accessToken: token.access_token, scope: token.scope ? String(token.scope) : null };
+}
+
+/** Same exchange, for callers that only need the access token. */
+export async function exchangeCode(provider, params, fetchImpl) {
+  return (await exchangeToken(provider, params, fetchImpl)).accessToken;
 }

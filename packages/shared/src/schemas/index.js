@@ -4,6 +4,7 @@ export * from './agent.js';
 export * from './alertChannel.js';
 export * from './auth.js';
 export * from './common.js';
+export * from './github.js';
 export * from './monitor.js';
 export * from './statusPage.js';
 export * from './workspace.js';

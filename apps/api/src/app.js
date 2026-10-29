@@ -15,6 +15,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { alertChannelsRouter } from './modules/alertChannels/alertChannels.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { githubRouter } from './modules/github/github.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { incidentsRouter } from './modules/incidents/incidents.routes.js';
 import { membersRouter } from './modules/members/members.routes.js';
@@ -44,6 +45,10 @@ export function createApp({
   getWorkerStatus,
   // fetch used to talk to OAuth providers (tests pass a fake).
   oauthFetch = globalThis.fetch,
+  // fetch used for the GitHub REST API, and the reachability probe for candidate
+  // URLs (default: the real HEAD check). Tests pass fakes.
+  githubFetch = globalThis.fetch,
+  githubProbe,
 }) {
   const app = express();
 
@@ -111,6 +116,18 @@ export function createApp({
     '/workspaces/:wid/monitors',
     requireAuth,
     monitorsRouter({ env, scheduler, schemas: monitorSchemas }),
+  );
+  api.use(
+    '/workspaces/:wid/github',
+    requireAuth,
+    githubRouter({
+      env,
+      scheduler,
+      schemas: monitorSchemas,
+      publicCache,
+      githubFetch,
+      githubProbe,
+    }),
   );
   api.use('/workspaces/:wid/incidents', requireAuth, incidentsRouter());
   api.use(
