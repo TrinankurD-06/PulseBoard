@@ -17,9 +17,7 @@ import {
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
 import AgentBanner from '../../components/monitors/AgentBanner.jsx';
-import AgentSetup from '../../components/monitors/AgentSetup.jsx';
 import BudgetBanner from '../../components/monitors/BudgetBanner.jsx';
-import HeartbeatSetup from '../../components/monitors/HeartbeatSetup.jsx';
 import HeartbeatStatusCard from '../../components/monitors/HeartbeatStatusCard.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
@@ -38,8 +36,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
 import { intervalDescription, isPausedByBudget } from '../../lib/budget.js';
 import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
-import { isAgent } from '../../lib/agent.js';
-import { isHeartbeat } from '../../lib/heartbeat.js';
+import { isAgent, isHeartbeat } from '../../lib/monitorType.js';
 import NotFound from '../NotFound.jsx';
 
 // The charts (and the chart library, the bulk of this page's JavaScript) load as
@@ -47,6 +44,8 @@ import NotFound from '../NotFound.jsx';
 const HealthDeck = lazy(() => import('../../components/health/HealthDeck.jsx'));
 const MonitorAnalytics = lazy(() => import('../../components/monitors/MonitorAnalytics.jsx'));
 const AgentAnalytics = lazy(() => import('../../components/monitors/AgentAnalytics.jsx'));
+const AgentSetup = lazy(() => import('../../components/monitors/AgentSetup.jsx'));
+const HeartbeatSetup = lazy(() => import('../../components/monitors/HeartbeatSetup.jsx'));
 const HeartbeatAnalytics = lazy(() => import('../../components/monitors/HeartbeatAnalytics.jsx'));
 
 /**
@@ -284,7 +283,9 @@ function HeartbeatDetail({ monitor, wid, canEdit, now }) {
         />
       </Deferred>
 
-      <HeartbeatSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+      <Deferred minHeight="24rem" onView>
+        <HeartbeatSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+      </Deferred>
 
       <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
     </div>
@@ -335,7 +336,9 @@ function AgentDetail({ monitor, wid, canEdit, now }) {
         <AgentAnalytics wid={wid} monitor={monitor} now={now} />
       </Deferred>
 
-      <AgentSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+      <Deferred minHeight="24rem" onView>
+        <AgentSetup wid={wid} monitor={monitor} canEdit={canEdit} />
+      </Deferred>
 
       <MonitorIncidents wid={wid} monitorId={monitor.id} now={now} />
     </div>

@@ -423,3 +423,13 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       light theme only). Same rules in the WebGL shader and the 2D fallback (`INK_DOWN` in `fieldMath.js`); the dark theme is unchanged.
       3 new tests, 265 client tests.
 - [x] **Checked by the owner (30 Oct):** the red down regions are clearly visible in light mode.
+
+---
+
+# Smaller first download (30 Oct)
+
+- [x] Found why every page downloaded the form code: `ErrorPage` (imported by `App` for 404s and crashes) statically imported the whole `AppShell`, which pulls in the
+      workspace-creation modal, the form library, `zod` and the shared schemas. The shell is now loaded on demand (only when a signed-in user lands on an error page).
+      Also: `lib/monitorType.js` (the monitor-type checks without the schemas), and the agent and heartbeat setup panels load lazily on the monitor page.
+- Result (uncompressed JavaScript, from the build manifest): first load of any page about 600 KB → 413 KB; monitor-detail critical path 669 KB → 558 KB.
+- [ ] **Not measured with Lighthouse:** memory was above the 80 % limit. Re-run the monitor-detail check (was 83 performance, target 85) when memory allows.

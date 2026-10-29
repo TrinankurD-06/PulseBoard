@@ -1,15 +1,19 @@
-import { useContext, useEffect } from 'react';
+import { lazy, Suspense, useContext, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.js';
 import { useDocumentTitle } from '../hooks/useDocumentTitle.js';
 import { errorLayout, workspaceFromPath } from '../lib/errorLayout.js';
 import { AppShellContext } from './layout/appShellContext.js';
-import AppShell from './layout/AppShell.jsx';
 import Logo from './Logo.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import PublicHeader from './public/PublicHeader.jsx';
 import FullPageSpinner from './ui/FullPageSpinner.jsx';
 import RingDotCta from './ui/RingDotCta.jsx';
+
+// The shell (navigation, workspace switcher, forms) is only needed when a logged-in
+// user lands on an error page. Loaded on demand, it stays out of every other page's
+// first download: this file is imported by App, so a static import would put it there.
+const AppShell = lazy(() => import('./layout/AppShell.jsx'));
 
 function ErrorContent({ code, title, message, action }) {
   const { label, ...ctaProps } = action;
@@ -87,7 +91,11 @@ function ContextualError({ code, title, message, action }) {
     case 'wait':
       return <FullPageSpinner />;
     case 'app':
-      return <AppShell wid={layout.wid}>{content}</AppShell>;
+      return (
+        <Suspense fallback={<FullPageSpinner />}>
+          <AppShell wid={layout.wid}>{content}</AppShell>
+        </Suspense>
+      );
     default:
       return <PublicFrame>{content}</PublicFrame>;
   }

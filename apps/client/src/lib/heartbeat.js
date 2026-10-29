@@ -3,8 +3,9 @@
 import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
 import { formatDuration, timeAgo } from './format.js';
 
-export const HEARTBEAT_TYPE = 'heartbeat';
-export const isHeartbeat = (monitor) => monitor?.type === HEARTBEAT_TYPE;
+import { HEARTBEAT_TYPE, isHeartbeat } from './monitorType.js';
+
+export { HEARTBEAT_TYPE, isHeartbeat };
 
 const DAY = 24 * 60 * 60;
 export const DEFAULT_GRACE_SEC = 60;

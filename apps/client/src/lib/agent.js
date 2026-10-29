@@ -11,8 +11,9 @@ import { agentCreateSchema } from '@pulseboard/shared/schemas';
 import { z } from 'zod';
 import { formatDuration, hostOf, timeAgo } from './format.js';
 
-export const AGENT_TYPE = 'agent';
-export const isAgent = (monitor) => monitor?.type === AGENT_TYPE;
+import { AGENT_TYPE, isAgent } from './monitorType.js';
+
+export { AGENT_TYPE, isAgent };
 
 export const AGENT_PACKAGE = 'pulseboard-agent';
 export const KEY_ENV_VAR = 'PULSEBOARD_KEY';
