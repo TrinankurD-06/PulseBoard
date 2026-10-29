@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { uptimeGaugeProps } from './uptimeLevels.js';
+import { uptimeLevel } from '@pulseboard/shared/uptime';
+import { UPTIME_TARGET, UPTIME_WARN_TARGET, uptimeGaugeProps } from './uptimeLevels.js';
+
+describe('gauge thresholds', () => {
+  it('match the bands of shared uptimeLevel(), so the ring and the bars agree', () => {
+    expect(uptimeLevel(UPTIME_TARGET)).toBe('good');
+    expect(uptimeLevel(UPTIME_TARGET - 0.01)).toBe('degraded');
+    expect(uptimeLevel(UPTIME_WARN_TARGET)).toBe('degraded');
+    expect(uptimeLevel(UPTIME_WARN_TARGET - 0.01)).toBe('bad');
+  });
+});
 
 describe('uptimeGaugeProps', () => {
   it('prints what the card prints: cut to 2 decimals, 100 only when perfect', () => {

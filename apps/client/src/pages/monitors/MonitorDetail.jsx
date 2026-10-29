@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUptime } from '../../api/analytics.js';
-import { uptimeGaugeProps } from '../../lib/uptimeLevels.js';
+import { UPTIME_TARGET, UPTIME_WARN_TARGET, uptimeGaugeProps } from '../../lib/uptimeLevels.js';
 import { errorMessage } from '../../api/http.js';
 import { useIncidents } from '../../api/incidents.js';
 import {
@@ -71,7 +71,8 @@ function MonitorHero({ wid, monitor, phrase, badges, actions }) {
           <div className="min-w-0">
             <TickGauge
               value={gauge.value}
-              target={99.9}
+              target={UPTIME_TARGET}
+              warnTarget={UPTIME_WARN_TARGET}
               label="Uptime"
               caption="Last 30 days"
               decimals={gauge.decimals}

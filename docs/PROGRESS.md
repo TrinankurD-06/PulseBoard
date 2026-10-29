@@ -234,8 +234,10 @@ Decision D102. Nothing pushed.
       & usage, team, settings, new monitor (website, heartbeat and agent forms), public status page. No console errors, no
       sideways scroll, no dark leftovers, no text under WCAG AA contrast. Not covered: the heartbeat and agent _detail_ pages
       (the live data has no such monitor), confirm dialogs, and hover tooltips.
-- Seen, not light-specific: the uptime gauge ring is fully red below the 99.9 % target (99.78 % on a healthy dashboard), and
-  the last x-axis label of the large charts was clipped at the right edge (fixed: right chart margin 8 to 32 px, checked on 108 axes).
+- Seen, not light-specific, both fixed: the last x-axis label of the large charts was clipped at the right edge (right chart
+  margin 8 to 32 px, checked on 108 axes), and the uptime gauge ring was fully red below the 99.9 % target (99.78 % on a
+  healthy dashboard). The ring now follows the uptime bands: green at 99.9 % and above, amber from 99 % (`warnTarget`,
+  `UPTIME_WARN_TARGET`), red below 99 %. Dashboard, monitor page and public status page; the Usage budget gauges are unchanged.
 
 ## Resume note (light theme)
 

@@ -110,6 +110,20 @@ describe('gaugeState', () => {
     expect(gaugeState({ value: 99.9, target: 99.9 })).toBe('ok');
     expect(gaugeState({ value: 99.98, target: 99.9 })).toBe('ok');
   });
+  it('warnTarget: a missed target is only a warning while the value is within it', () => {
+    const at = (value) => gaugeState({ value, target: 99.9, warnTarget: 99 });
+    expect(at(99.98)).toBe('ok');
+    expect(at(99.78)).toBe('warn');
+    expect(at(99)).toBe('warn'); // equal to the warn limit still warns
+    expect(at(98.99)).toBe('down');
+    expect(gaugeState({ value: 99.78, target: 99.9 })).toBe('down'); // no warnTarget: unchanged
+    expect(gaugeState({ value: 350, target: 300, warnTarget: 400, direction: 'below' })).toBe(
+      'warn',
+    );
+    expect(gaugeState({ value: 450, target: 300, warnTarget: 400, direction: 'below' })).toBe(
+      'down',
+    );
+  });
   it('below: over the target is down, equal counts as ok', () => {
     expect(gaugeState({ value: 450, target: 300, direction: 'below' })).toBe('down');
     expect(gaugeState({ value: 300, target: 300, direction: 'below' })).toBe('ok');

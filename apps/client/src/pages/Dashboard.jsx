@@ -17,9 +17,7 @@ import { useNow } from '../hooks/useNow.js';
 import { useSignalFeed } from '../hooks/useSignalFeed.js';
 import { formatDuration, formatMs } from '../lib/format.js';
 import { isOperational } from '../lib/status.js';
-import { uptimeGaugeProps } from '../lib/uptimeLevels.js';
-
-const UPTIME_TARGET = 99.9;
+import { UPTIME_TARGET, UPTIME_WARN_TARGET, uptimeGaugeProps } from '../lib/uptimeLevels.js';
 
 function summarize(monitors) {
   const count = (status) => monitors.filter((m) => m.status === status).length;
@@ -102,6 +100,7 @@ export default function Dashboard() {
             <TickGauge
               value={gauge.value}
               target={UPTIME_TARGET}
+              warnTarget={UPTIME_WARN_TARGET}
               label="Uptime"
               caption={
                 uptime == null ? 'Nothing has been covered yet' : 'Last 30 days, all monitors'

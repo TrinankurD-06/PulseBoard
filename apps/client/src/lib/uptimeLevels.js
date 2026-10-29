@@ -1,6 +1,10 @@
 import { formatUptime } from '@pulseboard/shared/uptime';
 // Status colours + a text label for every uptime level (colour is never the
 // only cue). Thresholds live in shared `uptimeLevel()`. `none` is the hairline.
+// The SLA target and the floor of the amber band; the same cut-offs as shared uptimeLevel().
+export const UPTIME_TARGET = 99.9;
+export const UPTIME_WARN_TARGET = 99;
+
 export const UPTIME_LEVELS = {
   good: { label: 'Operational', bar: 'bg-status-up' },
   degraded: { label: 'Degraded', bar: 'bg-status-degraded' },

@@ -1,7 +1,7 @@
 import { formatUptime, truncateTo } from '@pulseboard/shared/uptime';
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { uptimeGaugeProps } from '../lib/uptimeLevels.js';
+import { UPTIME_TARGET, UPTIME_WARN_TARGET, uptimeGaugeProps } from '../lib/uptimeLevels.js';
 import { usePublicStatus } from '../api/statusPages.js';
 import UptimeBars from '../components/charts/UptimeBars.jsx';
 import UptimeLegend from '../components/charts/UptimeLegend.jsx';
@@ -195,7 +195,8 @@ export default function PublicStatus() {
         {uptime != null && (
           <TickGauge
             value={uptimeGaugeProps(uptime).value}
-            target={99.9}
+            target={UPTIME_TARGET}
+            warnTarget={UPTIME_WARN_TARGET}
             size={220}
             decimals={uptimeGaugeProps(uptime).decimals}
             label="Uptime"

@@ -25,7 +25,8 @@ const TICKS = Array.from({ length: TICK_COUNT }, (_, i) => {
 /**
  * A ring of 60 thin ticks filled clockwise from 12 o'clock to value/max. Lit
  * ticks are --text with a small --accent dot at their outer end; the rest are
- * --line. With a `target` on the wrong side the lit part turns --status-down.
+ * --line. With a `target` on the wrong side the lit part turns --status-down, or
+ * --status-degraded while the value is still within `warnTarget`.
  * The number in the middle counts up as the ticks light, once, on mount.
  * `size` is the maximum width: the gauge shrinks with its container.
  * A null `value` is the empty state: no lit ticks and `emptyText` ("No data yet")
@@ -39,6 +40,7 @@ export default function TickGauge({
   unit = '%',
   target,
   thresholdDirection = 'above',
+  warnTarget,
   size = 240,
   decimals,
   ariaLabel,
@@ -49,9 +51,10 @@ export default function TickGauge({
   const empty = value == null;
   const filled = filledTickCount(value, max);
   const lit = Math.round(filled * progress);
-  const down = gaugeState({ value, target, direction: thresholdDirection }) === 'down';
-  const litColor = down ? 'var(--status-down)' : 'var(--series)';
-  const dotColor = down ? 'var(--status-down)' : 'var(--accent)';
+  const state = gaugeState({ value, target, direction: thresholdDirection, warnTarget });
+  const tone = { down: 'var(--status-down)', warn: 'var(--status-degraded)' }[state];
+  const litColor = tone ?? 'var(--series)';
+  const dotColor = tone ?? 'var(--accent)';
 
   const safeValue = Number.isFinite(value) ? value : 0;
   const number = formatGaugeNumber(safeValue * (progress >= 1 ? 1 : progress), { decimals });

@@ -50,14 +50,21 @@ export function tickLine(index, { cx, cy, rInner, rOuter, count = TICK_COUNT }) 
 }
 
 /**
- * 'ok' | 'down' | 'neutral'. Without a usable target the gauge is neutral.
+ * 'ok' | 'warn' | 'down' | 'neutral'. Without a usable target the gauge is neutral.
  * 'above': the value must be at least the target; 'below': at most the target.
- * Equal to the target counts as meeting it.
+ * Equal to the target counts as meeting it. A missed target is only 'warn'
+ * (not 'down') while the value is still on the right side of `warnTarget`,
+ * a second, looser limit.
  */
-export function gaugeState({ value, target, direction = 'above' }) {
+export function gaugeState({ value, target, direction = 'above', warnTarget }) {
   if (!Number.isFinite(target) || !Number.isFinite(value)) return 'neutral';
-  const missed = direction === 'below' ? value > target : value < target;
-  return missed ? 'down' : 'ok';
+  const below = direction === 'below';
+  const missed = below ? value > target : value < target;
+  if (!missed) return 'ok';
+  if (Number.isFinite(warnTarget) && (below ? value <= warnTarget : value >= warnTarget)) {
+    return 'warn';
+  }
+  return 'down';
 }
 
 /** Digits after the point when none are requested: whole numbers stay whole, otherwise up to 2. */
