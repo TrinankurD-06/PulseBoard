@@ -1,6 +1,6 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import { Activity, ArrowLeft, Cpu, ExternalLink, Pause, Pencil, Play, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useUptime } from '../../api/analytics.js';
@@ -16,15 +16,11 @@ import {
   useTestSavedMonitor,
 } from '../../api/monitors.js';
 import IncidentCard from '../../components/incidents/IncidentCard.jsx';
-import HealthDeck from '../../components/health/HealthDeck.jsx';
-import AgentAnalytics from '../../components/monitors/AgentAnalytics.jsx';
 import AgentBanner from '../../components/monitors/AgentBanner.jsx';
 import AgentSetup from '../../components/monitors/AgentSetup.jsx';
 import BudgetBanner from '../../components/monitors/BudgetBanner.jsx';
-import HeartbeatAnalytics from '../../components/monitors/HeartbeatAnalytics.jsx';
 import HeartbeatSetup from '../../components/monitors/HeartbeatSetup.jsx';
 import HeartbeatStatusCard from '../../components/monitors/HeartbeatStatusCard.jsx';
-import MonitorAnalytics from '../../components/monitors/MonitorAnalytics.jsx';
 import SslBadge from '../../components/monitors/SslBadge.jsx';
 import StatusBadge from '../../components/monitors/StatusBadge.jsx';
 import TestResult from '../../components/monitors/TestResult.jsx';
@@ -33,6 +29,7 @@ import UsageCard from '../../components/monitors/UsageCard.jsx';
 import TickGauge from '../../components/gauge/TickGauge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Card, { CardHeader } from '../../components/ui/Card.jsx';
+import LazyOnView from '../../components/ui/LazyOnView.jsx';
 import RingDotCta from '../../components/ui/RingDotCta.jsx';
 import SampleBadge from '../../components/ui/SampleBadge.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -44,6 +41,24 @@ import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
 import { isAgent } from '../../lib/agent.js';
 import { isHeartbeat } from '../../lib/heartbeat.js';
 import NotFound from '../NotFound.jsx';
+
+// The charts (and the chart library, the bulk of this page's JavaScript) load as
+// their own chunks, so the title, gauge and actions paint without waiting for them.
+const HealthDeck = lazy(() => import('../../components/health/HealthDeck.jsx'));
+const MonitorAnalytics = lazy(() => import('../../components/monitors/MonitorAnalytics.jsx'));
+const AgentAnalytics = lazy(() => import('../../components/monitors/AgentAnalytics.jsx'));
+const HeartbeatAnalytics = lazy(() => import('../../components/monitors/HeartbeatAnalytics.jsx'));
+
+/**
+ * A lazy chart section. `onView` also waits until the section is near the
+ * viewport (for sections below the fold). The placeholder reserves `minHeight`.
+ */
+function Deferred({ minHeight, onView = false, children }) {
+  const body = (
+    <Suspense fallback={<div style={{ minHeight }} aria-hidden="true" />}>{children}</Suspense>
+  );
+  return onView ? <LazyOnView minHeight={minHeight}>{body}</LazyOnView> : body;
+}
 
 /** Back link, the monitor name as a display headline (URL or summary as the muted phrase), uptime gauge, actions. */
 function MonitorHero({ wid, monitor, phrase, badges, actions }) {
@@ -257,13 +272,17 @@ function HeartbeatDetail({ monitor, wid, canEdit, now }) {
         actions={canEdit && <Actions monitor={monitor} wid={wid} canTest={false} />}
       />
 
-      <HealthDeck wid={wid} monitorId={monitor.id} />
+      <Deferred minHeight="44rem">
+        <HealthDeck wid={wid} monitorId={monitor.id} />
+      </Deferred>
 
-      <HeartbeatAnalytics
-        wid={wid}
-        monitorId={monitor.id}
-        side={<HeartbeatStatusCard wid={wid} monitor={monitor} now={now} />}
-      />
+      <Deferred minHeight="30rem" onView>
+        <HeartbeatAnalytics
+          wid={wid}
+          monitorId={monitor.id}
+          side={<HeartbeatStatusCard wid={wid} monitor={monitor} now={now} />}
+        />
+      </Deferred>
 
       <HeartbeatSetup wid={wid} monitor={monitor} canEdit={canEdit} />
 
@@ -304,13 +323,17 @@ function AgentDetail({ monitor, wid, canEdit, now }) {
         }
       />
 
-      <HealthDeck wid={wid} monitorId={monitor.id} />
+      <Deferred minHeight="44rem">
+        <HealthDeck wid={wid} monitorId={monitor.id} />
+      </Deferred>
 
       <AgentBanner monitor={monitor} now={now} />
 
       {testResult && <TestResult result={testResult} />}
 
-      <AgentAnalytics wid={wid} monitor={monitor} now={now} />
+      <Deferred minHeight="40rem" onView>
+        <AgentAnalytics wid={wid} monitor={monitor} now={now} />
+      </Deferred>
 
       <AgentSetup wid={wid} monitor={monitor} canEdit={canEdit} />
 
@@ -373,39 +396,43 @@ export default function MonitorDetail() {
         }
       />
 
-      <HealthDeck wid={wid} monitorId={monitor.id} />
+      <Deferred minHeight="44rem">
+        <HealthDeck wid={wid} monitorId={monitor.id} />
+      </Deferred>
 
       <BudgetBanner wid={wid} monitor={monitor} canEdit={can(ROLES.MEMBER)} />
 
       {testResult && <TestResult result={testResult} />}
 
-      <MonitorAnalytics
-        wid={wid}
-        monitorId={monitor.id}
-        latestCheckCard={
-          <Card>
-            <CardHeader title="Latest check" />
-            {monitor.lastCheckedAt ? (
-              <dl className="grid grid-cols-2 gap-4 p-5">
-                <Detail label="Checked">{timeAgo(monitor.lastCheckedAt, now)}</Detail>
-                <Detail label="Result">{monitor.lastOk ? 'Passed' : 'Failed'}</Detail>
-                <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
-                <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
-                {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
-                {monitor.lastTimings && (
-                  <div className="col-span-2">
-                    <TimingBar timings={monitor.lastTimings} />
-                  </div>
-                )}
-              </dl>
-            ) : (
-              <p className="p-5 text-sm text-muted">
-                {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
-              </p>
-            )}
-          </Card>
-        }
-      />
+      <Deferred minHeight="60rem" onView>
+        <MonitorAnalytics
+          wid={wid}
+          monitorId={monitor.id}
+          latestCheckCard={
+            <Card>
+              <CardHeader title="Latest check" />
+              {monitor.lastCheckedAt ? (
+                <dl className="grid grid-cols-2 gap-4 p-5">
+                  <Detail label="Checked">{timeAgo(monitor.lastCheckedAt, now)}</Detail>
+                  <Detail label="Result">{monitor.lastOk ? 'Passed' : 'Failed'}</Detail>
+                  <Detail label="Response time">{formatMs(monitor.lastResponseMs)}</Detail>
+                  <Detail label="Status code">{monitor.lastStatusCode ?? '—'}</Detail>
+                  {monitor.lastError && <Detail label="Error">{monitor.lastError}</Detail>}
+                  {monitor.lastTimings && (
+                    <div className="col-span-2">
+                      <TimingBar timings={monitor.lastTimings} />
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <p className="p-5 text-sm text-muted">
+                  {monitor.isPaused ? 'Monitoring is paused.' : 'Waiting for the first check…'}
+                </p>
+              )}
+            </Card>
+          }
+        />
+      </Deferred>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
