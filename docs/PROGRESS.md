@@ -317,5 +317,51 @@ No feature changes beyond the read-only demo safety. Base commit `8c85f2d`. Buil
 - [x] Backend: seed script uses the shared module; re-seeding does not duplicate workspaces (`scripts/lib/seedDemoAccount.js`).
 - [x] Backend: tests (shared, API 403/200, `/meta`, env, demo-target `/admin`, worker).
 - [x] Frontend: `lib/demo.js` and test, `DemoBanner`, Login uses shared constants (240 client tests, lint, build clean). Checked in a browser (banner in dark and light at 1440 and 390 px, absent when the flag is off).
-- [ ] Tester: commits and pushes, final verification (tests, ESLint, Prettier, build, greps).
-- [ ] Orchestrator: D105 checked against the final code, summary.
+- [x] Tester: commits and pushes, final verification (tests, ESLint, Prettier, build, greps).
+- [x] Orchestrator: D105 checked against the final code, summary.
+
+## Summary (29 Oct)
+
+Nine commits on `main`, `8c85f2d..4a68892` (39 files, +1031 / -136): `47f075b` docs and config, `8fe422f` client copy,
+`08e13d7` shared demo module and guards, `4200367` demo-reset job, `2419ee8` client banner, `e94d560` and `4a68892` progress and
+decisions, `62714fa` decisions wording, `3a9be18` seed helper. Gate on the pushed head: agent 49, shared 315, API 310, client 240,
+demo-target 23, worker 77 tests; ESLint and Prettier clean; client and agent builds pass. Not run against the live database.
+
+**1. Demo walkthrough:** `README.md` (sections replaced by one line), `docs/DEMO.md` (new: intro, "Before you start" checklist, the
+walkthrough).
+**2. Resend:** `README.md` (overview, features, diagram, tech stack, env table, deploy), `.env.example` (Resend variables; SMTP_* only as a
+commented optional fallback), `render.yaml` (SMTP_* removed, `DEMO_READ_ONLY` and `DEMO_OWNER_EMAIL` added), `docs/API.md`,
+`docs/ARCHITECTURE.md`, `apps/client/src/pages/AlertChannels.jsx` (hint), `apps/api/scripts/seed.js` and
+`packages/shared/src/demo/demoIncidents.js` (comments and sample alert text), `docs/DECISIONS.md` (D104).
+**3. Landing label:** `apps/client/src/pages/Landing.jsx`.
+**4. Read-only demo:**
+
+- shared: `src/demo/index.js` (new), `src/demo/demoIncidents.js` (moved from the API scripts), `src/constants.js`, `src/env.js`,
+  `package.json` (`./demo` export), tests `demo.test.js`, `env.test.js`.
+- API: `src/app.js`, `src/config/env.js`, `src/modules/meta/meta.routes.js`, `src/modules/workspaces/workspaces.routes.js`,
+  `scripts/seed.js`, `scripts/lib/seedDemoAccount.js` (new), `scripts/seed-demo-incidents.js`, tests `demoReadOnly.test.js` (new),
+  `seed.test.js`, `env.test.js`, `demoIncidents.test.js`.
+- worker: `src/jobs/demoReset.js` (new), `src/worker.js`, `src/config/env.js`, tests `demoReset.test.js` (new), `start.test.js`.
+- demo-target: test only (`/admin` needs no auth or API).
+- client: `lib/demo.js` and `demo.test.js` (new), `components/layout/DemoBanner.jsx` (new), `AppShell.jsx`, `pages/auth/Login.jsx`.
+- docs: `docs/DECISIONS.md` (D105), this file.
+  **5. Verification:** "Brevo", "Sent by push monitors" and the brand name: no hits in tracked files. "SMTP_" remains only where it is
+  real: `.env.example` (commented fallback), the README env-table row, `packages/shared/src/env.js` and `alerts/email.js` (the SMTP
+  fallback code), tests, and the D98/D104 history.
+
+**Deliberate differences from the brief**
+
+- "Brevo" never existed in the repo.
+- `SMTP_*` is not unused: the nodemailer fallback and the Ethereal local test inbox still run on it, so it stays in code and
+  tests; removing it would be a feature change. The real sender variable is `ALERT_FROM_EMAIL` (there is no `MAIL_FROM`).
+- `DEMO_READ_ONLY` defaults to `false` so the local demo account stays editable; `render.yaml` sets it to `true`.
+
+**Manual steps for you**
+
+1. On the live Render service set `DEMO_READ_ONLY=true` (an existing service may not pick up the new `render.yaml` variable on its own),
+   optionally `DEMO_OWNER_EMAIL` (an existing account that should own the demo workspace), and redeploy. The first worker boot
+   makes `demo@pulseboard.dev` a Viewer in "Acme Inc."; without `DEMO_OWNER_EMAIL` a password-less `demo-owner@pulseboard.dev` becomes its
+   owner. If you want to manage that workspace yourself, set `DEMO_OWNER_EMAIL` to your own account first.
+2. The daily reset (03:00 UTC) rebuilds only the sample "Demo Checkout API" monitor; real monitors are untouched.
+3. Not done: running any of this against the live database, and the Lighthouse run, styled delete confirmations and two flaky
+   timing tests from earlier notes.
