@@ -278,3 +278,16 @@ Not committed yet; nothing published. The name `pulseboard-agent` was free on np
 - [x] LICENSE, CHANGELOG, README rewritten. The wizard snippet and demo-target use `intervalSec`.
 - [x] Demo-target imports the package by name, which now resolves to `dist`: its `predev` and `pretest` build it first.
 - Gate: 968 tests, ESLint and Prettier clean, client build OK, `npm pack --dry-run`: 7 files, 12.5 kB.
+
+## Published (29 Oct)
+
+`pulseboard-agent@1.0.0` is live on npm (MIT, `latest`). Checked by installing it from the registry:
+`require` and `import` both load, and a missing `apiKey` throws the clear error. The registry also
+lists a `0.0.0-stage` placeholder, created when the name was reserved.
+
+Releasing a new version, from `packages/agent`:
+
+1. Bump `version` in `package.json` and `AGENT_VERSION` in `src/options.js` (a test fails if they differ).
+2. Add an entry to `CHANGELOG.md`.
+3. `npm test`, then `npm publish --access public` (needs the 2FA code), then `npm view pulseboard-agent version`.
+4. Commit and tag: `git tag agent-v<version>`.
