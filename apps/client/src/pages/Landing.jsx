@@ -25,7 +25,7 @@ const KEY_NUMBERS = [
   {
     value: 0,
     unit: 'requests',
-    label: 'Sent by push monitors',
+    label: 'Requests sent to push-monitored endpoints',
     description: 'Heartbeats and agents report in, so paid endpoints are never polled.',
   },
 ];

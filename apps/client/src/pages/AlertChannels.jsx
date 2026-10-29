@@ -40,7 +40,7 @@ const TYPES = {
     label: 'Email',
     icon: Mail,
     placeholder: 'oncall@company.com',
-    hint: 'Without SMTP settings, emails go to a test inbox; the preview link appears in the timeline.',
+    hint: 'Email (Resend). Without a Resend API key, emails go to a test inbox; the preview link appears in the timeline.',
   },
 };
 
