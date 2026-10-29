@@ -10,6 +10,7 @@ import {
   generateGrid,
   gridDims,
   parseCssColor,
+  pointColor,
   phaseRate,
   readColors,
   regionBins,
@@ -169,6 +170,53 @@ describe('fieldPoint', () => {
     s.snap();
     expect(fieldPoint(0.5, 0.5, 0.5, s, {}).down).toBeGreaterThan(0.9);
     expect(fieldPoint(0.1, 0.5, 0.5, s, {}).down).toBe(0);
+  });
+});
+
+describe('down regions on a light page (ink)', () => {
+  const downSim = () => {
+    const s = createSimulation();
+    s.setTarget({ amplitude: 0.3, speed: 0.4, regions: [{ x0: 0.4, x1: 0.6, state: 'down' }] });
+    s.snap();
+    return s;
+  };
+
+  it('makes down dots bigger, and never faint, only when drawn as ink', () => {
+    const s = downSim();
+    const light = fieldPoint(0.5, 0.95, 0.5, s, {}, false);
+    const ink = fieldPoint(0.5, 0.95, 0.5, s, {}, true);
+    expect(ink.size).toBeGreaterThan(light.size * 1.5);
+    expect(ink.alpha).toBeGreaterThanOrEqual(0.8);
+    // The faint far row of a calm region is left as it was.
+    expect(fieldPoint(0.1, 0.95, 0.5, s, {}, true).alpha).toBe(
+      fieldPoint(0.1, 0.95, 0.5, s, {}, false).alpha,
+    );
+    expect(fieldPoint(0.1, 0.95, 0.5, s, {}, true).size).toBe(
+      fieldPoint(0.1, 0.95, 0.5, s, {}, false).size,
+    );
+  });
+
+  it('paints down dots fully red as ink, 85 % red as light', () => {
+    const s = downSim();
+    const point = fieldPoint(0.5, 0.5, 0.5, s, {});
+    const base = {
+      near: [0.1, 0.1, 0.1],
+      far: [0.3, 0.3, 0.3],
+      accent: [0, 0.5, 0.2],
+      down: [0.9, 0.1, 0.05],
+    };
+    const ink = pointColor(point, { ...base, additive: false });
+    const additive = pointColor(point, { ...base, additive: true });
+    for (let c = 0; c < 3; c += 1) expect(ink[c]).toBeCloseTo(base.down[c], 5);
+    expect(Math.abs(additive[0] - base.down[0])).toBeGreaterThan(0.01);
+  });
+
+  it('uses --field-down when the theme defines it, else --status-down', () => {
+    const vars = { '--status-down': '#d02a1c', '--field-down': '#ee2412' };
+    expect(readColors((name) => vars[name] ?? '').down).toEqual(parseCssColor('#ee2412'));
+    expect(readColors((name) => (name === '--status-down' ? '#d02a1c' : '')).down).toEqual(
+      parseCssColor('#d02a1c'),
+    );
   });
 });
 

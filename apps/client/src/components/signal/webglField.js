@@ -3,6 +3,7 @@
 // and colour per point (the same rules as fieldMath.fieldPoint). No library.
 import {
   BINS,
+  INK_DOWN,
   MAX_RIPPLES,
   RIPPLE,
   VIEW,
@@ -27,6 +28,7 @@ uniform vec3 uFar;
 uniform vec3 uNear;
 uniform vec3 uAccent;
 uniform vec3 uDownCol;
+uniform float uInk; // 1.0 on a light page
 varying vec4 vColor;
 
 float sampleDown(float gx) {
@@ -75,13 +77,14 @@ void main() {
   float lift = clamp(0.5 + off / ${f(2 * VIEW.liftScale)}, 0.0, 1.0);
   float alpha = (0.14 + 0.86 * pow(max(near, 0.0001), 1.4)) * (0.5 + 0.5 * lift);
   alpha = clamp(alpha * ${f(VIEW.alphaGain)} * (1.0 + 0.9 * down), 0.0, 1.0);
+  alpha = max(alpha, uInk * ${f(INK_DOWN.alphaFloor)} * down);
   float sx = 0.5 + x * 0.5 * mix(${f(VIEW.xsNear)}, ${f(VIEW.xsFar)}, p);
   float sy = mix(${f(VIEW.yNear)}, ${f(VIEW.yFar)}, p) - off * k;
   vec3 col = mix(uFar, uNear, near);
   col = mix(col, uAccent, lift * 0.45);
-  col = mix(col, uDownCol, down * 0.85);
+  col = mix(col, uDownCol, mix(down * 0.85, min(1.0, down * ${f(INK_DOWN.colorGain)}), uInk));
   gl_Position = vec4(sx * 2.0 - 1.0, 1.0 - sy * 2.0, 0.0, 1.0);
-  gl_PointSize = mix(${f(VIEW.sizeFar)}, ${f(VIEW.sizeNear)}, near) * (0.8 + 0.4 * aPos.z) * uDpr;
+  gl_PointSize = mix(${f(VIEW.sizeFar)}, ${f(VIEW.sizeNear)}, near) * (0.8 + 0.4 * aPos.z) * (1.0 + ${f(INK_DOWN.sizeGain)} * down * uInk) * uDpr;
   vColor = vec4(col * alpha, alpha);
 }
 `;
@@ -168,6 +171,7 @@ export function createWebglField(canvas, initialColors) {
     gl.uniform3fv(gl.getUniformLocation(program, 'uNear'), colors.near);
     gl.uniform3fv(gl.getUniformLocation(program, 'uAccent'), colors.accent);
     gl.uniform3fv(gl.getUniformLocation(program, 'uDownCol'), colors.down);
+    gl.uniform1f(gl.getUniformLocation(program, 'uInk'), colors.additive === false ? 1 : 0);
     gl.blendFunc(gl.ONE, colors.additive === false ? gl.ONE_MINUS_SRC_ALPHA : gl.ONE);
   }
 

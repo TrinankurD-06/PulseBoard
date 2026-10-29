@@ -67,6 +67,15 @@ export const VIEW = {
   sizeNear: 2.3,
 };
 
+// On a light page the dots are ink laid over paper, so a down region has to be louder than on
+// a dark page, where red light adds to the dark and glows by itself: bigger dots, fully red
+// (not 85 %), and an opacity floor so even the faint far rows read as red.
+export const INK_DOWN = {
+  colorGain: 1.4, // down level -> share of red, capped at 1
+  alphaFloor: 0.85, // minimum opacity at down = 1
+  sizeGain: 0.9, // extra dot size at down = 1
+};
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const mix = (a, b, t) => a + (b - a) * t;
 const fract = (v) => v - Math.floor(v);
@@ -195,8 +204,9 @@ export const depthP = (z) => (1 - perspective(z)) / (1 - 1 / (1 + VIEW.k));
  * Everything a renderer needs for one point. `sim` supplies phase, amplitude,
  * bins and ripples. Returns normalised screen position, css pixel size, alpha,
  * and the lift (0..1, crest highlight) and down levels used for colour.
+ * `ink` is true on a light page (dots drawn over paper, not added as light).
  */
-export function fieldPoint(gx, gz, rnd, sim, out = {}) {
+export function fieldPoint(gx, gz, rnd, sim, out = {}, ink = false) {
   const x = gx * 2 - 1;
   const down = sampleBins(sim.bins, gx);
   const w = waveHeight(x, gz, sim.phase, down);
@@ -210,9 +220,13 @@ export function fieldPoint(gx, gz, rnd, sim, out = {}) {
   const near = 1 - p;
   let alpha = (0.14 + 0.86 * Math.pow(Math.max(near, 0.0001), 1.4)) * (0.5 + 0.5 * lift);
   alpha = clamp(alpha * VIEW.alphaGain * (1 + 0.9 * down), 0, 1);
+  if (ink) alpha = Math.max(alpha, INK_DOWN.alphaFloor * down);
   out.sx = 0.5 + x * 0.5 * mix(VIEW.xsNear, VIEW.xsFar, p);
   out.sy = mix(VIEW.yNear, VIEW.yFar, p) - off * k;
-  out.size = mix(VIEW.sizeFar, VIEW.sizeNear, near) * (0.8 + 0.4 * rnd);
+  out.size =
+    mix(VIEW.sizeFar, VIEW.sizeNear, near) *
+    (0.8 + 0.4 * rnd) *
+    (1 + (ink ? INK_DOWN.sizeGain * down : 0));
   out.alpha = alpha;
   out.lift = lift;
   out.down = down;
@@ -225,7 +239,9 @@ export function pointColor(point, colors, out = [0, 0, 0]) {
   for (let c = 0; c < 3; c += 1) {
     let v = mix(colors.far[c], colors.near[c], point.near);
     v = mix(v, colors.accent[c], point.lift * 0.45);
-    v = mix(v, colors.down[c], point.down * 0.85);
+    const redShare =
+      colors.additive === false ? Math.min(1, point.down * INK_DOWN.colorGain) : point.down * 0.85;
+    v = mix(v, colors.down[c], redShare);
     out[c] = v;
   }
   return out;
@@ -271,7 +287,9 @@ export function readColors(getVar) {
   const far = glow.map((v, i) => mix(mix(v, accent[i], 0.3), bg[i], 0.2));
   // Light themes draw dark dots over paper, so they blend normally, not additively.
   const additive = String(getVar('--field-blend') ?? '').trim() !== 'normal';
-  return { near: text, far, accent, down: read('--status-down', 'down'), additive };
+  // A light page may define a more vivid red for the field than the one tuned for text.
+  const down = parseCssColor(getVar('--field-down'), read('--status-down', 'down'));
+  return { near: text, far, accent, down, additive };
 }
 
 /**

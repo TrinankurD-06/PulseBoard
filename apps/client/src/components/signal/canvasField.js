@@ -64,7 +64,7 @@ export function createCanvasField(canvas, initialColors) {
       ctx.globalCompositeOperation = colors.additive === false ? 'source-over' : 'lighter';
       for (let i = 0; i < count; i += 1) {
         const o = i * 3;
-        fieldPoint(grid[o], grid[o + 1], grid[o + 2], sim, point);
+        fieldPoint(grid[o], grid[o + 1], grid[o + 2], sim, point, colors.additive === false);
         const style = styleFor(Math.min(1, point.alpha * 1.1), pointColor(point, colors, rgb));
         if (!style) continue;
         ctx.fillStyle = style;

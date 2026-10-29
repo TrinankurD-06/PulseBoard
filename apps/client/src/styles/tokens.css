@@ -67,6 +67,7 @@
 
   --status-up: #17803d;
   --status-down: #d02a1c;
+  --field-down: #ee2412; /* the signal field: brighter than the text-safe red */
   --status-degraded: #a15c00;
   --status-paused: #9a8f80;
   --status-pending: #9a8f80;
