@@ -1543,7 +1543,7 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   needs a real account to try the app. It is commented out in `.env.example` and is one row in the README table.
 - **Caveat:** Resend only sends from a verified domain. Until one is verified, mail can only go to the account owner's own
   address, so set `ALERT_FROM_EMAIL` to an address on the verified domain.
-- No provider named "Brevo" ever existed in the code; there was nothing to migrate.
+- No other email provider was ever wired into the code; there was nothing to migrate.
 
 ### D105. A read-only public demo
 
