@@ -312,9 +312,10 @@ No feature changes beyond the read-only demo safety. Base commit `8c85f2d`. Buil
 - [x] Email provider wording: Resend everywhere, `.env.example`, `render.yaml`, tech stack, D104.
 - [x] Landing stat label: "Requests sent to push-monitored endpoints".
 - [x] Shared demo module (`ensureReadOnlyDemo`, `resetDemoData`), constants, env fields, `/meta` fields, `POST /workspaces` guard.
-- [ ] Backend: worker `demo-reset` job and registration, worker start test.
-- [ ] Backend: seed script uses the shared module; re-seeding does not duplicate workspaces.
-- [ ] Backend: tests (shared, API 403/200, `/meta`, env, demo-target `/admin`).
-- [x] Frontend: `lib/demo.js` and test, `DemoBanner`, Login uses shared constants (240 client tests, lint, build clean). Browser check pending.
+- [x] Backend: worker `demo-reset` job and registration, worker start test (4200367).
+- [x] Frontend commit 2419ee8; shared+API guard 08e13d7.
+- [x] Backend: seed script uses the shared module; re-seeding does not duplicate workspaces (`scripts/lib/seedDemoAccount.js`).
+- [x] Backend: tests (shared, API 403/200, `/meta`, env, demo-target `/admin`, worker).
+- [x] Frontend: `lib/demo.js` and test, `DemoBanner`, Login uses shared constants (240 client tests, lint, build clean). Checked in a browser (banner in dark and light at 1440 and 390 px, absent when the flag is off).
 - [ ] Tester: commits and pushes, final verification (tests, ESLint, Prettier, build, greps).
 - [ ] Orchestrator: D105 checked against the final code, summary.

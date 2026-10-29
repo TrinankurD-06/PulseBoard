@@ -1565,4 +1565,8 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Default off.** `DEMO_READ_ONLY` defaults to `false` so local development stays editable; `render.yaml` sets it to `true`.
 - **Unaffected:** the demo-target `/admin` controls are a separate server with no API auth, so they keep working
   whatever the demo user's permissions are.
+- `npm run seed` applies the same role after creating the demo workspace, and when read-only it also removes workspaces where
+  the demo user is a Viewer, so re-seeding does not leave duplicates.
 - The demo module lives in `packages/shared/src/demo` so the seed script and the worker share one implementation.
+- **Known limit.** Turning `DEMO_READ_ONLY` back to `false` and re-seeding does not delete the old Viewer workspace (only
+  workspaces the demo user owns are removed when the flag is off), so it is left behind as an orphan.
