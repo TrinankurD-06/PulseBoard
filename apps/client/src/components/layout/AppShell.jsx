@@ -1,5 +1,6 @@
 import { useRealtime } from '../../realtime/useRealtime.js';
 import { AppShellContext } from './appShellContext.js';
+import DemoBanner from './DemoBanner.jsx';
 import HeaderLine from './HeaderLine.jsx';
 import TextNav from './TextNav.jsx';
 
@@ -14,6 +15,7 @@ export default function AppShell({ wid, children }) {
     <AppShellContext.Provider value={true}>
       <div className="mx-auto min-h-screen w-full max-w-7xl px-4 pt-4 pb-24 sm:px-6 md:pb-12 lg:px-8">
         <div className="space-y-3 pb-10">
+          <DemoBanner />
           <HeaderLine wid={wid} connected={connected} />
           <TextNav wid={wid} />
         </div>

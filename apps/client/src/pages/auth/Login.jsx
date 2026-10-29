@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD } from '@pulseboard/shared/constants';
 import { loginSchema } from '@pulseboard/shared/schemas';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -13,7 +14,7 @@ import AuthLayout from './AuthLayout.jsx';
 import OAuthButtons from './OAuthButtons.jsx';
 
 // Created by "npm run seed"; only advertised when the server runs in DEMO_MODE.
-const DEMO = { email: 'demo@pulseboard.dev', password: 'demo1234' };
+const DEMO = { email: DEMO_USER_EMAIL, password: DEMO_USER_PASSWORD };
 
 export default function Login() {
   const { login } = useAuth();
