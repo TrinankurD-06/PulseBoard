@@ -229,8 +229,13 @@ Decision D102. Nothing pushed.
 - [x] Signal field blends normally in light (`--field-blend`), recoloured live on a theme change; toasts follow the theme.
 - [x] Gate: client 227/227 tests, ESLint and Prettier clean, client build OK. Landing page checked in both themes in
       headless Chrome.
-- [ ] **Not checked in a browser:** the logged-in app pages (dashboard, monitor detail, charts, modals) in light mode,
-      since they need the API and a database. Worth a click-through.
+- [x] **Logged-in pages checked in light mode (29 Oct)**, headless Chrome against the local API on Atlas, demo account, at 1440 and
+      390 px: dashboard, monitor detail (Health deck, expanded chart, incidents), incidents, alert channels, status pages, cost
+      & usage, team, settings, new monitor (website, heartbeat and agent forms), public status page. No console errors, no
+      sideways scroll, no dark leftovers, no text under WCAG AA contrast. Not covered: the heartbeat and agent _detail_ pages
+      (the live data has no such monitor), confirm dialogs, and hover tooltips.
+- Seen, not light-specific: the uptime gauge ring is fully red below the 99.9 % target (99.78 % on a healthy dashboard), and
+  the last x-axis label of the large chart ("10:00 PM") is clipped at the right edge.
 
 ## Resume note (light theme)
 
