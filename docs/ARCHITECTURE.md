@@ -52,7 +52,7 @@ flowchart LR
     end
 
     T[(Monitored sites<br/>incl. demo-target)]
-    N[Discord / Slack / Email]
+    N[Email (Resend) / Discord / Slack]
 
     C -- REST + access token --> R
     P -- GET /public/status/:slug<br/>cached 30s --> R

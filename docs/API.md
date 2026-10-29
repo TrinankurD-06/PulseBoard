@@ -921,7 +921,7 @@ Sends a test alert immediately.
 { "data": { "delivered": true, "previewUrl": "https://ethereal.email/message/…" } }
 ```
 
-`previewUrl` is set for emails sent to the Ethereal test inbox (no SMTP configured).
+`previewUrl` is set for emails sent to the Ethereal test inbox (no Resend API key set).
 `502 ALERT_DELIVERY_FAILED` with the provider's reason if delivery fails.
 
 ---

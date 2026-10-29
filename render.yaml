@@ -43,16 +43,12 @@ services:
         value: 'true'
       - key: ALLOW_PRIVATE_TARGETS
         value: 'false'
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: 587
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
+      - key: DEMO_READ_ONLY
+        value: 'true' # the demo user is a read-only Viewer; the worker resets the demo data daily
+      - key: DEMO_OWNER_EMAIL
+        sync: false # optional: the account that owns the demo workspace (default: a login-less owner)
       - key: RESEND_API_KEY
-        sync: false # email alerts over HTTPS: the free plan blocks outbound SMTP
+        sync: false # email alerts through Resend (HTTPS; the free plan blocks outbound SMTP)
       - key: ALERT_FROM_EMAIL
         sync: false
       # Optional "Sign in with Google/GitHub": leave empty to hide a provider.

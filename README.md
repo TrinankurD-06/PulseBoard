@@ -2,7 +2,7 @@
 
 **Cost-aware uptime monitoring and public status pages, built on the MERN stack.**
 PulseBoard watches your websites, APIs and background jobs, opens an incident when one goes
-down, alerts your team on Discord, Slack or email, shows everything live on a dashboard,
+down, alerts your team by Email (Resend), Discord or Slack, shows everything live on a dashboard,
 and publishes a public status page for your users.
 
 It is **push-first**: polling a site costs its owner real requests (and often database or
@@ -86,7 +86,7 @@ bodies. Details in [packages/agent/README.md](packages/agent/README.md).
 - **Agent dashboards**: live request rate, error rate (with your threshold), latency
   percentiles and top routes for apps running the agent. A silent agent whose app still answers
   is shown as **degraded** (with one notice), not as an outage.
-- **Alerts** to Discord (embeds), Slack (Block Kit) and email (HTML), sent as background jobs
+- **Alerts** to Email (Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
 - **Live dashboard**: MongoDB change streams → Socket.io push status, response times and
   incidents to the browser instantly (falls back to polling if the socket drops).
@@ -128,7 +128,7 @@ flowchart LR
     Jobs["Cron jobs"] -- "heartbeat pings" --> API
     Sites -- "agent reports" --> API
     Worker -- "results, incidents" --> DB
-    Worker -- "alerts" --> Notify["Discord · Slack · Email"]
+    Worker -- "alerts" --> Notify["Email (Resend) · Discord · Slack"]
     DB -. "change streams" .-> API
 ```
 
@@ -155,7 +155,8 @@ logged in [docs/DECISIONS.md](docs/DECISIONS.md). The full API is in [docs/API.m
 React 18, Vite, React Router, Tailwind CSS v4, TanStack Query, Recharts, Socket.io client,
 React Hook Form + Zod · Node 20+, Express 5, Mongoose 9, Zod, JWT, bcrypt, helmet, pino,
 Socket.io · MongoDB (time-series collection for checks, change streams) · Agenda v6 (MongoDB
-backend) · Nodemailer · Vitest, Supertest, mongodb-memory-server.
+backend) · Resend (email alerts; Nodemailer for the SMTP fallback and the local test inbox) ·
+Vitest, Supertest, mongodb-memory-server.
 
 ## Run it locally
 
@@ -219,8 +220,8 @@ monitor are deleted. Anything created at or after the monitor's creation is kept
 
 To receive real Discord or Slack alerts, put a webhook URL in `SEED_DISCORD_WEBHOOK_URL` or
 `SEED_SLACK_WEBHOOK_URL` before seeding, or add a channel on the **Alert channels** page.
-Without SMTP settings, email alerts go to a free Ethereal test inbox, and each message's preview
-link appears in the incident timeline.
+Email alerts are sent through Resend. Without `RESEND_API_KEY` (the usual local setup) they go to a
+free Ethereal test inbox instead, and each message's preview link appears in the incident timeline.
 
 ### Sign in with Google / GitHub (optional)
 
@@ -290,9 +291,11 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `AGENDA_MAX_CONCURRENCY`       | worker, api (combined) | `20`                                                                        | Checks a worker runs in parallel                                                                                                              |
 | `DASHBOARD_URL`                | api, worker            | `http://localhost:5173`                                                     | Links in alerts                                                                                                                               |
 | `APP_URL`                      | api, worker            | empty → `DASHBOARD_URL`                                                     | Public web app URL: checker User-Agent, OAuth callback URLs                                                                                   |
-| `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Email delivery; empty = Ethereal test inbox                                                                                                   |
-| `RESEND_API_KEY`               | api, worker            | empty                                                                       | Send email over Resend's HTTPS API instead of SMTP (needed on Render's free plan, which blocks SMTP). Takes precedence over `SMTP_*`          |
-| `ALERT_FROM_EMAIL`             | api, worker            | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails                                                                                                                        |
+| `RESEND_API_KEY`               | api, worker            | empty                                                                       | Email alerts through Resend (free tier, one HTTPS call). Empty = Ethereal test inbox, for local development                                   |
+| `ALERT_FROM_EMAIL`             | api, worker            | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails. Resend needs an address on a verified domain; until then `onboarding@resend.dev` is used                              |
+| `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Optional fallback, used only when `RESEND_API_KEY` is empty                                                                                   |
+| `DEMO_READ_ONLY`               | api, worker            | `false`                                                                     | Public demo: the demo user is a read-only Viewer, a banner says so, and the worker resets the demo data daily                                 |
+| `DEMO_OWNER_EMAIL`             | api, worker, seed      | empty                                                                       | Account that owns the demo workspace when `DEMO_READ_ONLY=true`; empty = a login-less owner account                                           |
 | `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                                        |
 | `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                          |
 | `SEED_ALERT_EMAIL`             | seed                   | empty                                                                       | Email channel target (default: the demo user)                                                                                                 |
@@ -346,15 +349,17 @@ alerts, rollups); there is no separate worker service. Then fill in the variable
 
 - `MONGODB_URI`: the Atlas string.
 - `CLIENT_ORIGIN` and `DASHBOARD_URL`: your Vercel URL, e.g. `https://pulseboard.vercel.app`.
-- SMTP settings (optional; without them, emails go to Ethereal).
+- `RESEND_API_KEY` and `ALERT_FROM_EMAIL` (email alerts through Resend, see below).
+- `DEMO_READ_ONLY=true` for a public demo (already set by `render.yaml`).
 - OAuth credentials (optional): `GOOGLE_CLIENT_*` / `GITHUB_CLIENT_*`, see
   [Sign in with Google / GitHub](#sign-in-with-google--github-optional).
 
 JWT secrets are generated by Render.
 
-> **Email on the free plan:** Render's free plan blocks outbound SMTP, so email alerts there need
-> `RESEND_API_KEY` (Resend's HTTPS API; free tier). Until you verify a domain at resend.com, mail
-> can only be sent to your own Resend account address. Discord and Slack alerts are unaffected.
+> **Email (Resend):** email alerts are sent through [Resend](https://resend.com), which has a free
+> tier and a one-call HTTPS API, so it also works on Render's free plan (which blocks outbound SMTP).
+> Until you verify a domain at resend.com, mail can only be sent to your own Resend account address.
+> Discord and Slack alerts are unaffected.
 >
 > **Free plan caveat:** a free Render web service spins down after about 15 minutes without
 > HTTP traffic, and **no checks run while it is asleep**. Keep it awake by requesting
@@ -382,43 +387,7 @@ host `apps/demo-target` somewhere public and pass `SEED_DEMO_TARGET_URL`. Remove
 later with `npm run seed:clear`. The worker reconciles jobs on start, so seeded monitors begin checking
 immediately.
 
-## Demo script (about 5 minutes)
-
-1. **Landing → login.** Open the site, show the pitch, log in as the demo user ("Fill in").
-2. **Dashboard.** Four monitors with live sparklines; point at the **Live** indicator. Explain:
-   the worker writes to MongoDB, change streams push to the browser.
-3. **Monitor detail** (Demo API). Uptime tiles, response-time chart (switch 1h/24h/7d),
-   timing breakdown, 90-day bars (hover a day), the Table view toggle. Press **Test now**.
-4. **Break it.** Open the demo-target control page (`/admin`) and click **down**.
-   Back on the dashboard: within ~30 s (3 failed checks at 10 s) the card turns **red**, a
-   "… is down" toast appears, and the Discord/Slack/email alert arrives.
-5. **Incidents page.** Expand the open incident's timeline (opened → alert sent).
-6. **Public status page.** Open `/status/acme` in a private window: banner shows the outage,
-   no login needed.
-7. **Fix it.** Click **up** on the demo target. After 2 successful checks (~20 s) the incident
-   resolves with the correct duration, and a recovery alert is sent.
-8. **(Optional) under the hood.** `/health` on API and worker; run two workers to show checks
-   aren't duplicated (Agenda locking); `docs/DECISIONS.md` for the reasoning.
-
-**Push-first part (about 5 more minutes)**
-
-9. **Agent.** Open **Demo Agent**: live request rate, error rate and latency from the
-   demo-target's own traffic. Point at "requests saved vs 1-minute polling".
-10. **Errors.** On `/admin`, switch on **5xx errors**: the error-rate chart jumps and after 3
-    report windows (~1.5 min) an incident opens with "Error rate … above 5 %". Switch it off.
-11. **Agent silent.** Click **agent silent**: the site keeps serving, so after ~1 min the probes
-    succeed and the monitor turns amber **Degraded** with one notice, no incident.
-12. **Crash.** Click **crash**: no reports, probes refused, and within ~2 minutes an incident
-    opens and the alert arrives. Click **restore**: the next reports resolve it.
-13. **Heartbeat.** Run `npm run heartbeat -w @pulseboard/demo-target -- --stop-after 3`: three
-    pings, then silence; **Demo Cron Job** opens an incident once the expected period + grace
-    has passed. Start the script again and the first ping resolves it. `--fail` reports a
-    failure with a message.
-14. **Cost & usage.** Requests sent this month, requests saved, the estimate and cost per
-    currency, per-monitor intervals (adaptive / slowed) and budget bars.
-
-Tip: in production the free demo-target sleeps when idle; open its `/admin` page a minute
-before the demo.
+See [docs/DEMO.md](docs/DEMO.md) for a guided walkthrough of every feature.
 
 ## Project structure
 
