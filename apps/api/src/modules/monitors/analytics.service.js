@@ -380,7 +380,7 @@ export async function getAgentMetrics(monitorId, from, to) {
     ]),
     AgentReport.findOne(
       { 'meta.monitorId': id },
-      { hostname: 1, agentVersion: 1, uptimeSec: 1, windowEnd: 1 },
+      { hostname: 1, serviceName: 1, agentVersion: 1, uptimeSec: 1, windowEnd: 1 },
     )
       .sort({ windowEnd: -1 })
       .lean(),
@@ -399,6 +399,7 @@ export async function getAgentMetrics(monitorId, from, to) {
     lastReport: last
       ? {
           hostname: last.hostname ?? null,
+          serviceName: last.serviceName ?? null,
           agentVersion: last.agentVersion ?? null,
           uptimeSec: last.uptimeSec ?? null,
           windowEnd: last.windowEnd,

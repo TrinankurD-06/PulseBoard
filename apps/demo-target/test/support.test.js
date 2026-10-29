@@ -77,7 +77,7 @@ describe('agent controller', () => {
   it('starts, stops and restarts with a fresh instance', async () => {
     const { created, createAgent } = factory();
     const controller = createAgentController({ config, createAgent });
-    expect(created[0].options).toMatchObject({ apiKey: 'pbk_a', reportEverySec: 30 });
+    expect(created[0].options).toMatchObject({ apiKey: 'pbk_a', intervalSec: 30 });
     controller.start(); // already running: no second instance
     expect(created).toHaveLength(1);
 

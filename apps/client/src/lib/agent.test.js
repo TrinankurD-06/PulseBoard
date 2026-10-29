@@ -102,8 +102,8 @@ describe('agent helpers', () => {
     expect(snippets.code).toContain("endpoint: 'https://app.example.com/api/v1'");
     expect(snippets.code).toContain('process.env.PULSEBOARD_KEY');
     expect(snippets.code).not.toContain('pbk_secret');
-    expect(snippets.code).not.toContain('reportEverySec'); // default interval
-    expect(agentSnippets({ endpoint, reportEverySec: 120 }).code).toContain('reportEverySec: 120');
+    expect(snippets.code).not.toContain('intervalSec'); // default interval
+    expect(agentSnippets({ endpoint, reportEverySec: 120 }).code).toContain('intervalSec: 120');
     expect(maskedKey('pbk_Ab3d')).toMatch(/^pbk_Ab3d•+$/);
   });
 

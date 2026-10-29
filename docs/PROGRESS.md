@@ -263,3 +263,18 @@ Fixes the monitor page showing a 30-day gauge of 100.0 next to a 24-hour card of
       rollups and usage to the demo account's workspace. Additive (removes nothing), everything flagged `isSeed`
       ("Sample data"), removed by `npm run seed:clear`, replaced if run twice. Not scheduled, so no real checks or alerts.
 - [x] Run on the live database for demo@pulseboard.dev / "Acme Inc.".
+
+# pulseboard-agent: production-ready package (29 Oct)
+
+Not committed yet; nothing published. The name `pulseboard-agent` was free on npm (404) on 29 Oct.
+
+- [x] Build: rolldown (dev dependency) bundles `src` to `dist/index.js` (ESM) and `dist/index.cjs`, plus `.d.ts` / `.d.cts`
+      (checked with `tsc --strict`). `package.json`: exports map, files (dist, README, LICENSE), sideEffects false,
+      optional express peer, MIT, repository/bugs/homepage, `prepublishOnly` = build + test.
+- [x] Behaviour: bad options throw at start-up; `intervalSec` (alias `reportEverySec`), `serviceName`, `debug`;
+      one warning per outage; `beforeExit` flush; `heartbeat(apiKey, endpoint)`; ids in mount paths masked; routes
+      capped at 300 characters (the API rejects longer). The API accepts and stores `serviceName`.
+- [x] Tests: 49 in the package (percentiles, aggregation, heartbeat, failure path, no PII, unref, supertest, CJS/ESM dist).
+- [x] LICENSE, CHANGELOG, README rewritten. The wizard snippet and demo-target use `intervalSec`.
+- [x] Demo-target imports the package by name, which now resolves to `dist`: its `predev` and `pretest` build it first.
+- Gate: 968 tests, ESLint and Prettier clean, client build OK, `npm pack --dry-run`: 7 files, 12.5 kB.

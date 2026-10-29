@@ -3,7 +3,21 @@ import { createReservoir, percentile } from './stats.js';
 export const OTHER_ROUTE = 'other';
 export const UNMATCHED_ROUTE = 'unmatched';
 const ROUTE_SAMPLE_CAP = 500; // per-route latency samples (bounded too)
+const MAX_ROUTE_LENGTH = 300;
 const TOP_ROUTES = 10; // routes included in a report
+
+// req.baseUrl is the *matched* mount path, so a router mounted at
+// "/users/:id" yields "/users/42". Segments that look like ids are masked so a
+// parameterised mount point can't leak them.
+const ID_SEGMENT =
+  /^(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{16,}|[\w-]{32,})$/i;
+
+function maskIds(base) {
+  return base
+    .split('/')
+    .map((segment) => (ID_SEGMENT.test(segment) ? ':id' : segment))
+    .join('/');
+}
 
 /**
  * The route *pattern* of a request, never the concrete URL: "/api/orders/:id",
@@ -14,7 +28,7 @@ export function routeOf(req) {
   const path = req?.route?.path;
   if (path == null) return UNMATCHED_ROUTE;
   const pattern = typeof path === 'string' ? path : String(path);
-  const base = typeof req.baseUrl === 'string' ? req.baseUrl : '';
+  const base = typeof req.baseUrl === 'string' ? maskIds(req.baseUrl) : '';
   if (!base) return pattern;
   return pattern === '/' ? base : `${base}${pattern}`;
 }
@@ -58,7 +72,8 @@ export function createAggregator({
       else if (code >= 400) window.errors4xx += 1;
       window.latency.add(ms);
 
-      let key = route || UNMATCHED_ROUTE;
+      // The API rejects a whole report holding a route over 300 characters.
+      let key = (route || UNMATCHED_ROUTE).slice(0, MAX_ROUTE_LENGTH);
       if (!window.routes.has(key) && window.routes.size >= maxRoutes) key = OTHER_ROUTE;
       let entry = window.routes.get(key);
       if (!entry) {

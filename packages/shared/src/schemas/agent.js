@@ -118,6 +118,7 @@ export const agentReportSchema = z
       .default([]),
     agentVersion: z.string().max(50).nullish().default(null),
     hostname: z.string().max(255).nullish().default(null),
+    serviceName: z.string().max(100).nullish().default(null),
     uptimeSec: z.number().min(0).nullish().default(null),
   })
   .superRefine((report, ctx) => {

@@ -2,18 +2,6 @@
   "name": "pulseboard-agent",
   "version": "1.0.0",
   "description": "Express middleware that reports request rate, errors and latency to PulseBoard, so your app is monitored from the inside with near-zero extra requests.",
-  "type": "module",
-  "main": "./src/index.js",
-  "exports": {
-    ".": "./src/index.js"
-  },
-  "files": [
-    "src",
-    "README.md"
-  ],
-  "engines": {
-    "node": ">=18"
-  },
   "keywords": [
     "monitoring",
     "uptime",
@@ -23,7 +11,58 @@
     "pulseboard"
   ],
   "license": "MIT",
+  "author": "Trinankur Das",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TrinankurD-06/PulseBoard.git",
+    "directory": "packages/agent"
+  },
+  "homepage": "https://github.com/TrinankurD-06/PulseBoard/tree/main/packages/agent#readme",
+  "bugs": {
+    "url": "https://github.com/TrinankurD-06/PulseBoard/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "express": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
   "scripts": {
-    "test": "vitest run"
+    "build": "node scripts/build.js",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "express": "^5.3.0",
+    "rolldown": "^1.2.15",
+    "supertest": "^7.3.1"
   }
 }

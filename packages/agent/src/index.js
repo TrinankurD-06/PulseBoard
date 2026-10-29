@@ -1,16 +1,13 @@
-import os from 'node:os';
 import { createAggregator, routeOf } from './aggregator.js';
+import { resolveOptions } from './options.js';
+import { postReport, reportExtras } from './send.js';
 
 export { createAggregator, routeOf } from './aggregator.js';
+export { heartbeat } from './heartbeat.js';
+export { AGENT_VERSION, MAX_REPORT_SEC, MIN_REPORT_SEC } from './options.js';
 export { createReservoir, percentile } from './stats.js';
 
-export const AGENT_VERSION = '1.0.0';
-export const MIN_REPORT_SEC = 30;
-export const MAX_REPORT_SEC = 300;
-const REQUEST_TIMEOUT_MS = 5000;
 const SHUTDOWN_TIMEOUT_MS = 2000;
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function noopMiddleware(_req, _res, next) {
   next();
@@ -23,97 +20,70 @@ function noopMiddleware(_req, _res, next) {
  *   app.use(pulseboard({ apiKey: process.env.PULSEBOARD_KEY, endpoint: 'https://…/api/v1' }));
  *
  * Guarantees:
+ * - bad options throw a clear error at start-up (a missing apiKey is a bug to
+ *   find at boot, not at 3 a.m.); after that nothing throws into the host app;
  * - adds no awaited work to requests (recording is synchronous and O(1));
- * - never throws into the host app (misconfiguration logs a warning and the
- *   middleware becomes a pass-through);
  * - sends a report every window even with zero traffic (a heartbeat: silence
  *   means the app is down);
- * - if PulseBoard can't be reached, that window is dropped with one warning;
- *   memory stays bounded.
+ * - if PulseBoard can't be reached, that window is dropped, one warning is
+ *   logged per outage, and memory stays bounded.
  *
  * Returns the middleware function, with `flush()` (send now) and `stop()`
- * (stop the timer and signal handler, flushing the last window by default).
+ * (stop the timer and signal handlers, flushing the last window by default).
  */
 export function pulseboard(options = {}) {
-  const {
-    apiKey,
-    endpoint,
-    reportEverySec = 60,
-    enabled = true,
-    logger = console,
-    maxRoutes = 50,
-    maxSamples = 5000,
-    handleSignals = true,
-    // Advanced / testing hooks (not part of the documented options).
-    fetch: fetchImpl = globalThis.fetch,
-    now = () => new Date(),
-    random = Math.random,
-    kill = (pid, signal) => process.kill(pid, signal),
-  } = options;
+  const config = resolveOptions(options);
 
-  const warn = (message) => {
+  if (!config.enabled) {
+    const middleware = (req, res, next) => noopMiddleware(req, res, next);
+    middleware.flush = async () => false;
+    middleware.stop = async () => {};
+    return middleware;
+  }
+
+  const { apiKey, url, intervalMs, serviceName, debug, logger, fetchImpl, now, kill } = config;
+  const aggregator = createAggregator({
+    maxSamples: config.maxSamples,
+    maxRoutes: config.maxRoutes,
+    random: config.random,
+    now,
+  });
+  let stopped = false;
+  let failing = false; // inside an outage: warned already, stay quiet until it recovers
+
+  const log = (level, message) => {
     try {
-      logger?.warn?.(`[pulseboard-agent] ${message}`);
+      logger?.[level]?.(`[pulseboard-agent] ${message}`);
     } catch {
       // A broken logger must never break the host app.
     }
   };
 
-  const disabled = (reason) => {
-    if (reason) warn(`${reason}; the agent is disabled.`);
-    const middleware = (req, res, next) => noopMiddleware(req, res, next);
-    middleware.flush = async () => false;
-    middleware.stop = async () => {};
-    return middleware;
-  };
-
-  if (!enabled) return disabled();
-  if (!apiKey) return disabled('No apiKey given');
-  if (!endpoint) return disabled('No endpoint given');
-  if (typeof fetchImpl !== 'function')
-    return disabled('fetch is not available (Node 18+ required)');
-
-  const url = `${String(endpoint).replace(/\/+$/, '')}/agent/report`;
-  const intervalMs = clamp(Number(reportEverySec) || 60, MIN_REPORT_SEC, MAX_REPORT_SEC) * 1000;
-  const aggregator = createAggregator({ maxSamples, maxRoutes, random, now });
-  let stopped = false;
-
   /** Sends the current window. Resolves true on success, false otherwise; never rejects. */
-  async function flush({ timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  async function flush({ timeoutMs } = {}) {
     let body;
     try {
-      body = {
-        ...aggregator.snapshot(now()),
-        agentVersion: AGENT_VERSION,
-        hostname: os.hostname(),
-        uptimeSec: Math.round(process.uptime()),
-      };
+      body = { ...aggregator.snapshot(now()), ...reportExtras(serviceName) };
     } catch (err) {
-      warn(`Could not build the report (${err?.message ?? err}); window dropped.`);
+      log('warn', `Could not build the report (${err?.message ?? err}); window dropped.`);
       return false;
     }
-    try {
-      const res = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${apiKey}`,
-          'user-agent': `pulseboard-agent/${AGENT_VERSION}`,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      if (!res.ok) {
-        warn(`PulseBoard answered HTTP ${res.status}; this window's report was dropped.`);
-        return false;
+    const result = await postReport({ url, apiKey, body, fetchImpl, timeoutMs });
+    if (!result.ok) {
+      if (!failing) {
+        log('warn', `${result.reason}; this window's report was dropped. Retrying next window.`);
+      } else if (debug) {
+        log('info', `report dropped: ${result.reason}`);
       }
-      return true;
-    } catch (err) {
-      warn(
-        `Could not reach PulseBoard (${err?.message ?? err}); this window's report was dropped.`,
-      );
+      failing = true;
       return false;
     }
+    if (failing) log('info', 'Reports are reaching PulseBoard again.');
+    failing = false;
+    if (debug) {
+      log('info', `report sent: ${body.requests} requests, ${body.topRoutes.length} routes.`);
+    }
+    return true;
   }
 
   const timer = setInterval(() => {
@@ -121,12 +91,17 @@ export function pulseboard(options = {}) {
   }, intervalMs);
   timer.unref?.();
 
+  function detach() {
+    clearInterval(timer);
+    process.removeListener('SIGTERM', onSigterm);
+    process.removeListener('beforeExit', onBeforeExit);
+  }
+
   // SIGTERM: send what we have, best effort. We never call process.exit: if
   // nobody else listens for SIGTERM, adding our listener would otherwise stop
   // Node's default "terminate", so we re-raise the signal after flushing.
   async function onSigterm() {
-    process.removeListener('SIGTERM', onSigterm);
-    clearInterval(timer);
+    detach();
     await flush({ timeoutMs: SHUTDOWN_TIMEOUT_MS });
     if (process.listenerCount('SIGTERM') === 0) {
       try {
@@ -136,7 +111,19 @@ export function pulseboard(options = {}) {
       }
     }
   }
-  if (handleSignals) process.on('SIGTERM', onSigterm);
+
+  // beforeExit: the event loop is empty (a script finished, a server closed).
+  // Send the last window once; the listener is removed first so the exit isn't
+  // postponed a second time.
+  async function onBeforeExit() {
+    detach();
+    await flush({ timeoutMs: SHUTDOWN_TIMEOUT_MS });
+  }
+
+  if (config.handleSignals) {
+    process.on('SIGTERM', onSigterm);
+    process.on('beforeExit', onBeforeExit);
+  }
 
   function middleware(req, res, next) {
     if (!stopped) {
@@ -169,8 +156,7 @@ export function pulseboard(options = {}) {
   middleware.stop = async ({ flush: flushLast = true } = {}) => {
     if (stopped) return;
     stopped = true;
-    clearInterval(timer);
-    process.removeListener('SIGTERM', onSigterm);
+    detach();
     if (flushLast) await flush();
   };
   return middleware;

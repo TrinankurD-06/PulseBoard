@@ -822,11 +822,12 @@ Sent by `pulseboard-agent` every `reportEverySec`. `Authorization: Bearer <agent
   "topRoutes": [{ "route": "/api/orders/:id", "requests": 410, "errors5xx": 1, "p95Ms": 95.2 }],
   "agentVersion": "1.0.0",
   "hostname": "web-1",
-  "uptimeSec": 86400
+  "uptimeSec": 86400,
+  "serviceName": "checkout-api"
 }
 ```
 
-`202 { "ok": true }`. `401` missing/unknown key, `400` invalid body. A report is a failed check
+`serviceName` is optional (up to 100 characters) and stored with the report. `202 { "ok": true }`. `401` missing/unknown key, `400` invalid body. A report is a failed check
 when the 5xx rate is above `errorRateThreshold` or `p95Ms` is above `p95ThresholdMs`; otherwise
 (including zero traffic) it's a successful one. Incidents follow the usual 3 failures / 2
 successes. If no report arrives for 2 × `reportEverySec`, the worker probes `probeUrl` (up to 3

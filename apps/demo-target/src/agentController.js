@@ -22,7 +22,7 @@ export function createAgentController({
     instance = createAgent({
       apiKey: config.apiKey,
       endpoint: config.endpoint,
-      reportEverySec: config.reportEverySec,
+      intervalSec: config.reportEverySec,
       logger,
     });
     state = 'reporting';

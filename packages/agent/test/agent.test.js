@@ -147,7 +147,7 @@ describe('reports', () => {
     res.emit('finish');
     await expect(agent.flush()).resolves.toBe(false); // never rejects
     expect(log.warn).toHaveBeenCalledTimes(1);
-    expect(log.warn.mock.calls[0][0]).toMatch(/Could not reach PulseBoard/);
+    expect(log.warn.mock.calls[0][0]).toMatch(/could not reach PulseBoard/);
 
     // Next window: sent normally, without the dropped data (no retry queue).
     await expect(agent.flush()).resolves.toBe(true);
@@ -163,14 +163,67 @@ describe('reports', () => {
 });
 
 describe('configuration', () => {
-  it('becomes a pass-through with a warning when misconfigured (never throws)', async () => {
-    const log = logger();
-    const agent = pulseboard({ endpoint: ENDPOINT, logger: log });
-    const next = vi.fn();
-    agent({}, {}, next);
-    expect(next).toHaveBeenCalled();
-    expect(log.warn.mock.calls[0][0]).toMatch(/No apiKey/);
-    await expect(agent.flush()).resolves.toBe(false);
+  it('throws a clear error at start-up when the apiKey is missing', () => {
+    expect(() => pulseboard({ endpoint: ENDPOINT })).toThrow(/apiKey is required/);
+    expect(() => pulseboard({ apiKey: '  ', endpoint: ENDPOINT })).toThrow(/apiKey is required/);
+    expect(() => pulseboard({ apiKey: 42, endpoint: ENDPOINT })).toThrow(TypeError);
+  });
+
+  it('validates the other options', () => {
+    const base = { apiKey: 'k', endpoint: ENDPOINT, handleSignals: false };
+    expect(() => pulseboard({ apiKey: 'k' })).toThrow(/endpoint is required/);
+    expect(() => pulseboard({ ...base, endpoint: 'not a url' })).toThrow(/not a valid URL/);
+    expect(() => pulseboard({ ...base, endpoint: 'ftp://x/api/v1' })).toThrow(/http/);
+    expect(() => pulseboard({ ...base, intervalSec: 'soon' })).toThrow(/intervalSec/);
+    expect(() => pulseboard({ ...base, intervalSec: -5 })).toThrow(/intervalSec/);
+    expect(() => pulseboard({ ...base, serviceName: 7 })).toThrow(/serviceName/);
+    expect(() => pulseboard({ ...base, fetch: null })).toThrow(/fetch is not available/);
+    expect(() => pulseboard(null)).toThrow(/options must be an object/);
+  });
+
+  it('accepts intervalSec and its alias reportEverySec', async () => {
+    vi.useFakeTimers();
+    const fetch = fakeFetch();
+    makeAgent({ fetch, logger: logger(), intervalSec: 45 });
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends serviceName with every report when set', async () => {
+    const fetch = fakeFetch();
+    await makeAgent({ fetch, logger: logger(), serviceName: 'checkout-api' }).flush();
+    expect(fetch.calls[0].body.serviceName).toBe('checkout-api');
+  });
+
+  it('logs one report line per window only with debug: true', async () => {
+    const quiet = { warn: vi.fn(), info: vi.fn() };
+    await makeAgent({ fetch: fakeFetch(), logger: quiet }).flush();
+    expect(quiet.info).not.toHaveBeenCalled();
+
+    const loud = { warn: vi.fn(), info: vi.fn() };
+    await makeAgent({ fetch: fakeFetch(), logger: loud, debug: true }).flush();
+    expect(loud.info).toHaveBeenCalledTimes(1);
+    expect(loud.info.mock.calls[0][0]).toMatch(/report sent: 0 requests/);
+  });
+
+  it('warns once per outage, not once per window, and says when it recovers', async () => {
+    const log = { warn: vi.fn(), info: vi.fn() };
+    let up = false;
+    const fetch = fakeFetch(() => (up ? { ok: true, status: 202 } : new Error('offline')));
+    const agent = makeAgent({ fetch, logger: log });
+    await agent.flush();
+    await agent.flush();
+    await agent.flush();
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(3); // still trying every window, no retry storm
+
+    up = true;
+    await expect(agent.flush()).resolves.toBe(true);
+    expect(log.info).toHaveBeenCalledTimes(1);
+
+    up = false;
+    await agent.flush(); // a new outage warns again
+    expect(log.warn).toHaveBeenCalledTimes(2);
   });
 
   it('enabled: false sends nothing and logs nothing', async () => {
@@ -190,7 +243,7 @@ describe('configuration', () => {
   });
 });
 
-describe('stop() and SIGTERM', () => {
+describe('stop(), SIGTERM and beforeExit', () => {
   it('stop() flushes the last window, stops the timer and stops recording', async () => {
     vi.useFakeTimers();
     const fetch = fakeFetch();
@@ -248,5 +301,28 @@ describe('stop() and SIGTERM', () => {
     expect(process.listenerCount('SIGTERM')).toBe(before + 1);
     await agent.stop({ flush: false });
     expect(process.listenerCount('SIGTERM')).toBe(before);
+  });
+
+  it('flushes once on beforeExit and removes its listeners', async () => {
+    const fetch = fakeFetch();
+    const before = process.listenerCount('beforeExit');
+    const agent = pulseboard({ apiKey: 'k', endpoint: ENDPOINT, fetch, logger: logger() });
+    agents.push(agent);
+    expect(process.listenerCount('beforeExit')).toBe(before + 1);
+
+    process.emit('beforeExit', 0);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(process.listenerCount('beforeExit')).toBe(before);
+    process.emit('beforeExit', 0); // a second exit attempt must not send again
+    await Promise.resolve();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleSignals: false registers no process listeners', async () => {
+    const sigterm = process.listenerCount('SIGTERM');
+    const exit = process.listenerCount('beforeExit');
+    makeAgent({ fetch: fakeFetch(), logger: logger() });
+    expect(process.listenerCount('SIGTERM')).toBe(sigterm);
+    expect(process.listenerCount('beforeExit')).toBe(exit);
   });
 });

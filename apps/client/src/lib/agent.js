@@ -90,7 +90,7 @@ export function maskedKey(prefix) {
 export function agentSnippets({ endpoint, reportEverySec, agentKey }) {
   const options = [`    apiKey: process.env.${KEY_ENV_VAR},`, `    endpoint: '${endpoint}',`];
   if (reportEverySec && Number(reportEverySec) !== AGENT_DEFAULT_REPORT_EVERY_SEC) {
-    options.push(`    reportEverySec: ${Number(reportEverySec)},`);
+    options.push(`    intervalSec: ${Number(reportEverySec)},`);
   }
   return {
     install: `npm install ${AGENT_PACKAGE}`,
