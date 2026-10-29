@@ -384,3 +384,8 @@ Done directly, two tasks at a time, with memory kept well under the 95 % ceiling
       with 14 busy-loop processes saturating 16 cores: no failures. A suspect (`crossType.test.js`, which assumes under a second has
       passed) still passed with a 2.5 s pause inserted, so it is not time-sensitive that way. If a failure shows up again, keep its
       output (test name and assertion) before changing anything.
+- [x] **Lighthouse, logged-in pages** (same setup, signed in as the demo user, mobile profile; performance / accessibility / best practices):
+      dashboard 97 / 98 / 100, incidents 99 / 98 / 100, cost & usage 99 / 100 / 100, **monitor detail 60 / 97 / 100** (LCP 4.4 s,
+      total blocking time 1.39 s, CLS 0.023). Monitor detail misses the performance target of 85: it is the heaviest page (the
+      Health deck and chart library; forced reflow and unused JavaScript are flagged). Not fixed yet. Minor accessibility items:
+      heading order on the dashboard and incidents pages, and a definition-list structure on monitor detail.
