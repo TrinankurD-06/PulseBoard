@@ -422,6 +422,4 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       fully red (not 85 %), with an opacity floor of 0.85 so even the faint far rows read as red, in a more vivid red (`--field-down`,
       light theme only). Same rules in the WebGL shader and the 2D fallback (`INK_DOWN` in `fieldMath.js`); the dark theme is unchanged.
       3 new tests, 265 client tests.
-- [ ] **Not looked at in a browser:** memory was above the 80 % limit (other sessions on the machine), so the shader and the result were
-      not seen. If a shader error occurred, the field would fall back to the 2D renderer (which is unit-tested). Check the dashboard in
-      light mode with a monitor down; if the red is still too faint or too heavy, tune `INK_DOWN` (`colorGain`, `alphaFloor`, `sizeGain`).
+- [x] **Checked by the owner (30 Oct):** the red down regions are clearly visible in light mode.
