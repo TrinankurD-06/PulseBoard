@@ -1532,3 +1532,37 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **`npm run rollups:rebuild`** recomputes every stored day with the formula (days without raw results keep their
   counts and get their downtime and watched time recomputed from incidents and pause history). Run it once after
   upgrading.
+
+### D104. Resend is the email provider
+
+- **Chosen:** alert and invitation email go through Resend (`RESEND_API_KEY`, sender `ALERT_FROM_EMAIL`). The docs, UI
+  hints, `.env.example`, `render.yaml` and the tech stack table all say "Email (Resend), Discord, Slack".
+- **Why:** the free tier is enough for a small deployment, and sending is a single HTTPS call. That matters on Render's
+  free plan, which blocks outbound SMTP ports, so an SMTP provider could not work there at all.
+- **SMTP stays** as an optional fallback (`SMTP_*`, nodemailer) and as the local-development inbox (Ethereal), so nothing
+  needs a real account to try the app. It is commented out in `.env.example` and is one row in the README table.
+- **Caveat:** Resend only sends from a verified domain. Until one is verified, mail can only go to the account owner's own
+  address, so set `ALERT_FROM_EMAIL` to an address on the verified domain.
+- No provider named "Brevo" ever existed in the code; there was nothing to migrate.
+
+### D105. A read-only public demo
+
+- **Problem:** the demo login (`demo@pulseboard.dev`) is public, so anyone could delete monitors, change channels or
+  fill the database.
+- **Viewer, not a special case.** With `DEMO_READ_ONLY=true` the demo user is a **Viewer** of the demo workspace, using
+  the existing role checks, so every mutating route already answers 403 and reads still work. The workspace is owned by a
+  separate owner account with no password, so nobody can log in as it (an existing account named by `DEMO_OWNER_EMAIL`,
+  otherwise a default one created on demand). The owner is only created or promoted where the demo user was the sole owner;
+  an existing co-owner is kept, so a workspace is never left without an owner.
+- **`POST /workspaces` is refused** for the demo user, because a Viewer could otherwise create a workspace of their own
+  and be its owner.
+- **Visible to the visitor:** `GET /meta` returns `demoReadOnly` and `demoEmail` (the email only when read-only). The client
+  shows a "Demo mode — read-only" banner when the signed-in user's email equals `demoEmail`.
+- **Daily reset.** A worker job `demo-reset` runs at 03:00 UTC. It re-applies the Viewer role and rebuilds the sample
+  "Demo Checkout API" monitor and its incidents, keeping its status-page entry. The role is also applied once when the
+  worker boots, so turning the flag on takes effect after the next deploy. The locally seeded fictional monitors are not
+  rebuilt by the daily job.
+- **Default off.** `DEMO_READ_ONLY` defaults to `false` so local development stays editable; `render.yaml` sets it to `true`.
+- **Unaffected:** the demo-target `/admin` controls are a separate server with no API auth, so they keep working
+  whatever the demo user's permissions are.
+- The demo module lives in `packages/shared/src/demo` so the seed script and the worker share one implementation.

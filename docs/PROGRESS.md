@@ -298,3 +298,23 @@ Releasing a new version, from `packages/agent`:
 2. Add an entry to `CHANGELOG.md`.
 3. `npm test`, then `npm publish --access public` (needs the 2FA code), then `npm view pulseboard-agent version`.
 4. Commit and tag: `git tag agent-v<version>`.
+
+---
+
+# Docs and polish + read-only demo (29 Oct)
+
+No feature changes beyond the read-only demo safety. Base commit `8c85f2d`. Built by a four-agent team
+(backend, frontend, tester, orchestrator).
+
+## Task board
+
+- [x] Demo walkthrough moved from the README to `docs/DEMO.md`.
+- [x] Email provider wording: Resend everywhere, `.env.example`, `render.yaml`, tech stack, D104.
+- [x] Landing stat label: "Requests sent to push-monitored endpoints".
+- [x] Shared demo module (`ensureReadOnlyDemo`, `resetDemoData`), constants, env fields, `/meta` fields, `POST /workspaces` guard.
+- [ ] Backend: worker `demo-reset` job and registration, worker start test.
+- [ ] Backend: seed script uses the shared module; re-seeding does not duplicate workspaces.
+- [ ] Backend: tests (shared, API 403/200, `/meta`, env, demo-target `/admin`).
+- [x] Frontend: `lib/demo.js` and test, `DemoBanner`, Login uses shared constants (240 client tests, lint, build clean). Browser check pending.
+- [ ] Tester: commits and pushes, final verification (tests, ESLint, Prettier, build, greps).
+- [ ] Orchestrator: D105 checked against the final code, summary.
