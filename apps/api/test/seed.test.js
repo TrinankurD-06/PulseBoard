@@ -1,5 +1,6 @@
-import { CHECK_SOURCES } from '@pulseboard/shared/constants';
+import { CHECK_SOURCES, DEMO_USER_EMAIL, ROLES } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
+import { addDemoIncidentMonitor, ensureReadOnlyDemo } from '@pulseboard/shared/demo';
 import {
   AgentReport,
   AlertChannel,
@@ -7,6 +8,7 @@ import {
   DailyRollup,
   Incident,
   Monitor,
+  Membership,
   MonitorUsage,
   StatusPage,
   User,
@@ -20,6 +22,7 @@ import {
 } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { removePreviousDemo } from '../scripts/lib/seedDemoAccount.js';
 import { clearSeedData, countSeedData } from '../scripts/lib/seedClear.js';
 import { seedMonitors } from '../scripts/lib/seedData.js';
 import {
@@ -154,6 +157,64 @@ describe('the seed', () => {
     expect(names.sort()).toEqual([...REAL].sort());
     expect(await CheckResult.countDocuments()).toBe(0);
     expect(await Incident.countDocuments()).toBe(0);
+  });
+});
+
+describe('the demo account in the seed', () => {
+  const quiet = () => {};
+
+  async function seedDemoAccount({ readOnly }) {
+    await removePreviousDemo({ scheduler, readOnly, log: quiet });
+    const user = await User.create({
+      name: 'Demo User',
+      email: DEMO_USER_EMAIL,
+      passwordHash: 'x',
+    });
+    const workspace = await createWorkspaceWithOwner({ name: 'Acme Inc.', ownerId: user._id });
+    if (readOnly) await ensureReadOnlyDemo();
+    await seedInto(workspace);
+    return { user, workspace };
+  }
+
+  it('removes nothing when there is no demo account yet', async () => {
+    expect(await removePreviousDemo({ scheduler, log: quiet })).toBe(-1);
+  });
+
+  it('with DEMO_READ_ONLY the demo user is a Viewer and the workspace keeps an owner', async () => {
+    const { user, workspace } = await seedDemoAccount({ readOnly: true });
+    const roles = await Membership.find({ workspaceId: workspace._id }).lean();
+    expect(roles.find((m) => String(m.userId) === String(user._id)).role).toBe(ROLES.VIEWER);
+    expect(roles.filter((m) => m.role === ROLES.OWNER)).toHaveLength(1);
+  });
+
+  it('without it the demo user stays the owner', async () => {
+    const { user, workspace } = await seedDemoAccount({ readOnly: false });
+    const membership = await Membership.findOne({ workspaceId: workspace._id, userId: user._id });
+    expect(membership.role).toBe(ROLES.OWNER);
+  });
+
+  it('re-seeding a read-only demo leaves one workspace, not a duplicate', async () => {
+    await seedDemoAccount({ readOnly: true });
+    await seedDemoAccount({ readOnly: true });
+    expect(await Workspace.countDocuments()).toBe(1);
+    expect(await User.countDocuments({ email: DEMO_USER_EMAIL })).toBe(1);
+    expect(await Monitor.countDocuments({ name: 'Google' })).toBe(1);
+  });
+
+  it('keeps other users workspaces, and only deletes Viewer workspaces when read-only', async () => {
+    const other = await workspaceFor('other@example.com');
+    const { workspace } = await seedDemoAccount({ readOnly: true });
+    // A non-read-only re-seed only removes workspaces the demo user owns.
+    await removePreviousDemo({ scheduler, readOnly: false, log: quiet });
+    expect(await Workspace.findById(workspace._id)).toBeTruthy();
+    expect(await Workspace.findById(other._id)).toBeTruthy();
+  });
+
+  it('seed-demo-incidents can add its monitor to a Viewer membership workspace', async () => {
+    const { user } = await seedDemoAccount({ readOnly: true });
+    const membership = await Membership.findOne({ userId: user._id }).sort({ createdAt: 1 }).lean();
+    const { monitor } = await addDemoIncidentMonitor({ workspaceId: membership.workspaceId });
+    expect(monitor.isSeed).toBe(true);
   });
 });
 
