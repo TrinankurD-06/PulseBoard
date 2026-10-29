@@ -47,10 +47,12 @@ services:
         value: 'true' # the demo user is a read-only Viewer; the worker resets the demo data daily
       - key: DEMO_OWNER_EMAIL
         sync: false # optional: the account that owns the demo workspace (default: a login-less owner)
+      - key: BREVO_API_KEY
+        sync: false # email alerts through Brevo (HTTPS; the free plan blocks outbound SMTP); wins over Resend
       - key: RESEND_API_KEY
-        sync: false # email alerts through Resend (HTTPS; the free plan blocks outbound SMTP)
+        sync: false # alternative: Resend (sends to any address only once a domain is verified)
       - key: ALERT_FROM_EMAIL
-        sync: false
+        sync: false # with Brevo: a sender address verified in Brevo, e.g. PulseBoard <you@gmail.com>
       # Optional "Sign in with Google/GitHub": leave empty to hide a provider.
       # Callback: https://<your-vercel-app>/api/v1/auth/oauth/<google|github>/callback
       - key: GOOGLE_CLIENT_ID

@@ -2,7 +2,7 @@
 
 **Cost-aware uptime monitoring and public status pages, built on the MERN stack.**
 PulseBoard watches your websites, APIs and background jobs, opens an incident when one goes
-down, alerts your team by Email (Resend), Discord or Slack, shows everything live on a dashboard,
+down, alerts your team by Email, Discord or Slack, shows everything live on a dashboard,
 and publishes a public status page for your users.
 
 It is **push-first**: polling a site costs its owner real requests (and often database or
@@ -86,7 +86,7 @@ bodies. Details in [packages/agent/README.md](packages/agent/README.md).
 - **Agent dashboards**: live request rate, error rate (with your threshold), latency
   percentiles and top routes for apps running the agent. A silent agent whose app still answers
   is shown as **degraded** (with one notice), not as an outage.
-- **Alerts** to Email (Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
+- **Alerts** to Email (Brevo or Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
 - **Import from GitHub** (for people who signed in with GitHub): finds the sites behind your public
   repos (homepage, GitHub Pages, deployments, README links), checks which are live, and creates the
@@ -131,7 +131,7 @@ flowchart LR
     Jobs["Cron jobs"] -- "heartbeat pings" --> API
     Sites -- "agent reports" --> API
     Worker -- "results, incidents" --> DB
-    Worker -- "alerts" --> Notify["Email (Resend) · Discord · Slack"]
+    Worker -- "alerts" --> Notify["Email (Brevo / Resend) · Discord · Slack"]
     DB -. "change streams" .-> API
 ```
 
@@ -158,7 +158,7 @@ logged in [docs/DECISIONS.md](docs/DECISIONS.md). The full API is in [docs/API.m
 React 18, Vite, React Router, Tailwind CSS v4, TanStack Query, Recharts, Socket.io client,
 React Hook Form + Zod · Node 20+, Express 5, Mongoose 9, Zod, JWT, bcrypt, helmet, pino,
 Socket.io · MongoDB (time-series collection for checks, change streams) · Agenda v6 (MongoDB
-backend) · Resend (email alerts; Nodemailer for the SMTP fallback and the local test inbox) ·
+backend) · Brevo or Resend (email alerts; Nodemailer for the SMTP fallback and the local test inbox) ·
 Vitest, Supertest, mongodb-memory-server.
 
 ## Run it locally
@@ -223,8 +223,8 @@ monitor are deleted. Anything created at or after the monitor's creation is kept
 
 To receive real Discord or Slack alerts, put a webhook URL in `SEED_DISCORD_WEBHOOK_URL` or
 `SEED_SLACK_WEBHOOK_URL` before seeding, or add a channel on the **Alert channels** page.
-Email alerts are sent through Resend. Without `RESEND_API_KEY` (the usual local setup) they go to a
-free Ethereal test inbox instead, and each message's preview link appears in the incident timeline.
+Email alerts are sent through Brevo or Resend. Without `BREVO_API_KEY` or `RESEND_API_KEY` (the usual
+local setup) they go to a free Ethereal test inbox instead, and each message's preview link appears in the incident timeline.
 
 ### Sign in with Google / GitHub (optional)
 
@@ -314,6 +314,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `AGENDA_MAX_CONCURRENCY`       | worker, api (combined) | `20`                                                                        | Checks a worker runs in parallel                                                                                                              |
 | `DASHBOARD_URL`                | api, worker            | `http://localhost:5173`                                                     | Links in alerts                                                                                                                               |
 | `APP_URL`                      | api, worker            | empty → `DASHBOARD_URL`                                                     | Public web app URL: checker User-Agent, OAuth callback URLs                                                                                   |
+| `BREVO_API_KEY`                | api, worker            | empty                                                                       | Email alerts through Brevo: any recipient, from one verified sender address. Wins over Resend                                                 |
 | `RESEND_API_KEY`               | api, worker            | empty                                                                       | Email alerts through Resend (free tier, one HTTPS call). Empty = Ethereal test inbox, for local development                                   |
 | `ALERT_FROM_EMAIL`             | api, worker            | `PulseBoard <alerts@pulseboard.local>`                                      | Sender of alert emails. Resend needs an address on a verified domain; until then `onboarding@resend.dev` is used                              |
 | `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Optional fallback, used only when `RESEND_API_KEY` is empty                                                                                   |
@@ -372,17 +373,20 @@ alerts, rollups); there is no separate worker service. Then fill in the variable
 
 - `MONGODB_URI`: the Atlas string.
 - `CLIENT_ORIGIN` and `DASHBOARD_URL`: your Vercel URL, e.g. `https://pulseboard.vercel.app`.
-- `RESEND_API_KEY` and `ALERT_FROM_EMAIL` (email alerts through Resend, see below).
+- `BREVO_API_KEY` (or `RESEND_API_KEY`) and `ALERT_FROM_EMAIL` (email alerts, see below).
 - `DEMO_READ_ONLY=true` for a public demo (already set by `render.yaml`).
 - OAuth credentials (optional): `GOOGLE_CLIENT_*` / `GITHUB_CLIENT_*`, see
   [Sign in with Google / GitHub](#sign-in-with-google--github-optional).
 
 JWT secrets are generated by Render.
 
-> **Email (Resend):** email alerts are sent through [Resend](https://resend.com), which has a free
-> tier and a one-call HTTPS API, so it also works on Render's free plan (which blocks outbound SMTP).
-> Until you verify a domain at resend.com, mail can only be sent to your own Resend account address.
-> Discord and Slack alerts are unaffected.
+> **Email:** alerts go over an HTTPS API, so they also work on Render's free plan (which blocks
+> outbound SMTP). Use [Brevo](https://brevo.com) (free tier, 300 a day): create an API key, verify one
+> sender address in Brevo (Senders & IP → Senders), then set `BREVO_API_KEY` and `ALERT_FROM_EMAIL`
+> (for example `PulseBoard <you@gmail.com>`, the verified address). It delivers to **any address a user
+> adds as an alert channel**. [Resend](https://resend.com) works too, but delivers to other addresses
+> only after you verify a domain; until then only to your own Resend account address. If both keys are
+> set, Brevo is used. Discord and Slack alerts are unaffected.
 >
 > **Free plan caveat:** a free Render web service spins down after about 15 minutes without
 > HTTP traffic, and **no checks run while it is asleep**. Keep it awake by requesting

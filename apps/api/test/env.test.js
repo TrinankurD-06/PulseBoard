@@ -32,9 +32,11 @@ describe('credentials pasted into a hosting dashboard', () => {
   it('trims the email provider settings too', () => {
     const env = envSchema.parse({
       ...base,
+      BREVO_API_KEY: 'xkeysib-abc\n',
       RESEND_API_KEY: 're_abc\n',
       SMTP_HOST: ' smtp.example.com ',
     });
+    expect(env.BREVO_API_KEY).toBe('xkeysib-abc');
     expect(env.RESEND_API_KEY).toBe('re_abc');
     expect(env.SMTP_HOST).toBe('smtp.example.com');
   });

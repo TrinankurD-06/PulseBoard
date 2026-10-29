@@ -29,8 +29,8 @@ export function parseEnv(schema, source = process.env) {
 
 /**
  * Alert-delivery settings, used by both the API ("send test alert") and the
- * worker. RESEND_API_KEY wins over SMTP; with neither set, an Ethereal test inbox
- * is used (development).
+ * worker. BREVO_API_KEY wins over RESEND_API_KEY, which wins over SMTP; with none of
+ * them set, an Ethereal test inbox is used (development).
  */
 export const alertEnvFields = {
   DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
@@ -41,7 +41,10 @@ export const alertEnvFields = {
   SMTP_PORT: z.coerce.number().int().default(587),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
-  // Email over Resend's HTTPS API. Set it where outbound SMTP is blocked (Render's free plan).
+  // Email over an HTTPS API, for hosts that block outbound SMTP (Render's free plan).
+  // Brevo sends to any recipient from one verified sender address (ALERT_FROM_EMAIL).
+  BREVO_API_KEY: z.string().trim().default(''),
+  // Resend sends to any recipient only once a domain is verified.
   RESEND_API_KEY: z.string().trim().default(''),
   ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
 };
@@ -68,6 +71,7 @@ export const appUrlOf = (env) => env.APP_URL ?? env.DASHBOARD_URL;
 export const alertSenderConfig = (env) => ({
   smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS },
   from: env.ALERT_FROM_EMAIL,
+  brevoApiKey: env.BREVO_API_KEY || undefined,
   resendApiKey: env.RESEND_API_KEY || undefined,
 });
 

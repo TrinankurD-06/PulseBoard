@@ -1610,3 +1610,20 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
   adaptive on, named after the repo (the name comes from the cached scan; otherwise the hostname). Member role or above.
   It also requires a GitHub-linked user so the feature behaves the same on both endpoints. The optional status page
   either creates a public page (random slug suffix) or appends to an existing one, checked before anything is created.
+
+### D107. Brevo as the preferred email provider, beside Resend
+
+- **Problem:** with Resend and no verified domain, mail goes only to the Resend account's own address
+  (`You can only send testing emails to your own email address`), so an alert channel added by anyone else
+  never received anything. The code already sent to the address in the channel; the limit was the provider's.
+- **Decision:** add Brevo's transactional API (`POST https://api.brevo.com/v3/smtp/email`, `api-key` header)
+  as a second HTTPS sender. Brevo delivers to any recipient from a sender address verified in the account
+  (one click on an email, no domain or DNS), and has a free tier (300 a day). It works on Render's free plan,
+  which blocks SMTP, like Resend.
+- **Order:** `BREVO_API_KEY`, then `RESEND_API_KEY`, then SMTP, then the Ethereal test inbox for local
+  development. `ALERT_FROM_EMAIL` must be the verified Brevo sender; the placeholder default is refused with a message
+  saying so, instead of a vague provider error. Both HTTPS providers share one request helper, so timeouts and
+  error messages (the provider's own explanation when it gives one) behave the same.
+- **Resend stays** for people who own a domain; nothing is removed. The channel's "Test" button shows the
+  provider's refusal if the setup is wrong.
+- **Limit:** Brevo's free tier caps at 300 emails a day across all workspaces on the deployment.

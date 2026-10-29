@@ -433,3 +433,15 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       Also: `lib/monitorType.js` (the monitor-type checks without the schemas), and the agent and heartbeat setup panels load lazily on the monitor page.
 - Result (uncompressed JavaScript, from the build manifest): first load of any page about 600 KB → 413 KB; monitor-detail critical path 669 KB → 558 KB.
 - [ ] **Not measured with Lighthouse:** memory was above the 80 % limit. Re-run the monitor-detail check (was 83 performance, target 85) when memory allows.
+
+---
+
+# Email to any address: Brevo (30 Oct)
+
+- [x] Cause of "alert emails only reach the owner": Resend without a verified domain delivers only to the Resend account's own address. The code already
+      sent to the channel's address. Added **Brevo** (HTTPS API, any recipient, one verified sender address, no domain) as the preferred provider:
+      `BREVO_API_KEY` wins over `RESEND_API_KEY`, then SMTP, then the local test inbox. Both HTTPS providers share one request helper (same messages for
+      timeouts and refusals); the placeholder `ALERT_FROM_EMAIL` is refused with a clear message. D107, README, `.env.example`, `render.yaml`. 353 shared tests (13 new).
+- [ ] **Needs you on Render:** create a Brevo API key (SMTP & API → API keys), verify one sender address in Brevo (Senders & IP → Senders), then set
+      `BREVO_API_KEY` and `ALERT_FROM_EMAIL` (for example `PulseBoard <you@gmail.com>`, exactly the verified address) and redeploy. Then use "Test" on an
+      email channel with a different address.

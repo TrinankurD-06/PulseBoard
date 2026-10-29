@@ -135,51 +135,104 @@ export function renderEmail(alert) {
 const SMTP_TIMEOUTS = { connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 };
 
 const RESEND_URL = 'https://api.resend.com/emails';
-const RESEND_TIMEOUT_MS = 15_000;
+const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+const HTTP_TIMEOUT_MS = 15_000;
 // Resend only accepts a verified domain or its own test sender. The default
 // ALERT_FROM_EMAIL (alerts@pulseboard.local) is neither, so it is swapped.
 const RESEND_TEST_SENDER = 'PulseBoard <onboarding@resend.dev>';
 
-/** Sends over Resend's HTTPS API: works where outbound SMTP is blocked. */
-async function sendViaResend({ apiKey, from, to, message, fetchImpl }) {
+/**
+ * POSTs one email to a provider's HTTPS API (they work where outbound SMTP is blocked).
+ * Failures become readable errors: the provider's own explanation when it gives one.
+ */
+async function postEmail({ provider, url, headers, body, fetchImpl }) {
   let res;
   try {
-    res = await fetchImpl(RESEND_URL, {
+    res = await fetchImpl(url, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        from: from.includes('@pulseboard.local') ? RESEND_TEST_SENDER : from,
-        to: [to],
-        subject: message.subject,
-        html: message.html,
-        text: message.text,
-      }),
-      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
   } catch (err) {
-    if (err.name === 'TimeoutError') throw new Error('Resend did not answer in time');
-    throw new Error(`Could not reach Resend: ${err.message}`);
+    if (err.name === 'TimeoutError') throw new Error(`${provider} did not answer in time`);
+    throw new Error(`Could not reach ${provider}: ${err.message}`);
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new Error(
-      `Resend rejected the email (${res.status})${detail?.message ? `: ${detail.message}` : ''}`,
+      `${provider} rejected the email (${res.status})${detail?.message ? `: ${detail.message}` : ''}`,
     );
   }
   return { previewUrl: null };
 }
 
+/** Sends over Resend's HTTPS API. */
+function sendViaResend({ apiKey, from, to, message, fetchImpl }) {
+  return postEmail({
+    provider: 'Resend',
+    url: RESEND_URL,
+    headers: { authorization: `Bearer ${apiKey}` },
+    body: {
+      from: from.includes('@pulseboard.local') ? RESEND_TEST_SENDER : from,
+      to: [to],
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    },
+    fetchImpl,
+  });
+}
+
+/** "Name <addr@x.y>" or "addr@x.y" -> { name?, email }. */
+export function parseSender(from) {
+  const match = /^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/.exec(String(from));
+  if (match) return { name: match[1]?.trim() || undefined, email: match[2].trim() };
+  return { email: String(from).trim() };
+}
+
+/**
+ * Sends over Brevo's HTTPS API. Brevo delivers to any recipient from a sender address
+ * verified in the Brevo account (no domain needed), so ALERT_FROM_EMAIL must be that address.
+ */
+function sendViaBrevo({ apiKey, from, to, message, fetchImpl }) {
+  const sender = parseSender(from);
+  if (
+    !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(sender.email) ||
+    sender.email.endsWith('@pulseboard.local')
+  ) {
+    throw new Error(
+      'Brevo needs ALERT_FROM_EMAIL to be a sender address verified in your Brevo account (it is still the placeholder)',
+    );
+  }
+  return postEmail({
+    provider: 'Brevo',
+    url: BREVO_URL,
+    headers: { 'api-key': apiKey, accept: 'application/json' },
+    body: {
+      sender,
+      to: [{ email: to }],
+      subject: message.subject,
+      htmlContent: message.html,
+      textContent: message.text,
+    },
+    fetchImpl,
+  });
+}
+
 /**
  * Email sender. Order of preference:
- * 1. `resendApiKey`: Resend's HTTPS API (works where SMTP is blocked).
- * 2. `smtp.host`: that SMTP server.
- * 3. Neither (local development): a free Ethereal test inbox, so nothing real
+ * 1. `brevoApiKey`: Brevo's HTTPS API (any recipient, from one verified sender address).
+ * 2. `resendApiKey`: Resend's HTTPS API (any recipient once a domain is verified).
+ * 3. `smtp.host`: that SMTP server.
+ * 4. None of these (local development): a free Ethereal test inbox, so nothing real
  *    is sent and each message gets a preview URL that is logged in the
  *    incident timeline.
  */
 export function createEmailSender({
   smtp,
   from,
+  brevoApiKey,
   resendApiKey,
   fetchImpl = globalThis.fetch,
   logger,
@@ -214,6 +267,15 @@ export function createEmailSender({
   }
 
   return async function sendEmail(to, alert) {
+    if (brevoApiKey) {
+      return sendViaBrevo({
+        apiKey: brevoApiKey,
+        from,
+        to,
+        message: renderEmail(alert),
+        fetchImpl,
+      });
+    }
     if (resendApiKey) {
       return sendViaResend({
         apiKey: resendApiKey,

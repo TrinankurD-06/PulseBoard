@@ -13,10 +13,10 @@ export * from './webhooks.js';
  * One sender per channel type: (target, alert) => Promise<{ previewUrl? } | void>.
  * Tests pass fakes with the same shape instead.
  */
-export function createAlertSenders({ smtp, from, resendApiKey, logger }) {
+export function createAlertSenders({ smtp, from, brevoApiKey, resendApiKey, logger }) {
   return {
     discord: (target, alert) => sendDiscord(target, alert),
     slack: (target, alert) => sendSlack(target, alert),
-    email: createEmailSender({ smtp, from, resendApiKey, logger }),
+    email: createEmailSender({ smtp, from, brevoApiKey, resendApiKey, logger }),
   };
 }

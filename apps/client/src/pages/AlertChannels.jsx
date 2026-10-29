@@ -41,7 +41,7 @@ const TYPES = {
     label: 'Email',
     icon: Mail,
     placeholder: 'oncall@company.com',
-    hint: 'Email (Resend). Without a Resend API key, emails go to a test inbox; the preview link appears in the timeline.',
+    hint: 'Alerts are emailed to this address. Without an email provider key on the server, they go to a test inbox; the preview link appears in the timeline.',
   },
 };
 
