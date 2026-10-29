@@ -88,6 +88,9 @@ bodies. Details in [packages/agent/README.md](packages/agent/README.md).
   is shown as **degraded** (with one notice), not as an outage.
 - **Alerts** to Email (Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
+- **Import from GitHub** (for people who signed in with GitHub): finds the sites behind your public
+  repos (homepage, GitHub Pages, deployments, README links), checks which are live, and creates the
+  monitors you pick in one step. Deterministic, no AI; see [Import from GitHub](#import-from-github).
 - **Live dashboard**: MongoDB change streams → Socket.io push status, response times and
   incidents to the browser instantly (falls back to polling if the socket drops).
 - **Analytics**: uptime for 24 h / 7 / 30 / 90 days, response-time chart (1 h / 24 h / 7 d,
@@ -248,6 +251,25 @@ A provider account is linked to an existing user only when the provider reports 
 verified; otherwise a new user (no password) with a personal workspace is created. Run
 `npm run migrate` once on an existing database to add the identities index.
 
+### Import from GitHub
+
+Signed in with GitHub? The dashboard shows **Import from GitHub** next to "New monitor" (members and
+owners). It lists your **public** repositories (archived ones skipped, forks only if you turn them on),
+and for each one collects candidate site URLs from the repo's homepage, its GitHub Pages site, its
+latest deployments and links in its README (hosting domains such as vercel.app, netlify.app,
+onrender.com, or links labelled demo, live or website). Badges, images, github.com and localhost are
+left out, duplicates are merged, and each URL is checked with the normal SSRF-guarded check runner
+(HEAD, 5 s) so you can see **Live**, **Redirect** or **Down** before choosing. You tick what you want
+and PulseBoard creates the monitors (named after the repo, HEAD, every 5 minutes, adaptive on),
+optionally adding them to a new or existing status page.
+
+- It uses GitHub's API, not scraping, and asks for no extra permission: sign-in already requests only
+  `read:user` and `user:email`, so private repositories are out of reach.
+- The GitHub token is kept **encrypted** (AES-256-GCM) and only used for this import. People who
+  signed in before this feature exist are asked to sign in with GitHub once more.
+- Results are cached for 10 minutes, and GitHub's rate limits are respected. Details and limits:
+  [DECISIONS.md](docs/DECISIONS.md) (D106) and [docs/API.md](docs/API.md).
+
 ### Scripts
 
 | Command                                        | What it does                                                                                                   |
@@ -287,6 +309,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `TRUST_PROXY`                  | api                    | `false` (`true` on Render)                                                  | Real client IPs behind a proxy                                                                                                                |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with Google" (both needed)                                                                                                   |
 | `GITHUB_CLIENT_ID` / `_SECRET` | api                    | empty                                                                       | Enables "Sign in with GitHub" (both needed)                                                                                                   |
+| `GITHUB_TOKEN_ENCRYPTION_KEY`  | api                    | empty → derived from `JWT_REFRESH_SECRET`                                   | Optional, 32+ characters. Encrypts the stored GitHub token (AES-256-GCM); changing it makes users sign in with GitHub again                   |
 | `WORKER_HEALTH_PORT`           | worker                 | `4002`                                                                      | Worker `/health` port                                                                                                                         |
 | `AGENDA_MAX_CONCURRENCY`       | worker, api (combined) | `20`                                                                        | Checks a worker runs in parallel                                                                                                              |
 | `DASHBOARD_URL`                | api, worker            | `http://localhost:5173`                                                     | Links in alerts                                                                                                                               |

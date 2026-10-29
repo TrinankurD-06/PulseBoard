@@ -389,3 +389,25 @@ Done directly, two tasks at a time, with memory kept well under the 95 % ceiling
       total blocking time 1.39 s, CLS 0.023). Monitor detail misses the performance target of 85: it is the heaviest page (the
       Health deck and chart library; forced reflow and unused JavaScript are flagged). Not fixed yet. Minor accessibility items:
       heading order on the dashboard and incidents pages, and a definition-list structure on monitor detail.
+
+---
+
+# Monitor-detail performance and Import from GitHub (30 Oct)
+
+Memory kept at or below 80 % (a second Claude session runs beside this one). Heavy processes (Chrome, Lighthouse, dev servers) ran one at a time under a lock.
+
+- [x] **Monitor detail performance** (`c9773bc`): the chart sections load as their own chunks (the page chunk went from 448 KB to 25 KB) and
+      the ones below the fold render only when near the viewport (`LazyOnView`). Lighthouse, mobile, signed in: performance **60 → 83**
+      (blocking time 1.39 s → 0.42 s, main content 4.4 s → 3.3 s), accessibility 97 → 100. Still 2 points under the 85 target; next
+      candidates are the sparkline cards above the fold and the shared chart chunk (364 KB).
+- [x] **Import from GitHub, backend** (`0dc1fee`): `GET /workspaces/:wid/github/candidates` and `POST .../github/import`, pure extraction and
+      ranking in `packages/shared/src/github`, the GitHub token stored AES-256-GCM encrypted on the identity (sign-in scopes unchanged),
+      `finalUrl` added to check results, docs in API.md and D106. 30 + 29 new tests.
+- [x] **Import from GitHub, frontend** (`fee8391`): review screen at `/app/:wid/import/github`, entry points on the dashboard, helpers with 17 tests.
+- [x] README: feature bullet, "Import from GitHub" section, `GITHUB_TOKEN_ENCRYPTION_KEY` in the env table.
+- Gate: agent 49, shared 346, API 339, client 262, demo-target 23, worker 77 tests; ESLint, Prettier and both builds clean.
+- [ ] **Not done:** the review screen has not been looked at in a browser (the first attempt was blocked waiting for the heavy-process lock, then
+      memory was held down), and nothing was run against the real GitHub API. Look at it dark and light at 1440 and 390 px, with a real
+      GitHub sign-in, before relying on it.
+- Known limits: users who signed in with GitHub before this feature have no stored token and are asked to sign in again; the 10-minute cache
+  is per API process.
