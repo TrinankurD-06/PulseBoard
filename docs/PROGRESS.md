@@ -235,7 +235,7 @@ Decision D102. Nothing pushed.
       sideways scroll, no dark leftovers, no text under WCAG AA contrast. Not covered: the heartbeat and agent _detail_ pages
       (the live data has no such monitor), confirm dialogs, and hover tooltips.
 - Seen, not light-specific: the uptime gauge ring is fully red below the 99.9 % target (99.78 % on a healthy dashboard), and
-  the last x-axis label of the large chart ("10:00 PM") is clipped at the right edge.
+  the last x-axis label of the large charts was clipped at the right edge (fixed: right chart margin 8 to 32 px, checked on 108 axes).
 
 ## Resume note (light theme)
 

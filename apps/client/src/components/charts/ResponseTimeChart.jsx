@@ -97,7 +97,7 @@ export default function ResponseTimeChart({ points, rangeMs }) {
       {chart.bands.length > 0 && <OfflineLegend />}
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chart.rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <ComposedChart data={chart.rows} margin={{ top: 8, right: 32, bottom: 0, left: 0 }}>
             <defs>
               <AreaGradient id={`${id}-area`} />
             </defs>

@@ -112,7 +112,7 @@ export default function MetricLineChart({
       {series.length > 1 && <Legend series={series} />}
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chart.rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <LineChart data={chart.rows} margin={{ top: 8, right: 32, bottom: 0, left: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis
               dataKey="t"

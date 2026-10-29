@@ -60,7 +60,7 @@ export default function TimingChart({ timings, range }) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={timings}
-            margin={{ top: 12, right: 8, bottom: 0, left: 0 }}
+            margin={{ top: 12, right: 32, bottom: 0, left: 0 }}
             accessibilityLayer={false}
           >
             <CartesianGrid {...gridProps} />
