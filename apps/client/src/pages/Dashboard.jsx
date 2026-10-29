@@ -1,6 +1,7 @@
 import { ROLES } from '@pulseboard/shared/constants';
 import { Link } from 'react-router-dom';
 import { useSparklines, useUptimeSummary } from '../api/analytics.js';
+import { useAuth } from '../auth/AuthContext.js';
 import { useIncidents } from '../api/incidents.js';
 import { useMonitors } from '../api/monitors.js';
 import { useAmbientAlertSignal } from '../components/ambient/ambientStore.js';
@@ -58,11 +59,23 @@ export default function Dashboard() {
   const signal = useSignalFeed(wid);
   const now = useNow();
   const canEdit = can(ROLES.MEMBER);
+  const { user } = useAuth();
+  // Only people who signed in with GitHub can read their repos.
+  const canImport = canEdit && Boolean(user?.providers?.includes('github'));
 
   const summary = monitors?.length ? summarize(monitors) : null;
   useAmbientAlertSignal((summary?.down ?? 0) > 0);
 
   const newButton = canEdit && <RingDotCta to={`/app/${wid}/monitors/new`}>New monitor</RingDotCta>;
+  const importButton = canImport && (
+    <RingDotCta to={`/app/${wid}/import/github`}>Import from GitHub</RingDotCta>
+  );
+  const actions = (
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+      {importButton}
+      {newButton}
+    </div>
+  );
   const uptime = uptimeSummary?.uptime ?? null;
   const gauge = uptimeGaugeProps(uptime);
   const side = monitors
@@ -71,7 +84,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title={headline(summary)} phrase={side} action={newButton} />
+      <PageHeader title={headline(summary)} phrase={side} action={canEdit ? actions : undefined} />
 
       {isError && <p className="text-sm text-status-down">Couldn&apos;t load monitors.</p>}
 
@@ -90,7 +103,7 @@ export default function Dashboard() {
               ? 'Add a URL to start checking its uptime and response time.'
               : 'Ask a workspace member to add the first monitor.'
           }
-          action={newButton}
+          action={canEdit ? actions : undefined}
         />
       )}
 

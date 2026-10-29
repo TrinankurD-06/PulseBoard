@@ -16,6 +16,7 @@ const AuthCallback = lazy(() => import('./pages/auth/AuthCallback.jsx'));
 const Bot = lazy(() => import('./pages/Bot.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const EditMonitor = lazy(() => import('./pages/monitors/EditMonitor.jsx'));
+const GithubImport = lazy(() => import('./pages/GithubImport.jsx'));
 const Incidents = lazy(() => import('./pages/Incidents.jsx'));
 const Login = lazy(() => import('./pages/auth/Login.jsx'));
 const MonitorDetail = lazy(() => import('./pages/monitors/MonitorDetail.jsx'));
@@ -50,6 +51,7 @@ export default function App() {
               <Route path=":wid" element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="monitors/new" element={<NewMonitor />} />
+                <Route path="import/github" element={<GithubImport />} />
                 <Route path="monitors/:mid" element={<MonitorDetail />} />
                 <Route path="monitors/:mid/edit" element={<EditMonitor />} />
                 <Route path="incidents" element={<Incidents />} />
