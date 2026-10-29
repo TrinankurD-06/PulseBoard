@@ -16,6 +16,7 @@ import StatusPageForm from '../components/statusPages/StatusPageForm.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
+import { useConfirm } from '../components/ui/confirmContext.js';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import RingDotCta from '../components/ui/RingDotCta.jsx';
@@ -91,6 +92,7 @@ export default function StatusPages() {
   const createPage = useCreateStatusPage(wid);
   const updatePage = useUpdateStatusPage(wid);
   const deletePage = useDeleteStatusPage(wid);
+  const confirm = useConfirm();
   // null = closed, {} = creating, page = editing
   const [editing, setEditing] = useState(null);
 
@@ -116,7 +118,12 @@ export default function StatusPages() {
   }
 
   async function onDelete(page) {
-    if (!window.confirm(`Delete "${page.title}"? Its public link will stop working.`)) return;
+    const confirmed = await confirm({
+      title: 'Delete status page',
+      message: `Delete "${page.title}"? Its public link will stop working.`,
+      confirmLabel: 'Delete page',
+    });
+    if (!confirmed) return;
     try {
       await deletePage.mutateAsync(page.id);
       toast.success('Status page deleted');

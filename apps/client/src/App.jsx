@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './auth/routes.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
+import ConfirmProvider from './components/ui/ConfirmProvider.jsx';
 import FullPageSpinner from './components/ui/FullPageSpinner.jsx';
 import Landing from './pages/Landing.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -30,38 +31,40 @@ export default function App() {
   const { pathname } = useLocation();
   return (
     <AppErrorBoundary resetKey={pathname}>
-      <Suspense fallback={<FullPageSpinner />}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/status/:slug" element={<PublicStatus />} />
-          <Route path="/bot" element={<Bot />} />
-          {/* Outside GuestRoute: it restores the session itself, then honours ?next. */}
-          <Route path="/auth/callback" element={<AuthCallback />} />
+      <ConfirmProvider>
+        <Suspense fallback={<FullPageSpinner />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/status/:slug" element={<PublicStatus />} />
+            <Route path="/bot" element={<Bot />} />
+            {/* Outside GuestRoute: it restores the session itself, then honours ?next. */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
-          <Route element={<GuestRoute />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-          </Route>
-
-          <Route path="/app" element={<ProtectedRoute />}>
-            <Route index element={<AppIndex />} />
-            <Route path=":wid" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="monitors/new" element={<NewMonitor />} />
-              <Route path="monitors/:mid" element={<MonitorDetail />} />
-              <Route path="monitors/:mid/edit" element={<EditMonitor />} />
-              <Route path="incidents" element={<Incidents />} />
-              <Route path="alerts" element={<AlertChannels />} />
-              <Route path="status-pages" element={<StatusPages />} />
-              <Route path="usage" element={<Usage />} />
-              <Route path="team" element={<Team />} />
-              <Route path="settings" element={<Settings />} />
+            <Route element={<GuestRoute />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+            <Route path="/app" element={<ProtectedRoute />}>
+              <Route index element={<AppIndex />} />
+              <Route path=":wid" element={<AppLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="monitors/new" element={<NewMonitor />} />
+                <Route path="monitors/:mid" element={<MonitorDetail />} />
+                <Route path="monitors/:mid/edit" element={<EditMonitor />} />
+                <Route path="incidents" element={<Incidents />} />
+                <Route path="alerts" element={<AlertChannels />} />
+                <Route path="status-pages" element={<StatusPages />} />
+                <Route path="usage" element={<Usage />} />
+                <Route path="team" element={<Team />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </ConfirmProvider>
     </AppErrorBoundary>
   );
 }

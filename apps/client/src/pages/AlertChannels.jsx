@@ -16,6 +16,7 @@ import { errorMessage } from '../api/http.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Button from '../components/ui/Button.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
+import { useConfirm } from '../components/ui/confirmContext.js';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Field from '../components/ui/Field.jsx';
 import RingDotCta from '../components/ui/RingDotCta.jsx';
@@ -105,6 +106,7 @@ function ChannelRow({ channel, wid, canEdit }) {
   const updateChannel = useUpdateAlertChannel(wid);
   const deleteChannel = useDeleteAlertChannel(wid);
   const testChannel = useTestAlertChannel(wid);
+  const confirm = useConfirm();
   const { label, icon: Icon } = TYPES[channel.type];
 
   async function onToggle(isEnabled) {
@@ -141,7 +143,12 @@ function ChannelRow({ channel, wid, canEdit }) {
   }
 
   async function onDelete() {
-    if (!window.confirm(`Delete the ${label} channel "${channel.name || channel.target}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete channel',
+      message: `Delete the ${label} channel "${channel.name || channel.target}"? Alerts will no longer be sent to it.`,
+      confirmLabel: 'Delete channel',
+    });
+    if (!confirmed) return;
     try {
       await deleteChannel.mutateAsync(channel.id);
       toast.success('Channel deleted');

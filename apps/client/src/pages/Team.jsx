@@ -16,6 +16,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import Card, { CardHeader } from '../components/ui/Card.jsx';
+import { useConfirm } from '../components/ui/confirmContext.js';
 import Field, { inputClasses } from '../components/ui/Field.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../hooks/useCurrentWorkspace.js';
@@ -86,6 +87,7 @@ function AddMemberForm({ wid }) {
 function MemberRow({ member, wid, isOwner, isSelf }) {
   const changeRole = useChangeMemberRole(wid);
   const removeMember = useRemoveMember(wid);
+  const confirm = useConfirm();
 
   async function onRoleChange(event) {
     const role = event.target.value;
@@ -98,7 +100,12 @@ function MemberRow({ member, wid, isOwner, isSelf }) {
   }
 
   async function onRemove() {
-    if (!window.confirm(`Remove ${member.name} from this workspace?`)) return;
+    const confirmed = await confirm({
+      title: 'Remove member',
+      message: `Remove ${member.name} from this workspace? They lose access immediately.`,
+      confirmLabel: 'Remove',
+    });
+    if (!confirmed) return;
     try {
       await removeMember.mutateAsync(member.userId);
       toast.success(`${member.name} removed`);

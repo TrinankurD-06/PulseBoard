@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useUptime } from '../../api/analytics.js';
 import { UPTIME_TARGET, UPTIME_WARN_TARGET, uptimeGaugeProps } from '../../lib/uptimeLevels.js';
 import { errorMessage } from '../../api/http.js';
+import { useConfirm } from '../../components/ui/confirmContext.js';
 import { useIncidents } from '../../api/incidents.js';
 import {
   useDeleteMonitor,
@@ -145,6 +146,7 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
   const pause = usePauseMonitor(wid, monitor.id);
   const resume = useResumeMonitor(wid, monitor.id);
   const remove = useDeleteMonitor(wid, monitor.id);
+  const confirm = useConfirm();
 
   const run = (mutation, message) => async () => {
     try {
@@ -165,7 +167,12 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
   }
 
   async function onDelete() {
-    if (!window.confirm(`Delete "${monitor.name}" and all of its check history?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete monitor',
+      message: `Delete "${monitor.name}" and all of its check history? This can't be undone.`,
+      confirmLabel: 'Delete monitor',
+    });
+    if (!confirmed) return;
     try {
       await remove.mutateAsync();
       toast.success('Monitor deleted');
