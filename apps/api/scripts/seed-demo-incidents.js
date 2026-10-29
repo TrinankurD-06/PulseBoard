@@ -4,18 +4,19 @@
 //   npm run seed:demo-incidents                      # demo@pulseboard.dev, its first workspace
 //   npm run seed:demo-incidents -- --email you@x.com # another account's workspace
 //
-// It removes nothing else. Everything it creates is flagged isSeed (shown as "Sample
+// Works for a read-only (Viewer) demo account too. It removes nothing else. Everything it creates is flagged isSeed (shown as "Sample
 // data") and `npm run seed:clear` removes it. Running it twice replaces the monitor.
+import { DEMO_USER_EMAIL } from '@pulseboard/shared/constants';
 import { connectMongo, disconnectMongo, mongoose } from '@pulseboard/shared/db';
 import { loadEnv, parseEnv } from '@pulseboard/shared/env';
 import { Membership, User, Workspace } from '@pulseboard/shared/models';
 import { z } from 'zod';
-import { addDemoIncidentMonitor, DEMO_MONITOR_NAME } from './lib/demoIncidents.js';
+import { addDemoIncidentMonitor, DEMO_MONITOR_NAME } from '@pulseboard/shared/demo';
 
 loadEnv();
 
 const argIndex = process.argv.indexOf('--email');
-const email = (argIndex > -1 ? process.argv[argIndex + 1] : 'demo@pulseboard.dev')?.toLowerCase();
+const email = (argIndex > -1 ? process.argv[argIndex + 1] : DEMO_USER_EMAIL)?.toLowerCase();
 
 async function main() {
   const env = parseEnv(z.object({ MONGODB_URI: z.string().min(1) }));

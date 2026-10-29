@@ -1,6 +1,7 @@
 // npm run seed: creates a ready-to-demo account.
 //
-//   login: demo@pulseboard.dev / demo1234
+//   login: the shared demo account (DEMO_USER_EMAIL / DEMO_USER_PASSWORD, see
+//     packages/shared/src/constants.js)
 //   workspace "Acme Inc." with 7 monitors:
 //     real sites (Google, GitHub, Example.com): created empty, they fill up from
 //       the worker's first check
@@ -14,22 +15,24 @@
 //   apps/demo-target/.pulseboard-demo.json (git-ignored): the agent key and the
 //     heartbeat URL, read by the demo-target and its heartbeat script
 //
+// With DEMO_READ_ONLY=true the demo account is a Viewer (see packages/shared/src/demo), so the
+// public demo cannot be changed; DEMO_OWNER_EMAIL names the account that owns the workspace.
+//
 // Safe to run again: the previous demo account and its data are removed first.
 // The agent key and heartbeat token in .pulseboard-demo.json are kept, so a
 // demo-target or heartbeat script that is already running keeps working.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { AGENT_KEY_PREFIX, MONITOR_TYPES, ROLES } from '@pulseboard/shared/constants';
-import { connectMongo, disconnectMongo, ensureCollections, mongoose } from '@pulseboard/shared/db';
-import { loadEnv, parseEnv } from '@pulseboard/shared/env';
 import {
-  AlertChannel,
-  Membership,
-  Monitor,
-  Session,
-  StatusPage,
-  User,
-} from '@pulseboard/shared/models';
+  AGENT_KEY_PREFIX,
+  DEMO_USER_EMAIL,
+  DEMO_USER_PASSWORD,
+  MONITOR_TYPES,
+} from '@pulseboard/shared/constants';
+import { connectMongo, disconnectMongo, ensureCollections, mongoose } from '@pulseboard/shared/db';
+import { ensureReadOnlyDemo } from '@pulseboard/shared/demo';
+import { demoEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
+import { AlertChannel, Monitor, StatusPage, User } from '@pulseboard/shared/models';
 import {
   createAgenda,
   createAgendaScheduler,
@@ -39,10 +42,8 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { generateAgentKey, hashAgentKey } from '../src/modules/agent/agentKey.js';
 import { generateHeartbeatToken } from '../src/modules/monitors/monitors.service.js';
-import {
-  createWorkspaceWithOwner,
-  deleteWorkspace,
-} from '../src/modules/workspaces/workspaces.service.js';
+import { createWorkspaceWithOwner } from '../src/modules/workspaces/workspaces.service.js';
+import { removePreviousDemo } from './lib/seedDemoAccount.js';
 import { seedMonitors } from './lib/seedData.js';
 
 loadEnv();
@@ -50,6 +51,7 @@ const env = parseEnv(
   z.object({
     MONGODB_URI: z.string().min(1),
     DEMO_MODE: z.enum(['true', 'false']).default('false'),
+    ...demoEnvFields,
     API_PORT: z.coerce.number().default(4000),
     DEMO_TARGET_PORT: z.coerce.number().default(4011),
     // Empty variables in .env mean "not set".
@@ -67,8 +69,8 @@ const env = parseEnv(
   }),
 );
 
-const DEMO_EMAIL = 'demo@pulseboard.dev';
-const DEMO_PASSWORD = 'demo1234';
+const DEMO_EMAIL = DEMO_USER_EMAIL;
+const DEMO_PASSWORD = DEMO_USER_PASSWORD;
 const STATUS_SLUG = 'acme';
 const now = Date.now();
 
@@ -88,19 +90,6 @@ const DEMO_FILE = fileURLToPath(
 );
 const AGENT_KEY_FORMAT = new RegExp(`^${AGENT_KEY_PREFIX}[A-Za-z0-9_-]{32}$`);
 const HEARTBEAT_TOKEN_FORMAT = /^[A-Za-z0-9_-]{43}$/;
-
-async function removePreviousDemo(scheduler) {
-  const user = await User.findOne({ email: DEMO_EMAIL });
-  if (!user) return;
-  const owned = await Membership.find({ userId: user._id, role: ROLES.OWNER }).lean();
-  for (const { workspaceId } of owned) await deleteWorkspace(workspaceId, scheduler);
-  await Promise.all([
-    Membership.deleteMany({ userId: user._id }),
-    Session.deleteMany({ userId: user._id }),
-    user.deleteOne(),
-  ]);
-  console.warn('Removed the previous demo account and its data.');
-}
 
 /** The previous run's demo file, or {} when missing or unreadable. */
 function readDemoFile() {
@@ -148,7 +137,7 @@ function alertChannelsFromEnv() {
     channels.push({ name: '#ops (Slack)', type: 'slack', target: env.SEED_SLACK_WEBHOOK_URL });
   }
   if (env.SEED_ALERT_EMAIL || channels.length === 0) {
-    // Without SMTP settings this goes to an Ethereal test inbox (preview link in the timeline).
+    // Without a Resend API key this goes to an Ethereal test inbox (preview link in the timeline).
     channels.push({
       name: 'On-call inbox',
       type: 'email',
@@ -166,7 +155,7 @@ async function main() {
   await ensureAgendaIndexes(mongoose.connection.db);
   const scheduler = createAgendaScheduler(agenda);
 
-  await removePreviousDemo(scheduler);
+  await removePreviousDemo({ scheduler, readOnly: env.DEMO_READ_ONLY });
   const secrets = await demoSecrets();
 
   const user = await User.create({
@@ -175,6 +164,9 @@ async function main() {
     passwordHash: await bcrypt.hash(DEMO_PASSWORD, env.BCRYPT_COST),
   });
   const workspace = await createWorkspaceWithOwner({ name: 'Acme Inc.', ownerId: user._id });
+
+  // Made a Viewer straight away, so nothing below depends on the demo user owning the workspace.
+  if (env.DEMO_READ_ONLY) await ensureReadOnlyDemo({ ownerEmail: env.DEMO_OWNER_EMAIL });
 
   const { monitors, specs } = await seedMonitors({
     workspace,
@@ -229,7 +221,7 @@ Then start the heartbeat by hand: npm run heartbeat -w @pulseboard/demo-target`
   Set SEED_LOCAL_DEMO=true to include them.`;
   console.warn(`
 Seeded the demo account.
-  Login:          ${DEMO_EMAIL} / ${DEMO_PASSWORD}
+  Login:          ${DEMO_EMAIL} / ${DEMO_PASSWORD}${env.DEMO_READ_ONLY ? '  (read-only: a Viewer)' : ''}
   Workspace:      ${workspace.name} (${monitors.length} monitors, ${channels.length} alert channel${channels.length === 1 ? '' : 's'}: ${channels.map((c) => c.type).join(', ')})
   Status page:    /status/${statusPage.slug}
 ${demoLines}

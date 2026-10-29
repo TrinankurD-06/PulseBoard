@@ -1,4 +1,6 @@
 import { ROLES } from '@pulseboard/shared/constants';
+import { isDemoUserEmail } from '@pulseboard/shared/demo';
+import { User } from '@pulseboard/shared/models';
 import { monthKey } from '@pulseboard/shared/cost';
 import {
   createWorkspaceSchema,
@@ -7,6 +9,7 @@ import {
   workspaceUsageQuerySchema,
 } from '@pulseboard/shared/schemas';
 import { Router } from 'express';
+import { forbidden } from '../../lib/errors.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import { getWorkspaceUsage } from './usage.service.js';
@@ -20,7 +23,7 @@ import {
 } from './workspaces.service.js';
 
 /** Mounted under /workspaces, after authenticate. */
-export function workspacesRouter({ scheduler }) {
+export function workspacesRouter({ scheduler, env = {} }) {
   const router = Router();
 
   router.get('/', validate({ query: paginationSchema }), async (req, res) => {
@@ -28,6 +31,12 @@ export function workspacesRouter({ scheduler }) {
   });
 
   router.post('/', validate({ body: createWorkspaceSchema }), async (req, res) => {
+    // Anyone may create a workspace of their own, so the read-only demo account must be stopped
+    // here: in a new workspace it would be the owner, free to do anything.
+    if (env.DEMO_READ_ONLY) {
+      const user = await User.findById(req.userId, { email: 1 }).lean();
+      if (isDemoUserEmail(user?.email)) throw forbidden('The demo account is read-only');
+    }
     const workspace = await createWorkspace({ name: req.valid.body.name, userId: req.userId });
     res.status(201).json({ data: workspace });
   });

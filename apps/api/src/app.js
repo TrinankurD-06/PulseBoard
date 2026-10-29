@@ -103,7 +103,7 @@ export function createApp({
   api.use('/ping', pingRouter({ processCheckResult }));
   // Agent reports (U4): public, the Bearer agent key is the authentication.
   api.use('/agent', agentRouter({ processCheckResult }));
-  api.use('/workspaces', requireAuth, workspacesRouter({ scheduler }));
+  api.use('/workspaces', requireAuth, workspacesRouter({ scheduler, env }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.
   api.use('/workspaces/:wid/monitors', requireAuth, monitorAnalyticsRouter());

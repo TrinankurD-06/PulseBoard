@@ -8,11 +8,7 @@ import {
 } from '@pulseboard/shared/models';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  addDemoIncidentMonitor,
-  DEMO_INCIDENTS,
-  DEMO_MONITOR_NAME,
-} from '../scripts/lib/demoIncidents.js';
+import { addDemoIncidentMonitor, DEMO_INCIDENTS, DEMO_MONITOR_NAME } from '@pulseboard/shared/demo';
 import { clearSeedData } from '../scripts/lib/seedClear.js';
 
 beforeAll(startMemoryDb);

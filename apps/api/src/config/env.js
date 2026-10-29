@@ -1,4 +1,4 @@
-import { alertEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
+import { alertEnvFields, demoEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
 import { z } from 'zod';
 
 loadEnv();
@@ -37,6 +37,7 @@ export const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().trim().default(''),
   GITHUB_CLIENT_SECRET: z.string().trim().default(''),
   ...alertEnvFields,
+  ...demoEnvFields,
 });
 
 // Hosting platforms (Render, Heroku...) tell web services which port to use via PORT.

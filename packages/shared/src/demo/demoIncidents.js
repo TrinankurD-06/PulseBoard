@@ -7,18 +7,12 @@
 // checks it and no real alert is sent for it; it points at https://example.com
 // (which answers 200), so if a worker does pick it up later (reconcile on boot)
 // it simply stays up.
-import { CHECK_SOURCES, MONITOR_STATUS } from '@pulseboard/shared/constants';
-import { monthKey, monthStart } from '@pulseboard/shared/cost';
-import {
-  CheckResult,
-  DailyRollup,
-  Incident,
-  Monitor,
-  MonitorUsage,
-} from '@pulseboard/shared/models';
-import { rollupDay } from '@pulseboard/shared/rollup';
-import { buildMonitorSchemas } from '@pulseboard/shared/schemas';
-import { addDays, DAY_MS, utcDayStart } from '@pulseboard/shared/uptime';
+import { CHECK_SOURCES, MONITOR_STATUS } from '../constants.js';
+import { monthKey, monthStart } from '../cost/index.js';
+import { CheckResult, DailyRollup, Incident, Monitor, MonitorUsage } from '../models/index.js';
+import { rollupDay } from '../rollup/index.js';
+import { buildMonitorSchemas } from '../schemas/index.js';
+import { addDays, DAY_MS, utcDayStart } from '../uptime/index.js';
 
 export const DEMO_MONITOR_NAME = 'Demo Checkout API';
 
@@ -89,7 +83,7 @@ function timelineOf(incident, startedAt, resolvedAt) {
       {
         at: new Date(opened.getTime() + 2000),
         type: 'alert_failed',
-        message: 'Down alert to "Ops email" failed (SMTP timeout); retrying in 30 s',
+        message: 'Down alert to "Ops email" failed (Resend timeout); retrying in 30 s',
       },
       {
         at: new Date(opened.getTime() + 32_000),

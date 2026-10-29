@@ -1,4 +1,4 @@
-import { alertEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
+import { alertEnvFields, demoEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
 import { z } from 'zod';
 
 loadEnv();
@@ -17,6 +17,7 @@ const envSchema = z.object({
   ALLOW_PRIVATE_TARGETS: booleanString,
   LOG_LEVEL: z.string().default('info'),
   ...alertEnvFields,
+  ...demoEnvFields,
 });
 
 export const env = parseEnv(envSchema);

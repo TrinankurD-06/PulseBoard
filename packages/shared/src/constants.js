@@ -128,7 +128,14 @@ export const JOB_NAMES = Object.freeze({
   BUDGET_RESET: 'budget-reset',
   HEARTBEAT_OVERDUE: 'heartbeat-overdue',
   AGENT_SILENCE: 'agent-silence',
+  DEMO_RESET: 'demo-reset',
 });
+
+// The public demo account (shown on the login page in DEMO_MODE). With DEMO_READ_ONLY it is a
+// Viewer; the demo workspace is then owned by an account nobody can log in to.
+export const DEMO_USER_EMAIL = 'demo@pulseboard.dev';
+export const DEMO_USER_PASSWORD = 'demo1234';
+export const DEMO_OWNER_DEFAULT_EMAIL = 'demo-owner@pulseboard.dev';
 
 // Adaptive intervals (U2): each run of this many consecutive successes while up
 // doubles the interval, up to maxIntervalSec.

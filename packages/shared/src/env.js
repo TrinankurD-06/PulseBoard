@@ -46,6 +46,22 @@ export const alertEnvFields = {
   ALERT_FROM_EMAIL: z.string().default('PulseBoard <alerts@pulseboard.local>'),
 };
 
+/**
+ * Public-demo settings, shared by the API (meta, workspace creation), the worker (daily reset) and
+ * the seed. DEMO_READ_ONLY makes the demo user a read-only Viewer; DEMO_OWNER_EMAIL names the
+ * account that owns the demo workspace (empty: a login-less one is created).
+ */
+export const demoEnvFields = {
+  DEMO_READ_ONLY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  DEMO_OWNER_EMAIL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined),
+    z.string().email().optional(),
+  ),
+};
+
 /** The public web app URL: APP_URL if set, else DASHBOARD_URL. */
 export const appUrlOf = (env) => env.APP_URL ?? env.DASHBOARD_URL;
 
