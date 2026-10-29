@@ -410,6 +410,6 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       grouped list with source badges and Live / Redirect / Down labels, already-monitored row disabled, select all, the status-page option,
       the import request (monitored URL left out), result view, include forks, and the 409 / 429 (retry time read from `error.details.resetAt`) /
       502 / empty states; no page errors. Found and fixed one defect: on phones the sticky Import bar sat under the bottom navigation. Memory stayed under 80 %.
-- [ ] **Still not done:** nothing has run against the real GitHub API yet. Sign in with GitHub on the live site and try the import once.
+- [x] **Live check (30 Oct):** tried on the live site with a real GitHub sign-in against the real GitHub API; the owner confirmed it works.
 - Known limits: users who signed in with GitHub before this feature have no stored token and are asked to sign in again; the 10-minute cache
   is per API process.
