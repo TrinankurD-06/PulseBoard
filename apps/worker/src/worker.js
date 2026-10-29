@@ -2,6 +2,7 @@ import os from 'node:os';
 import { createAlertSenders } from '@pulseboard/shared/alerts';
 import { JOB_NAMES, MAX_TIMEOUT_MS } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
+import { ensureReadOnlyDemo } from '@pulseboard/shared/demo';
 import { alertSenderConfig, appUrlOf } from '@pulseboard/shared/env';
 import { createIncidentEngine } from '@pulseboard/shared/incident';
 import {
@@ -13,6 +14,7 @@ import { createAgentProber } from './agentProbes.js';
 import { createBudgetEnforcer } from './budget.js';
 import { createAgentSilenceJob } from './jobs/agentSilence.js';
 import { createBudgetResetJob } from './jobs/budgetReset.js';
+import { createDemoResetJob } from './jobs/demoReset.js';
 import { createHeartbeatOverdueJob } from './jobs/heartbeatOverdue.js';
 import { createFinalizeRollupJob, createRollupJob } from './jobs/rollups.js';
 import { createRunCheckJob } from './jobs/runCheck.js';
@@ -26,7 +28,8 @@ import { reconcileJobs } from './reconcile.js';
  *
  * Used by the standalone worker (`apps/worker/src/index.js`) and, when
  * RUN_MODE=combined, by the API process itself. `env` needs MONGODB_URI,
- * ALLOW_PRIVATE_TARGETS, AGENDA_MAX_CONCURRENCY and the alert settings.
+ * ALLOW_PRIVATE_TARGETS, AGENDA_MAX_CONCURRENCY, the alert settings and the demo
+ * settings (DEMO_READ_ONLY, optional DEMO_OWNER_EMAIL).
  *
  * Returns { agenda, isRunning(), stop() }; stop() releases the jobs this runner
  * holds so another runner can pick them up at once.
@@ -93,6 +96,8 @@ export async function startWorker({
   agenda.define(JOB_NAMES.AGENT_SILENCE, (job) =>
     agentSilence(new Date(), { touch: () => job.touch() }),
   );
+  const demoReset = createDemoResetJob({ ownerEmail: env.DEMO_OWNER_EMAIL, logger });
+  agenda.define(JOB_NAMES.DEMO_RESET, () => demoReset());
   agenda.define(JOB_NAMES.ROLLUP, createRollupJob({ logger }));
   agenda.define(JOB_NAMES.FINALIZE_ROLLUP, createFinalizeRollupJob({ logger }));
   agenda.on('fail', (err, job) => logger.error({ err, job: job.attrs.name }, 'Job failed'));
@@ -100,6 +105,8 @@ export async function startWorker({
   // Catch up on a missed monthly reset first, so reconcile sees the restored intervals.
   await budgetReset(new Date());
   await reconcileJobs({ db, scheduler, logger });
+  // The public demo account must be read-only before any request can reach it.
+  if (env.DEMO_READ_ONLY) await ensureReadOnlyDemo({ ownerEmail: env.DEMO_OWNER_EMAIL, logger });
   await agenda.start();
   // every() creates a single job per name (upsert), so several runners booting
   // at once still end up with one rollup job and one nightly finalize job.
@@ -108,6 +115,12 @@ export async function startWorker({
   await agenda.every('30 seconds', JOB_NAMES.AGENT_SILENCE);
   await agenda.every('5 0 * * *', JOB_NAMES.FINALIZE_ROLLUP, undefined, { timezone: 'UTC' });
   await agenda.every('0 0 1 * *', JOB_NAMES.BUDGET_RESET, undefined, { timezone: 'UTC' });
+  if (env.DEMO_READ_ONLY) {
+    await agenda.every('0 3 * * *', JOB_NAMES.DEMO_RESET, undefined, { timezone: 'UTC' });
+  } else {
+    // A schedule left over from a run with the flag on must not keep resetting data.
+    await agenda.cancel({ name: JOB_NAMES.DEMO_RESET });
+  }
   let running = true;
   logger.info('Agenda started, processing jobs');
 

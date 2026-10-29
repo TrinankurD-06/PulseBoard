@@ -123,3 +123,18 @@ describe('demo target with the app agent', () => {
     expect(seen).toEqual([{ route: '/', status: 200 }]);
   });
 });
+
+describe('demo target control panel and the read-only demo account', () => {
+  // The panel is its own Express server: it never calls the PulseBoard API and checks no
+  // login, so making the demo user a Viewer cannot lock visitors out of it.
+  it('serves and drives /admin with no Authorization header and no API', async () => {
+    const app = createDemoTargetApp();
+    expect((await request(app).get('/admin')).status).toBe(200);
+    expect((await request(app).get('/admin/state')).status).toBe(200);
+    expect((await request(app).post('/admin/mode').send({ mode: 'error500' })).status).toBe(200);
+    expect((await request(app).get('/')).status).toBe(500);
+    const scenario = await request(app).post('/admin/scenario').send({ scenario: 'restore' });
+    expect(scenario.status).toBe(200);
+    expect((await request(app).get('/')).status).toBe(200);
+  });
+});

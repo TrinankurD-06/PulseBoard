@@ -39,3 +39,21 @@ describe('credentials pasted into a hosting dashboard', () => {
     expect(env.SMTP_HOST).toBe('smtp.example.com');
   });
 });
+
+describe('demo account settings', () => {
+  it('leaves the demo account editable by default', () => {
+    const env = envSchema.parse(base);
+    expect(env.DEMO_READ_ONLY).toBe(false);
+    expect(env.DEMO_OWNER_EMAIL).toBeUndefined();
+  });
+
+  it('reads DEMO_READ_ONLY and DEMO_OWNER_EMAIL', () => {
+    const env = envSchema.parse({
+      ...base,
+      DEMO_READ_ONLY: 'true',
+      DEMO_OWNER_EMAIL: 'Owner@Example.com',
+    });
+    expect(env.DEMO_READ_ONLY).toBe(true);
+    expect(env.DEMO_OWNER_EMAIL).toBe('owner@example.com');
+  });
+});

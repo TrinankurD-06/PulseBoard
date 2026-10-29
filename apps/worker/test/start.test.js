@@ -1,6 +1,7 @@
-import { JOB_NAMES } from '@pulseboard/shared/constants';
+import { DEMO_USER_EMAIL, JOB_NAMES } from '@pulseboard/shared/constants';
 import { mongoose } from '@pulseboard/shared/db';
 import { createLogger } from '@pulseboard/shared/logger';
+import { Membership, User, Workspace } from '@pulseboard/shared/models';
 import { AGENDA_COLLECTION } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -22,6 +23,8 @@ beforeAll(async () => {
     SMTP_USER: '',
     SMTP_PASS: '',
     ALERT_FROM_EMAIL: 'PulseBoard <alerts@pulseboard.local>',
+    DEMO_READ_ONLY: false,
+    DEMO_OWNER_EMAIL: undefined,
   };
 });
 
@@ -51,6 +54,56 @@ describe('startWorker', () => {
       await first.stop();
       expect(first.isRunning()).toBe(false);
       await second.stop();
+    }
+  });
+
+  it('does not schedule the demo reset when DEMO_READ_ONLY is off, and cancels a stored one', async () => {
+    await jobs.insertOne({
+      name: JOB_NAMES.DEMO_RESET,
+      type: 'single',
+      repeatInterval: '0 3 * * *',
+      nextRunAt: new Date(Date.now() + 3600_000),
+    });
+    const worker = await startWorker({ env, logger, agendaName: 'start-test-demo-off' });
+    try {
+      expect(await jobs.countDocuments({ name: JOB_NAMES.DEMO_RESET })).toBe(0);
+    } finally {
+      await worker.stop();
+    }
+  });
+
+  it('schedules the demo reset exactly once when DEMO_READ_ONLY is on', async () => {
+    const demoEnv = { ...env, DEMO_READ_ONLY: true };
+    const first = await startWorker({ env: demoEnv, logger, agendaName: 'start-test-demo-a' });
+    const second = await startWorker({ env: demoEnv, logger, agendaName: 'start-test-demo-b' });
+    try {
+      expect(await jobs.countDocuments({ name: JOB_NAMES.DEMO_RESET })).toBe(1);
+      const job = await jobs.findOne({ name: JOB_NAMES.DEMO_RESET });
+      expect(job.repeatInterval).toBe('0 3 * * *');
+    } finally {
+      await first.stop();
+      await second.stop();
+    }
+  });
+
+  it('makes the demo user read-only at boot when DEMO_READ_ONLY is on', async () => {
+    const user = await User.create({ name: 'Demo', email: DEMO_USER_EMAIL });
+    const workspace = await Workspace.create({
+      name: 'Demo',
+      slug: 'demo-boot',
+      ownerId: user._id,
+    });
+    await Membership.create({ workspaceId: workspace._id, userId: user._id, role: 'owner' });
+    const worker = await startWorker({
+      env: { ...env, DEMO_READ_ONLY: true },
+      logger,
+      agendaName: 'start-test-demo-boot',
+    });
+    try {
+      const membership = await Membership.findOne({ workspaceId: workspace._id, userId: user._id });
+      expect(membership.role).toBe('viewer');
+    } finally {
+      await worker.stop();
     }
   });
 
