@@ -30,6 +30,10 @@ export const MONITOR_TYPES = Object.freeze({
 export const CURRENCIES = Object.freeze(['INR', 'USD', 'EUR', 'GBP']);
 export const DEFAULT_CURRENCY = 'INR';
 
+// Platform roles are separate from workspace roles (ROLES): a superadmin runs the platform, and is
+// not automatically a member of anyone's workspace.
+export const PLATFORM_ROLES = Object.freeze({ USER: 'user', SUPERADMIN: 'superadmin' });
+
 export const ALERT_CHANNEL_TYPES = Object.freeze(['email', 'discord', 'slack']);
 
 export const INCIDENT_EVENT = Object.freeze({

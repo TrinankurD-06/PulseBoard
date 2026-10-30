@@ -1150,3 +1150,36 @@ On connect the socket joins one room per workspace the user belongs to.
 | `incident:opened`   | `{ id, monitorId, workspaceId, startedAt, resolvedAt: null, durationSec: null, cause }`                                                                                                                                                                         |
 | `incident:resolved` | same, with `resolvedAt` and `durationSec`                                                                                                                                                                                                                       |
 | `incident:updated`  | same; sent when the timeline changes (e.g. an alert was sent)                                                                                                                                                                                                   |
+
+## Admin console
+
+All under `/api/v1/admin/*`. Only a **superadmin** (`platformRole: 'superadmin'`, re-read from the
+database on every request; never the demo account, never a suspended user) is answered; any other signed-in
+user gets `403 FORBIDDEN`, an anonymous caller `401`. Rate limits per administrator: 300 reads and 60 writes
+a minute (`429 RATE_LIMITED`). Lists answer `{ data, pagination: { total, page, limit } }` (`limit` up to 100).
+`GET /auth/me` reports `isAdmin`.
+
+| Method and path                                                                                                               | Purpose                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/overview`                                                                                                         | Platform numbers: users, signups, workspaces, monitors by type and status, incidents, checks per day (30), alerts per channel, requests saved |
+| `GET /admin/system`                                                                                                           | API, worker, Agenda queue, change streams, alert failures, recent server errors                                                               |
+| `GET /admin/audit?adminId&action&targetType&from&to`                                                                          | The audit log                                                                                                                                 |
+| `GET /admin/users?search&status=all\|active\|suspended`                                                                       | Users                                                                                                                                         |
+| `GET /admin/users/:id` (audited)                                                                                              | Profile, workspaces, monitors, incidents, alert channels (masked), usage, analytics                                                           |
+| `POST /admin/users/:id/suspend` `{ reason }`                                                                                  | Blocks sign-in, ends sessions, pauses their monitors                                                                                          |
+| `POST /admin/users/:id/unsuspend`                                                                                             | Lets them back in (monitors stay paused)                                                                                                      |
+| `POST /admin/users/:id/revoke-sessions`                                                                                       | Ends every session                                                                                                                            |
+| `DELETE /admin/users/:id` `{ confirm: <email>, mode: 'cascade'\|'reassign', reassignTo? }`                                    | Deletes the account; their workspaces are deleted if nobody else is in them, else handed on                                                   |
+| `GET /admin/workspaces?search&status`, `GET /admin/workspaces/:id` (audited)                                                  | Workspaces                                                                                                                                    |
+| `POST /admin/workspaces/:id/transfer` `{ newOwnerId }`, `/suspend` `{ reason }`, `/unsuspend`; `DELETE` `{ confirm: <name> }` | Workspace actions                                                                                                                             |
+| `GET /admin/monitors?status&type&workspaceId&ownerId&failing&search`, `GET /admin/monitors/:id` (audited)                     | Every monitor                                                                                                                                 |
+| `POST /admin/monitors/:id/pause` `{ note? }`, `/resume`, `/test`; `DELETE` `{ confirm: <name> }`                              | Monitor actions (same scheduling code as users')                                                                                              |
+| `POST /admin/monitors/bulk` `{ action: 'pause'\|'resume'\|'delete', ids (max 100), note?, confirm?: 'DELETE' }`               | Bulk                                                                                                                                          |
+| `GET /admin/incidents?status&workspaceId&monitorId&search`, `GET /admin/incidents/:id` (audited)                              | Incidents with timeline                                                                                                                       |
+
+Errors: `400 CONFIRMATION_MISMATCH` (the typed confirmation is wrong), `409 ADMIN_PROTECTED` (yourself or another
+superadmin). **Read-through:** a superadmin's `GET` requests to `/api/v1/workspaces/:wid/**` pass as a viewer of any
+workspace (writes are refused with `403`); the workspace answers `role: 'viewer'` and `adminView: true`, and the first
+read in ten minutes is audit-logged (`workspace.view`). Monitor DTOs gain `pausedBy` (`user`, `budget`, `admin`) and, for an
+admin pause, `pauseNote`. Suspension answers `403 ACCOUNT_SUSPENDED` (sign-in, refresh and every call) and
+`403 WORKSPACE_SUSPENDED` (a suspended workspace; `GET /workspaces/:wid` stays readable so the app can say why).

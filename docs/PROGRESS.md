@@ -482,3 +482,22 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
 - [x] **Owner's own evaluation admin (30 Oct):** the owner set `ADMIN_EMAIL=admin@pulseboard.com` and `ADMIN_PASSWORD=admin123` on Render. The 12-character minimum would have refused that password
       (the API would have logged a warning and created no admin), so the minimum is now **8**, and the README and `.env.example` show these values. The earlier values in this file
       (`admin@pulseboard.dev` / `PulseBoard-Admin-2026`) are superseded. **Needs a redeploy** of the API on Render with this commit before the admin exists on the live site.
+
+- [x] **Brevo confirmed working (31 Oct):** the owner set `BREVO_API_KEY` and `ALERT_FROM_EMAIL` on Render; alert emails now reach the address a user adds as a channel.
+
+---
+
+# Admin console rebuilt as a platform console (31 Oct)
+
+- [x] **Roles and access:** `User.platformRole` (`user` | `superadmin`) apart from workspace roles. Superadmins come only from `ADMIN_EMAILS`, `ADMIN_EMAIL` + `ADMIN_PASSWORD` (which also creates the
+      account) or `npm run admin:grant -- email`; no screen or API promotes anyone; the demo account never qualifies. `requireSuperadmin` re-reads the role from the database on every
+      request; everyone else gets 403 on every `/api/v1/admin/*` route; per-admin rate limits (300 reads, 60 writes a minute).
+- [x] **Audit log** (`AdminAuditLog`, append-only): every admin write and every user, workspace, monitor and incident detail read; the entry is saved before the action runs. Filterable viewer.
+- [x] **Sections:** overview with charts, users (list, detail, suspend, unsuspend, revoke sessions, typed-confirmation delete that never deletes other people's data), workspaces (detail, transfer,
+      suspend, delete), global monitors (filters, pause with a note, resume, Test now, bulk, delete, read-only Health deck through read-through), incidents with timelines, system health, audit log.
+- [x] **Privacy:** explicit serialisers (never spread documents); a test plants real secrets and fails if one appears in any admin response; webhooks masked to 4 characters; no "view as user".
+- [x] **New records:** `AlertLog` and `ErrorLog` for the health page (redacted, expiring). Suspension blocks sign-in, refresh and every request; suspended workspaces answer `WORKSPACE_SUSPENDED`.
+- [x] **Read-through:** a superadmin's GETs on any workspace pass as a viewer (writes 403), audited; monitor DTOs gain `pausedBy` and `pauseNote` so the owner reads "Paused by an administrator".
+- [x] **Docs:** README "Admin console" (how to become a superadmin), API.md, DEMO.md, D109.
+- Gate: agent 49, shared 353, API 388, client 301, demo-target 23, worker 78; ESLint, Prettier and both builds clean. Frontend verified in a browser against a mocked API (82 checks).
+- [ ] **Not done:** the console has not been tried against the real deployed API with real data; do one pass after the deploy. Non-admin answers are now 403 (the earlier plan said 404; the spec said 403).

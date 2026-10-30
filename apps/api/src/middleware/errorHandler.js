@@ -1,4 +1,5 @@
 import { mongoose } from '@pulseboard/shared/db';
+import { recordServerError } from '../lib/errorLog.js';
 import { ZodError } from 'zod';
 import { AppError } from '../lib/errors.js';
 
@@ -38,6 +39,10 @@ export function toErrorResponse(err) {
 // Express recognises error handlers by their 4-argument signature.
 export function errorHandler(err, req, res, _next) {
   const { status, code, message, details } = toErrorResponse(err);
-  if (status >= 500) req.log?.error({ err }, 'Unhandled error');
+  if (status >= 500) {
+    req.log?.error({ err }, 'Unhandled error');
+    // The response says only "Something went wrong"; administrators see what it was (redacted).
+    recordServerError(req, { status, code, message: err?.message ?? message });
+  }
   res.status(status).json({ error: { code, message, ...(details && { details }) } });
 }

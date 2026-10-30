@@ -1654,3 +1654,45 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Listing** returns names, emails, sign-in providers (never tokens or hashes), workspaces with roles, monitor counts and
   the last sign-in, paged (25 by default, 100 at most) and searchable.
 - **Limits:** one administrator; no per-monitor control and no deleting users from the panel.
+
+### D109. A platform admin console: platform roles, an audit log and privacy rules
+
+Supersedes the single-email admin of D108 (the ADMIN_EMAIL / ADMIN_PASSWORD bootstrap stays; the gating does not).
+
+- **Platform role, separate from workspace roles.** `User.platformRole` is `user` or `superadmin`. Workspace roles (owner,
+  member, viewer) are unchanged and mean nothing on the platform; a superadmin is not a member of anyone's workspace.
+  The role is only set server-side: `ADMIN_EMAILS` / `ADMIN_EMAIL` at API start-up, or `npm run admin:grant`. There is no API
+  or screen that promotes anyone. The demo account is refused by every path, and by the guard even if its role were set.
+- **Enforced on the server, re-read each time.** `requireSuperadmin` loads the user from the database on every request (a
+  token that is still valid, of someone whose role was removed or who was suspended, gets nothing), answers 403 to everyone
+  else, and a per-administrator rate limiter (300 reads / 60 writes a minute) sits behind it. The console UI lives at
+  `/app/admin` and also hides itself from non-admins, but that is a convenience, not the protection.
+- **Reading other people's pages without copying them.** Instead of a second copy of every analytics endpoint, a superadmin's GET
+  requests pass the existing workspace role check as a **viewer** of any workspace (writes are refused). The real pages and the
+  Health deck then work read-only for the admin, with the viewer's secret masking already applied, a visible banner, and an
+  audit entry (once per ten minutes per workspace). **No "view as user"** impersonation: it adds risk and the read-through covers the need.
+- **Audit log.** `AdminAuditLog` is append-only (nothing updates or deletes it; kept two years): admin id and email, action,
+  target, a short before/after summary (never secrets or whole documents), IP, time. Every write and every detail read is
+  logged. For writes the entry is saved **before** the action, so an action whose entry cannot be saved does not run; the cost
+  is that an entry means "attempted", and a failed action leaves its entry. The console has a filterable viewer.
+- **Suspension.** A suspended user is refused at sign-in, refresh and on every authenticated request (checked against the
+  database with a 5-second cache that a suspension clears at once), their sessions end, and their monitors are paused with
+  reason `admin` and a note. Unsuspending does not restart monitors: that stays a deliberate step. A suspended workspace answers
+  403 `WORKSPACE_SUSPENDED` to its members, is still readable by the admin, and its monitors are paused.
+- **Admin pause uses the users' code.** Pause and resume go through the same monitor service (the job is cancelled and
+  re-created; pause history and incident closing included). The stored reason stays `pausedReason: 'admin'`; the DTO adds
+  `pausedBy` (`user`, `budget`, `admin`) and `pauseNote` for the owner. An owner cannot resume or re-pause an admin pause.
+- **Deleting a user never deletes other people's data.** Owned workspaces with nobody else in them are deleted; ones with
+  other members are handed to an existing owner or member (or to the user the admin picks). Typed confirmations (the email, the
+  workspace or monitor name, the word DELETE for bulk) are checked on the server. Administrators cannot suspend or delete
+  themselves or each other.
+- **Privacy rules.** Admin responses are built from explicit field lists (serialisers), never by spreading documents, so a new
+  secret field cannot leak by accident. Never present: password hashes, refresh or session tokens, OAuth tokens, agent keys
+  or their hashes, heartbeat tokens, monitor headers. Webhook URLs show their last 4 characters; monitor URLs lose credentials
+  and query strings; emails are shown. A test plants a recognisable secret in each place and fails if one appears in any response.
+- **New records for the health page.** `AlertLog` (one row per alert delivery attempt, no addresses or bodies, 90 days) and
+  `ErrorLog` (server 500s: route pattern, status, redacted message; no bodies, headers, query strings or ids; 14 days). Alert
+  history starts when logging started (the overview says since when). The worker's liveness is inferred from its recurring
+  jobs, so it works for a separate worker process too.
+- **Limits.** One kind of administrator (no read-only admin tier); the 5-second suspension cache and the 15-minute access
+  token mean a suspended user's open requests may finish; the audit "attempted" semantics above.

@@ -12,9 +12,13 @@ const NAV_ITEMS = [
   { to: 'settings', label: 'Settings', short: 'Settings' },
 ];
 
+// The console has its own layout and navigation, outside any workspace.
 const ADMIN_ITEM = { to: 'admin', label: 'Admin', short: 'Admin' };
 
-const href = (wid, to) => (to ? `/app/${wid}/${to}` : `/app/${wid}`);
+const href = (wid, to) => {
+  if (to === ADMIN_ITEM.to) return '/app/admin';
+  return to ? `/app/${wid}/${to}` : `/app/${wid}`;
+};
 
 /**
  * Text navigation. Desktop: a row under the header line (active = text-fg,

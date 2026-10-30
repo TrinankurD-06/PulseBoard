@@ -45,6 +45,8 @@ services:
         value: 'false'
       - key: DEMO_READ_ONLY
         value: 'true' # the demo user is a read-only Viewer; the worker resets the demo data daily
+      - key: ADMIN_EMAILS
+        sync: false # comma-separated emails of existing accounts to make superadmin at start-up
       - key: ADMIN_EMAIL
         sync: false # the administrator's email (enables the admin panel together with the password)
       - key: ADMIN_PASSWORD

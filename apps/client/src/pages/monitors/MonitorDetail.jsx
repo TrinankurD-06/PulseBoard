@@ -64,6 +64,21 @@ function Deferred({ minHeight, onView = false, children }) {
   return onView ? <LazyOnView minHeight={minHeight}>{body}</LazyOnView> : body;
 }
 
+/** "Paused by an administrator" with their note, for everyone who can see the monitor. */
+function AdminPauseNotice({ monitor }) {
+  if (!isPausedByAdmin(monitor)) return null;
+  return (
+    <div
+      role="status"
+      className="mt-5 max-w-[60ch] rounded-card border border-status-degraded/60 px-4 py-3 text-sm"
+    >
+      <p className="text-fg">Paused by an administrator</p>
+      {monitor.pauseNote && <p className="mt-1 break-words text-muted">{monitor.pauseNote}</p>}
+      <p className="mt-1 text-xs text-faint">Only an administrator can start it again.</p>
+    </div>
+  );
+}
+
 /** Back link, the monitor name as a display headline (URL or summary as the muted phrase), uptime gauge, actions. */
 function MonitorHero({ wid, monitor, phrase, badges, actions }) {
   const { data: uptime } = useUptime(wid, monitor.id);
@@ -85,6 +100,7 @@ function MonitorHero({ wid, monitor, phrase, badges, actions }) {
           </h1>
           <div className="mt-3 text-sm text-muted">{phrase}</div>
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">{badges}</div>
+          <AdminPauseNotice monitor={monitor} />
           {actions && <div className="mt-8">{actions}</div>}
         </div>
         {uptime ? (

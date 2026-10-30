@@ -41,9 +41,11 @@ export function workspacesRouter({ scheduler, env = {} }) {
     res.status(201).json({ data: workspace });
   });
 
-  router.get('/:wid', requireRole(ROLES.VIEWER), async (req, res) => {
+  // allowSuspended: members can still read why their workspace is suspended.
+  router.get('/:wid', requireRole(ROLES.VIEWER, { allowSuspended: true }), async (req, res) => {
     const workspace = await getWorkspace(req.params.wid);
-    res.json({ data: toWorkspaceDto(workspace, req.membership.role) });
+    const dto = toWorkspaceDto(workspace, req.membership.role);
+    res.json({ data: req.membership.adminView ? { ...dto, adminView: true } : dto });
   });
 
   // Cost & Usage page (U5): every monitor's usage for a month (default: this UTC month).

@@ -94,8 +94,16 @@ function editableFields(monitor) {
  * Custom headers often carry API keys, and a heartbeat token lets anyone report
  * pings. Viewers can see that they exist, but not their values.
  */
+const PAUSED_BY = { user: 'user', budget_exceeded: 'budget', admin: 'admin' };
+
+/** Who paused it, for the owner to read: 'user' | 'budget' | 'admin' (null while it runs). */
+export const pausedByOf = (monitor) =>
+  monitor.isPaused ? (PAUSED_BY[monitor.pausedReason] ?? 'user') : null;
+
 export function toMonitorDto(monitor, role) {
   const json = monitor.toJSON();
+  json.pausedBy = pausedByOf(monitor);
+  if (!monitor.isPaused || monitor.pausedReason !== 'admin') delete json.pauseNote;
   // Nobody gets the agent key hash; the key itself is only in create/regenerate responses.
   delete json.agentKeyHash;
   if (monitor.$locals?.agentKey) json.agentKey = monitor.$locals.agentKey;
@@ -286,7 +294,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
       return fresh;
     },
 
-    async pause(workspaceId, monitorId, { reason = PAUSED_REASONS.USER } = {}) {
+    async pause(workspaceId, monitorId, { reason = PAUSED_REASONS.USER, note = null } = {}) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
       // Pausing again must not turn an administrator's stop into one the user can undo.
       if (monitor.isPaused && monitor.pausedReason === PAUSED_REASONS.ADMIN) return monitor;
@@ -294,6 +302,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
         isPaused: true,
         status: MONITOR_STATUS.PAUSED,
         pausedReason: reason,
+        pauseNote: reason === PAUSED_REASONS.ADMIN ? (note ?? null) : null,
       });
       await monitor.save();
       await openPause(monitor._id, new Date());
@@ -321,6 +330,7 @@ export function createMonitorService({ env, scheduler, schemas }) {
           'This monitor was stopped by an administrator and only they can start it again',
         );
       }
+      monitor.pauseNote = null;
       const now = new Date();
       if (isHeartbeat(monitor)) {
         // A full period (plus grace) from now before a missing ping counts.

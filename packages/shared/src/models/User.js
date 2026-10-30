@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { OAUTH_PROVIDERS } from '../constants.js';
+import { OAUTH_PROVIDERS, PLATFORM_ROLES } from '../constants.js';
 import { baseOptions, jsonOptions } from './_options.js';
 
 const userJsonOptions = {
@@ -14,6 +14,12 @@ const userJsonOptions = {
     if (doc.isSelected?.('passwordHash')) ret.hasPassword = Boolean(doc.passwordHash);
     delete ret.identities;
     delete ret.passwordHash;
+    // Platform and moderation fields are for administrators, through their own serialisers: a
+    // user's own profile (and every API that embeds one) does not carry them.
+    delete ret.platformRole;
+    delete ret.suspendedAt;
+    delete ret.suspendedReason;
+    delete ret.lastLoginAt;
     return ret;
   },
 };
@@ -45,6 +51,18 @@ const userSchema = new mongoose.Schema(
     // Not required: users who signed up with Google/GitHub have no password.
     passwordHash: { type: String, select: false },
     identities: { type: [identitySchema], default: [] },
+    // 'superadmin' is only ever set server-side: ADMIN_EMAILS / ADMIN_EMAIL at start-up, or
+    // `npm run admin:grant`. No API or screen can promote anyone. The demo account can never be one.
+    platformRole: {
+      type: String,
+      enum: Object.values(PLATFORM_ROLES),
+      default: PLATFORM_ROLES.USER,
+    },
+    // Set by an administrator: the user cannot sign in and their monitors are paused.
+    suspendedAt: { type: Date, default: null },
+    suspendedReason: { type: String, trim: true, maxlength: 300, default: null },
+    // The last time a sign-in (password or OAuth) started a session; refreshes do not count.
+    lastLoginAt: { type: Date, default: null },
   },
   { ...baseOptions, toJSON: userJsonOptions, toObject: userJsonOptions },
 );

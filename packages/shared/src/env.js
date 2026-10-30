@@ -55,6 +55,18 @@ export const alertEnvFields = {
  * unset there is no admin and the panel does not exist. Never put real values in the repository.
  */
 export const adminEnvFields = {
+  // Comma-separated emails of people to make superadmin when the API starts (existing accounts
+  // only; `npm run admin:grant -- email` does the same on demand). The demo account never qualifies.
+  ADMIN_EMAILS: z.preprocess(
+    (value) =>
+      typeof value === 'string'
+        ? value
+            .split(',')
+            .map((email) => email.trim().toLowerCase())
+            .filter(Boolean)
+        : [],
+    z.array(z.string().email()).default([]),
+  ),
   ADMIN_EMAIL: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined),
     z.string().email().optional(),

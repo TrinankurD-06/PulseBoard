@@ -8,7 +8,7 @@ import { oauthRouter } from './oauth/oauth.routes.js';
 
 export const REFRESH_COOKIE = 'pb_refresh';
 
-export function authRouter({ env, tokens, logger, oauthFetch }) {
+export function authRouter({ env, tokens, logger, oauthFetch, activeUser }) {
   const router = Router();
   const auth = createAuthService({ env, tokens, logger });
   const authLimiter = createAuthLimiter(env.AUTH_RATE_LIMIT_MAX);
@@ -64,7 +64,7 @@ export function authRouter({ env, tokens, logger, oauthFetch }) {
   // Sign in with Google / GitHub. Issues the same session (refresh cookie) as login.
   router.use('/oauth', oauthRouter({ env, auth, logger, setRefreshCookie, fetchImpl: oauthFetch }));
 
-  router.get('/me', authenticate(tokens), async (req, res) => {
+  router.get('/me', authenticate(tokens), activeUser, async (req, res) => {
     res.json({ data: await auth.me(req.userId) });
   });
 

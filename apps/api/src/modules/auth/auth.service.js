@@ -4,7 +4,8 @@ import bcrypt from 'bcrypt';
 import { AppError, conflict, unauthorized } from '../../lib/errors.js';
 import { createTokenCrypto } from '../../lib/tokenCrypto.js';
 import { hashToken } from '../../lib/tokens.js';
-import { isAdminEmail } from '../admin/admin.service.js';
+import { suspendedError } from '../../middleware/activeUser.js';
+import { isSuperadminUser } from '../../middleware/requireSuperadmin.js';
 import { createWorkspaceWithOwner, toWorkspaceDto } from '../workspaces/workspaces.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -104,6 +105,14 @@ export function createAuthService({ env, tokens, logger }) {
     );
   }
 
+  // The sign-in itself, once the person is known to be allowed in: refuses a suspended account,
+  // notes the time, and starts the session.
+  async function startSession(user, meta) {
+    if (user.suspendedAt) throw suspendedError(user.suspendedReason);
+    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+    return { user, ...(await issueTokens(user._id, meta)) };
+  }
+
   async function revokeFamily(familyId) {
     await Session.updateMany({ familyId, revokedAt: null }, { revokedAt: new Date() });
   }
@@ -115,7 +124,7 @@ export function createAuthService({ env, tokens, logger }) {
       }
       const passwordHash = await bcrypt.hash(password, env.BCRYPT_COST);
       const user = await createUserWithWorkspace({ name, email, passwordHash });
-      return { user, ...(await issueTokens(user._id, meta)) };
+      return startSession(user, meta);
     },
 
     async login({ email, password }, meta) {
@@ -124,7 +133,7 @@ export function createAuthService({ env, tokens, logger }) {
       // against the dummy hash too, so they get the same generic error.
       const matches = await bcrypt.compare(password, user?.passwordHash ?? (await dummyHash()));
       if (!user || !matches) throw invalidCredentials();
-      return { user, ...(await issueTokens(user._id, meta)) };
+      return startSession(user, meta);
     },
 
     /**
@@ -152,7 +161,14 @@ export function createAuthService({ env, tokens, logger }) {
         throw invalidSession();
       }
 
-      if (!(await User.exists({ _id: session.userId }))) throw invalidSession();
+      const owner = await User.findById(session.userId)
+        .select('suspendedAt suspendedReason')
+        .lean();
+      if (!owner) throw invalidSession();
+      if (owner.suspendedAt) {
+        await revokeFamily(session.familyId);
+        throw suspendedError(owner.suspendedReason);
+      }
       return issueTokens(session.userId, { ...meta, familyId: session.familyId });
     },
 
@@ -170,7 +186,7 @@ export function createAuthService({ env, tokens, logger }) {
       if (provider === 'github' && credential?.accessToken) {
         await storeGithubToken(user._id, profile, credential);
       }
-      return { user, ...(await issueTokens(user._id, meta)) };
+      return startSession(user, meta);
     },
 
     async me(userId) {
@@ -183,7 +199,7 @@ export function createAuthService({ env, tokens, logger }) {
       const workspaces = memberships
         .filter((membership) => membership.workspaceId)
         .map((membership) => toWorkspaceDto(membership.workspaceId, membership.role));
-      return { user, workspaces, isAdmin: isAdminEmail(env, user.email) };
+      return { user, workspaces, isAdmin: isSuperadminUser(user) };
     },
   };
 }

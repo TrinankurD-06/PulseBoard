@@ -67,6 +67,8 @@ const monitorSchema = new mongoose.Schema(
     },
     // Why it is paused: by a user, or automatically because the monthly budget ran out.
     pausedReason: { type: String, enum: [...Object.values(PAUSED_REASONS), null], default: null },
+    // Shown to the owner when an administrator paused it ("Paused by an administrator: <note>").
+    pauseNote: { type: String, trim: true, maxlength: 300, default: null },
 
     // Adaptive interval (U2). intervalSec is the BASE interval; currentIntervalSec is
     // what the check job actually uses (null = intervalSec).

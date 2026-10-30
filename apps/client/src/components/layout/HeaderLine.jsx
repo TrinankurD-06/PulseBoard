@@ -29,7 +29,7 @@ function LiveStatus({ wid, connected }) {
   );
 }
 
-function UserMenu() {
+export function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);

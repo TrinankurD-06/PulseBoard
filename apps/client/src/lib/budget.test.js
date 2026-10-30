@@ -5,6 +5,7 @@ import {
   budgetSummary,
   intervalDescription,
   intervalLabel,
+  isPausedByAdmin,
   isPausedByBudget,
   isSlowedByBudget,
   nextMonthLabel,
@@ -102,5 +103,19 @@ describe('budget helpers', () => {
   it('budgetSummary derives the state when the server does not send it', () => {
     const summary = budgetSummary({ requests: 21_000, budget: { monthlyRequestBudget: 20_000 } });
     expect(summary).toMatchObject({ state: 'exceeded', exceeded: true, percent: 105 });
+  });
+});
+
+describe('isPausedByAdmin', () => {
+  it('reads pausedBy, and the older pausedReason', () => {
+    expect(isPausedByAdmin({ isPaused: true, pausedBy: 'admin' })).toBe(true);
+    expect(isPausedByAdmin({ isPaused: true, pausedReason: 'admin' })).toBe(true);
+  });
+
+  it('is false for the owner, the budget, or a monitor that is running', () => {
+    expect(isPausedByAdmin({ isPaused: true, pausedBy: 'user' })).toBe(false);
+    expect(isPausedByAdmin({ isPaused: true, pausedBy: 'budget' })).toBe(false);
+    expect(isPausedByAdmin({ isPaused: false, pausedBy: 'admin' })).toBe(false);
+    expect(isPausedByAdmin({ isPaused: true })).toBe(false);
   });
 });

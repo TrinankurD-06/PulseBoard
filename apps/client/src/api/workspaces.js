@@ -2,6 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ME_QUERY_KEY } from '../auth/AuthContext.js';
 import { http } from './http.js';
 
+/**
+ * A workspace the signed-in administrator is not a member of: the API answers it as a
+ * read-only viewer (`role: 'viewer'`, `adminView: true`). Only fetched when `enabled`.
+ */
+export function useWorkspaceView(wid, enabled) {
+  return useQuery({
+    queryKey: ['workspaces', wid, 'view'],
+    queryFn: () => http.get(`/workspaces/${wid}`).then((res) => res.data.data),
+    enabled: Boolean(enabled && wid),
+    retry: false,
+  });
+}
+
 const membersKey = (wid) => ['workspaces', wid, 'members'];
 
 export function useMembers(wid) {

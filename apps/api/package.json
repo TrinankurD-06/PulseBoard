@@ -12,7 +12,9 @@
     "seed:clear": "node scripts/seed-clear.js",
     "migrate": "node scripts/migrate.js",
     "rollups:rebuild": "node scripts/rollups-rebuild.js",
-    "seed:demo-incidents": "node scripts/seed-demo-incidents.js"
+    "seed:demo-incidents": "node scripts/seed-demo-incidents.js",
+    "admin:grant": "node scripts/admin-role.js grant",
+    "admin:revoke": "node scripts/admin-role.js revoke"
   },
   "dependencies": {
     "@pulseboard/shared": "^0.1.0",

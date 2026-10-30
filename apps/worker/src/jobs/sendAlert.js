@@ -1,4 +1,5 @@
 import { buildAlert } from '@pulseboard/shared/alerts';
+import { logAlertAttempt } from '../alertLog.js';
 import { ALERT_RETRY_DELAYS_SEC, INCIDENT_EVENT, JOB_NAMES } from '@pulseboard/shared/constants';
 import { addTimelineEntry } from '@pulseboard/shared/incident';
 import { AlertChannel, Incident, Monitor } from '@pulseboard/shared/models';
@@ -47,8 +48,16 @@ export function createSendAlertJob({ agenda, senders, dashboardUrl, logger }) {
         { type: INCIDENT_EVENT.ALERT_SENT, message: `${what} sent${preview}` },
         { $addToSet: { deliveredAlerts: deliveryKey } },
       );
+      await logAlertAttempt({ channel, ok: true, incidentId, workspaceId: incident.workspaceId });
       logger.info({ incidentId, channelId, kind }, 'Alert sent');
     } catch (err) {
+      await logAlertAttempt({
+        channel,
+        ok: false,
+        error: err,
+        incidentId,
+        workspaceId: incident.workspaceId,
+      });
       const delaySec = ALERT_RETRY_DELAYS_SEC[attempt - 1];
       const next = delaySec ? `retrying in ${delaySec}s` : 'giving up';
       await addTimelineEntry(incidentId, {

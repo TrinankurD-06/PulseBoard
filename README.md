@@ -88,9 +88,8 @@ bodies. Details in [packages/agent/README.md](packages/agent/README.md).
   is shown as **degraded** (with one notice), not as an outage.
 - **Alerts** to Email (Brevo or Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
-- **Admin panel** for the person running the deployment: every user (the demo account too), their
-  workspaces and monitor counts, and one button to stop or start a user's monitors. See
-  [Admin panel](#admin-panel).
+- **Admin console** for whoever runs the platform: every user (the demo account too), workspaces,
+  monitors, incidents, system health and an audit log. See [Admin console](#admin-console).
 - **Import from GitHub** (for people who signed in with GitHub): finds the sites behind your public
   repos (homepage, GitHub Pages, deployments, README links), checks which are live, and creates the
   monitors you pick in one step. Deterministic, no AI; see [Import from GitHub](#import-from-github).
@@ -184,7 +183,7 @@ npm run heartbeat -w @pulseboard/demo-target   # optional, in a second terminal:
 The seed writes `apps/demo-target/.pulseboard-demo.json` (git-ignored) with the demo agent key
 and heartbeat URL, so the demo-target starts reporting through the agent by itself.
 
-The admin panel login for the evaluation is under [Admin panel](#admin-panel).
+The admin console login for the evaluation is under [Admin console](#admin-console).
 
 Open <http://localhost:5173> and log in with **demo@pulseboard.dev / demo1234** (the login
 page has a "Fill in" button in demo mode). The public status page is at
@@ -275,10 +274,11 @@ optionally adding them to a new or existing status page.
 - Results are cached for 10 minutes, and GitHub's rate limits are respected. Details and limits:
   [DECISIONS.md](docs/DECISIONS.md) (D106) and [docs/API.md](docs/API.md).
 
-### Admin panel
+### Admin console
 
-The administrator sees every user (the demo account too) and can stop or start their monitors with one
-button.
+A separate console for whoever runs the platform: every user (the demo account too), workspaces,
+monitors, incidents, system health and an audit log. It lives at `/app/admin`, with its own navigation,
+and only a **superadmin** can open it.
 
 #### Evaluation admin account (temporary)
 
@@ -292,36 +292,74 @@ For the evaluation of this project, a dedicated admin account is published here:
 Sign in on the normal login page, then open **Admin** in the navigation.
 
 - **Locally**: `cp .env.example .env` already contains these values (`ADMIN_EMAIL`, `ADMIN_PASSWORD`), so
-  the admin exists as soon as the API starts with `npm run dev`.
+  the account exists, and is a superadmin, as soon as the API starts with `npm run dev`.
 - **On the deployed site**: the same two variables must be set on the host (on Render, under
-  **Environment**), which the project owner does; the account then exists after the next start.
-- This is a throwaway account made for the evaluation. It is not anyone's personal login and it is only
-  as safe as this file is private, which it is not: **remove it afterwards** by deleting `ADMIN_EMAIL` and
-  `ADMIN_PASSWORD` from the host's environment (the panel then disappears), or change `ADMIN_PASSWORD`
-  there to lock everyone else out. The account stays in the database but cannot be used to sign in once its
-  password is changed.
+  **Environment**); the account then exists after the next start.
+- This is a throwaway account made for the evaluation, and it is only as safe as this file is private,
+  which it is not: **remove it afterwards** by deleting `ADMIN_EMAIL` and `ADMIN_PASSWORD` from the host
+  (nobody is then granted the role by them), or change `ADMIN_PASSWORD`. To also take the role away from
+  the account, run `npm run admin:revoke -- admin@pulseboard.com`.
 
-#### How the admin account works
+#### Platform roles are not workspace roles
 
-1. `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 8 characters) in the API's environment define it.
-2. At start-up the API creates that account (or, if it exists, makes its password match
-   `ADMIN_PASSWORD`, so changing the variable is how you change the password).
-3. If only one of the two is set, or the password is shorter than 8 characters, the admin is simply not
-   created and the API logs why; the rest of PulseBoard runs normally.
+- A **workspace role** (owner, member, viewer) is what someone may do inside one workspace.
+- A **platform role** (`user`, `superadmin`) is stored on the account and is separate: a superadmin is
+  not a member of anyone's workspace and has no extra rights in them, except that they can **read** any
+  workspace as a viewer (never write), and every such read is recorded.
+- The role is checked on the server, against the database, on every admin request (not read from the
+  login token), so taking it away or suspending the admin takes effect at once. Everyone else gets 403
+  from every `/api/v1/admin/*` route. Admin routes are rate-limited per administrator.
+- **There is no way to promote yourself**: no screen, no API. The demo account can never be an admin.
 
-What the panel does:
+#### How to make your account a superadmin
 
-- Lists every user with email, how they sign in, workspaces and roles, monitor counts (total, running,
-  stopped by you, paused by the user, down), and last sign-in. The demo user is included and tagged.
-  Search by name or email.
-- **One button per user.** If anything is running it reads _Stop monitors_: it pauses every running
-  monitor and cancels its checks. Once nothing is running it reads _Start monitors_: it resumes only
-  the monitors you stopped. Monitors the user paused themselves stay paused.
-- It acts on the workspaces a user **owns** (for the demo user, the demo workspace), never on one they
-  were only invited to.
-- A user cannot resume a monitor you stopped (the Resume button is disabled and the API answers
-  `STOPPED_BY_ADMIN`), and pausing it again does not change who can start it.
-- Everyone else gets a plain "not found" for the panel and its API, so it does not reveal itself.
+Your account must already exist (sign up normally first). Then either:
+
+1. set `ADMIN_EMAILS=you@example.com` (comma-separated for several) in the API's environment and
+   restart: the API grants the role to those existing accounts when it starts; or
+2. run, against the database in your `.env`: `npm run admin:grant -- you@example.com`
+   (`npm run admin:revoke -- you@example.com` takes it away again).
+
+`ADMIN_EMAIL` together with `ADMIN_PASSWORD` (at least 8 characters) additionally **creates** that account
+if it does not exist and keeps its password equal to the variable, which is how the evaluation login
+above works. A too-short password only disables that account's creation, with a log message; the API
+still starts.
+
+#### What the console has
+
+- **Overview**: users, signups over 7 and 30 days, workspaces, monitors by type and status, open
+  incidents, checks per day, alerts sent and failed per channel, and requests saved by push monitors,
+  with charts.
+- **Users**: search, filter and page through everyone (sign-in provider, created, last login, workspaces,
+  monitors, status). A user's page shows their workspaces and roles, monitors, incidents, alert channels
+  (webhook URLs masked to their last 4 characters), usage and cost, and analytics. Actions: **suspend**
+  (they cannot sign in, their sessions end, their monitors are paused), unsuspend, **revoke sessions**,
+  and **delete** (type their email to confirm; their workspaces are deleted when nobody else is in
+  them, and handed to another member otherwise, or to a user you choose).
+- **Workspaces**: list and detail (members, monitors, status pages, incidents, usage). Actions: transfer
+  ownership, suspend (members get a clear "suspended" message and its monitors are paused), delete
+  (type the workspace name).
+- **Monitors**: every monitor of every user, filtered by status, type, workspace, owner or "failing now".
+  Per monitor and in bulk: pause, resume, Test now, delete. **Open** shows the monitor's normal Health
+  deck and analytics, read-only. An admin pause uses the same scheduling code as a user's (the job is
+  cancelled, and re-created on resume), is marked "paused by an administrator" with your note, and the
+  owner cannot undo it.
+- **Incidents**: all incidents on the platform, filterable, with timelines.
+- **System**: API and worker status, the Agenda queue (pending, running, failed, oldest due), change
+  streams, alert delivery failures per channel, and recent server errors.
+- **Audit log**: who did what to whom, when and from where; filterable.
+
+#### Privacy and safety
+
+- Never in any admin response: password hashes, refresh or session tokens, OAuth tokens, agent API keys,
+  heartbeat tokens, monitor headers. Webhook URLs show only their last 4 characters; monitor URLs are
+  shown without credentials or query strings. Emails are visible. A test plants real secrets and fails
+  if any of them appears in any admin response.
+- Viewing a user's data is read-only. There is deliberately **no "view as user"**.
+- Every admin write, and every read of a user's, workspace's, monitor's or incident's detail, goes into
+  the audit log, and the entry is written **before** the action runs, so an action whose entry cannot
+  be saved does not happen. Destructive actions need a typed confirmation, which the server checks too.
+- Administrators cannot suspend or delete themselves or another administrator.
 
 ### Scripts
 
@@ -373,7 +411,8 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Optional fallback, used only when `RESEND_API_KEY` is empty                                                                                   |
 | `DEMO_READ_ONLY`               | api, worker            | `false`                                                                     | Public demo: the demo user is a read-only Viewer, a banner says so, and the worker resets the demo data daily                                 |
 | `DEMO_OWNER_EMAIL`             | api, worker, seed      | empty                                                                       | Account that owns the demo workspace when `DEMO_READ_ONLY=true`; empty = a login-less owner account                                           |
-| `ADMIN_EMAIL`                  | api                    | empty                                                                       | The administrator's email. With `ADMIN_PASSWORD`, enables the admin panel. Set it as a secret, never in the repo                              |
+| `ADMIN_EMAILS`                 | api                    | empty                                                                       | Comma-separated emails of existing accounts to make superadmin when the API starts (never the demo account)                                   |
+| `ADMIN_EMAIL`                  | api                    | empty                                                                       | With `ADMIN_PASSWORD`: creates this account if missing and makes it a superadmin (the evaluation login)                                       |
 | `ADMIN_PASSWORD`               | api                    | empty                                                                       | The administrator's password, at least 8 characters. The API creates the account and keeps its password in line with this value               |
 | `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                                        |
 | `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                          |

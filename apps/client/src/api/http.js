@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { describeApiError } from '../lib/apiErrors.js';
 import { getAccessToken, setAccessToken } from './tokenStore.js';
 
 const baseURL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -68,5 +69,6 @@ http.interceptors.response.use(
 
 /** The human-readable message from the API's error shape, with a fallback. */
 export function errorMessage(error, fallback = 'Something went wrong. Please try again.') {
-  return error?.response?.data?.error?.message ?? fallback;
+  const { code, message } = error?.response?.data?.error ?? {};
+  return describeApiError(code, message) ?? fallback;
 }

@@ -9,7 +9,17 @@ import NotFound from './pages/NotFound.jsx';
 
 // Route-level code splitting: the landing page and public status pages don't
 // download the dashboard (and its charting library), and vice versa.
-const Admin = lazy(() => import('./pages/Admin.jsx'));
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout.jsx'));
+const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
+const AdminUsers = lazy(() => import('./pages/admin/Users.jsx'));
+const AdminUserDetail = lazy(() => import('./pages/admin/UserDetail.jsx'));
+const AdminWorkspaces = lazy(() => import('./pages/admin/Workspaces.jsx'));
+const AdminWorkspaceDetail = lazy(() => import('./pages/admin/WorkspaceDetail.jsx'));
+const AdminMonitors = lazy(() => import('./pages/admin/Monitors.jsx'));
+const AdminIncidents = lazy(() => import('./pages/admin/Incidents.jsx'));
+const AdminIncidentDetail = lazy(() => import('./pages/admin/IncidentDetail.jsx'));
+const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
+const AdminAuditLog = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AlertChannels = lazy(() => import('./pages/AlertChannels.jsx'));
 const AppIndex = lazy(() => import('./pages/AppIndex.jsx'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout.jsx'));
@@ -49,6 +59,21 @@ export default function App() {
 
             <Route path="/app" element={<ProtectedRoute />}>
               <Route index element={<AppIndex />} />
+              {/* The platform admin console: its own layout, and for administrators only.
+                  A static segment outranks :wid below. */}
+              <Route path="admin" element={<AdminLayout />}>
+                <Route index element={<AdminOverview />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="users/:id" element={<AdminUserDetail />} />
+                <Route path="workspaces" element={<AdminWorkspaces />} />
+                <Route path="workspaces/:id" element={<AdminWorkspaceDetail />} />
+                <Route path="monitors" element={<AdminMonitors />} />
+                <Route path="incidents" element={<AdminIncidents />} />
+                <Route path="incidents/:id" element={<AdminIncidentDetail />} />
+                <Route path="system" element={<AdminSystem />} />
+                <Route path="audit" element={<AdminAuditLog />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
               <Route path=":wid" element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="monitors/new" element={<NewMonitor />} />
@@ -61,7 +86,6 @@ export default function App() {
                 <Route path="usage" element={<Usage />} />
                 <Route path="team" element={<Team />} />
                 <Route path="settings" element={<Settings />} />
-                <Route path="admin" element={<Admin />} />
               </Route>
             </Route>
 

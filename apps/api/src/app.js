@@ -15,6 +15,9 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { alertChannelsRouter } from './modules/alertChannels/alertChannels.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { createActiveUserGuard } from './middleware/activeUser.js';
+import { createAdminLimiter } from './middleware/rateLimits.js';
+import { requireSuperadmin } from './middleware/requireSuperadmin.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { githubRouter } from './modules/github/github.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
@@ -88,7 +91,9 @@ export function createApp({
   app.use('/health', healthRouter({ getRealtimeStatus, getWorkerStatus }));
 
   const tokens = createTokenService(env);
-  const requireAuth = authenticate(tokens);
+  // A valid token is not enough: a suspended account is refused on every authenticated route.
+  const activeUser = createActiveUserGuard();
+  const requireAuth = [authenticate(tokens), activeUser];
 
   const monitorSchemas = buildMonitorSchemas({ demoMode: env.DEMO_MODE });
   // Shared by the public endpoint (reads) and status page CRUD (invalidates).
@@ -103,13 +108,28 @@ export function createApp({
 
   const api = express.Router();
   api.use('/meta', metaRouter({ env, schemas: monitorSchemas }));
-  api.use('/auth', authRouter({ env, tokens, logger, oauthFetch }));
+  api.use('/auth', authRouter({ env, tokens, logger, oauthFetch, activeUser }));
   api.use('/public', publicRouter({ publicCache }));
   // Heartbeat pings: public, the token in the URL is the authentication.
   api.use('/ping', pingRouter({ processCheckResult }));
   // Agent reports (U4): public, the Bearer agent key is the authentication.
   api.use('/agent', agentRouter({ processCheckResult }));
-  api.use('/admin', requireAuth, adminRouter({ env, scheduler, schemas: monitorSchemas }));
+  // The admin console: superadmins only (role re-read from the database on every request),
+  // rate-limited per administrator.
+  api.use(
+    '/admin',
+    requireAuth,
+    requireSuperadmin(),
+    createAdminLimiter(),
+    adminRouter({
+      env,
+      scheduler,
+      schemas: monitorSchemas,
+      activeUser,
+      getRealtimeStatus,
+      getWorkerStatus,
+    }),
+  );
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler, env }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.

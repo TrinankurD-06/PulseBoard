@@ -70,3 +70,26 @@ export function createRefreshLimiter(max) {
     message: 'Too many session refreshes. Please try again shortly.',
   });
 }
+
+/**
+ * The admin console, per administrator (not per IP): 300 reads and 60 writes a minute. One
+ * middleware for /admin; it picks the budget by method, so a burst of list reads cannot use up
+ * the writes and the other way round. Must run after authenticate().
+ */
+export function createAdminLimiter() {
+  const key = (req) => `admin:${req.userId}`;
+  const reads = limiter({
+    windowMs: 60 * 1000,
+    limit: 300,
+    message: 'Too many admin requests. Please slow down.',
+    keyGenerator: (req) => `${key(req)}:read`,
+  });
+  const writes = limiter({
+    windowMs: 60 * 1000,
+    limit: 60,
+    message: 'Too many admin actions. Please slow down.',
+    keyGenerator: (req) => `${key(req)}:write`,
+  });
+  return (req, res, next) =>
+    (req.method === 'GET' || req.method === 'HEAD' ? reads : writes)(req, res, next);
+}

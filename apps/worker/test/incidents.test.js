@@ -1,6 +1,6 @@
 import { mongoose } from '@pulseboard/shared/db';
 import { createLogger } from '@pulseboard/shared/logger';
-import { AlertChannel, Incident, Monitor } from '@pulseboard/shared/models';
+import { AlertChannel, AlertLog, Incident, Monitor } from '@pulseboard/shared/models';
 import { AGENDA_COLLECTION, createAgenda } from '@pulseboard/shared/scheduling';
 import { clearMemoryDb, startMemoryDb, stopMemoryDb } from '@pulseboard/shared/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -228,6 +228,28 @@ describe('send-alert job', () => {
     expect(timeline.map((e) => e.type)).toEqual(Array(4).fill('alert_failed'));
     expect(timeline[0].message).toMatch(/attempt 1\): HTTP 500: upstream error; retrying in 30s/);
     expect(timeline[3].message).toMatch(/attempt 4\).*giving up/);
+  });
+
+  it('logs every delivery attempt for the admin console, without addresses, URLs or secrets', async () => {
+    await runJob(data());
+    const original = senders.discord;
+    // A failing sender whose message carries the webhook URL (a credential).
+    senders.discord = async () => {
+      throw new Error(`post to ${channel.target} failed: HTTP 500`);
+    };
+    try {
+      await runJob(data({ kind: 'up' }));
+    } finally {
+      senders.discord = original;
+    }
+
+    const rows = await AlertLog.find().sort({ at: 1 }).lean();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ channelType: 'discord', ok: true, error: null });
+    expect(String(rows[0].workspaceId)).toBe(String(workspaceId));
+    expect(rows[1]).toMatchObject({ channelType: 'discord', ok: false });
+    expect(rows[1].error).toBe('post to [url] failed: HTTP 500');
+    expect(JSON.stringify(rows)).not.toContain('discord.com/api/webhooks');
   });
 
   it('skips disabled or deleted channels', async () => {

@@ -7,13 +7,13 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { envSchema } from '../src/config/env.js';
 import {
-  ensureAdminAccount,
   MIN_ADMIN_PASSWORD_LENGTH,
-} from '../src/modules/admin/admin.service.js';
+  bootstrapSuperadmins,
+} from '../src/modules/admin/platformAdmins.js';
 import { buildTestApp, testEnv } from './helpers.js';
 
-// The evaluation admin published in the README must be the one `.env.example` carries, must be
-// valid, and must really let someone in. If anyone edits one and not the others, this fails.
+// The evaluation admin published in the README must be the one `.env.example` carries, must be a valid
+// pair, and must really sign in to the admin console. If anyone edits one and not the others, this fails.
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
 const example = readFileSync(join(repoRoot, '.env.example'), 'utf8');
@@ -37,11 +37,7 @@ describe('the evaluation admin account in the README', () => {
     expect(readme).toContain(`\`${password}\``);
   });
 
-  it('is the dedicated evaluation address, not a personal one', () => {
-    expect(email).toBe('admin@pulseboard.com');
-  });
-
-  it('parses with the API environment schema', () => {
+  it('parses with the API environment schema, with ADMIN_EMAILS empty by default', () => {
     const parsed = parseEnv(envSchema, {
       NODE_ENV: 'test',
       MONGODB_URI: 'mongodb://localhost/x',
@@ -50,15 +46,29 @@ describe('the evaluation admin account in the README', () => {
       JWT_REFRESH_SECRET: 'y'.repeat(32),
       ADMIN_EMAIL: email,
       ADMIN_PASSWORD: password,
+      ADMIN_EMAILS: fromExample('ADMIN_EMAILS'),
     });
     expect(parsed.ADMIN_EMAIL).toBe(email);
     expect(parsed.ADMIN_PASSWORD).toBe(password);
+    expect(parsed.ADMIN_EMAILS).toEqual([]);
   });
 
-  it('signs in to the admin panel once the API has created it', async () => {
-    const env = { ...testEnv, ADMIN_EMAIL: email, ADMIN_PASSWORD: password };
-    expect(await ensureAdminAccount({ env })).toBe('created');
-    const app = buildTestApp({ env: { ADMIN_EMAIL: email, ADMIN_PASSWORD: password } });
+  it('parses a comma-separated ADMIN_EMAILS list, trimmed and lower-cased', () => {
+    const parsed = parseEnv(envSchema, {
+      NODE_ENV: 'test',
+      MONGODB_URI: 'mongodb://localhost/x',
+      CLIENT_ORIGIN: 'http://localhost:5173',
+      JWT_ACCESS_SECRET: 'x'.repeat(32),
+      JWT_REFRESH_SECRET: 'y'.repeat(32),
+      ADMIN_EMAILS: ' One@Example.com , two@example.com ,, ',
+    });
+    expect(parsed.ADMIN_EMAILS).toEqual(['one@example.com', 'two@example.com']);
+  });
+
+  it('signs in to the admin console once the API has started and bootstrapped it', async () => {
+    const env = { ...testEnv, ADMIN_EMAILS: [], ADMIN_EMAIL: email, ADMIN_PASSWORD: password };
+    expect((await bootstrapSuperadmins({ env })).account).toBe('created');
+    const app = buildTestApp({ env });
 
     const login = await request(app).post('/api/v1/auth/login').send({ email, password });
     expect(login.status).toBe(200);
@@ -66,9 +76,9 @@ describe('the evaluation admin account in the README', () => {
 
     const me = await request(app).get('/api/v1/auth/me').set(auth);
     expect(me.body.data.isAdmin).toBe(true);
+    expect((await request(app).get('/api/v1/admin/overview').set(auth)).status).toBe(200);
     expect((await request(app).get('/api/v1/admin/users').set(auth)).status).toBe(200);
 
-    // A wrong password gets nowhere.
     const bad = await request(app)
       .post('/api/v1/auth/login')
       .send({ email, password: 'nope-nope-nope' });

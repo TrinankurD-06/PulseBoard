@@ -1,4 +1,5 @@
 import { buildNotice } from '@pulseboard/shared/alerts';
+import { logAlertAttempt } from '../alertLog.js';
 import { ALERT_RETRY_DELAYS_SEC, JOB_NAMES } from '@pulseboard/shared/constants';
 import { AlertChannel, Monitor } from '@pulseboard/shared/models';
 
@@ -23,8 +24,10 @@ export function createSendNoticeJob({ agenda, senders, dashboardUrl, logger }) {
     try {
       const notice = buildNotice({ noticeKind, monitor, details, dashboardUrl });
       await senders[channel.type](channel.target, notice);
+      await logAlertAttempt({ channel, ok: true, workspaceId: monitor.workspaceId });
       logger.info({ monitorId, channelId, noticeKind }, 'Notice sent');
     } catch (err) {
+      await logAlertAttempt({ channel, ok: false, error: err, workspaceId: monitor.workspaceId });
       const delaySec = ALERT_RETRY_DELAYS_SEC[attempt - 1];
       logger.warn(
         {

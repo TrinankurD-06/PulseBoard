@@ -58,10 +58,14 @@ done on the demo target's `/admin` page, which needs no login.
     failure with a message.
 14. **Cost & usage.** Requests sent this month, requests saved, the estimate and cost per
     currency, per-monitor intervals (adaptive / slowed) and budget bars.
-15. **Admin panel.** Sign in with the evaluation admin from the README (Admin panel section) and open
-    **Admin**: every user, the demo account included, with workspaces and monitor counts. Press **Stop
-    monitors** on a user (confirm), watch their monitors turn paused on that user's dashboard, then press
-    **Start monitors**. A user cannot resume what you stopped.
+15. **Admin console.** Sign in with the evaluation admin from the README (Admin console section) and open
+    **Admin**. **Overview**: platform numbers and charts. **Users**: find the demo account, open it to see
+    its workspaces, monitors and incidents (read-only), then **Suspend** one test user (they cannot sign in
+    and their monitors pause) and **Unsuspend** them. **Monitors**: filter "failing now", select two, and
+    **Pause** them with a note; open one with **Open** to see its full Health deck read-only; then
+    **Resume**. Pause one on a user's own dashboard in another window to show the "paused by an
+    administrator" notice and that the user cannot resume it. **System**: the queue and recent errors.
+    **Audit log**: every step above is there, with who, what and when.
 
 Tip: in production the free demo-target sleeps when idle; open its `/admin` page a minute
 before the demo.
