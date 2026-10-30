@@ -88,6 +88,9 @@ bodies. Details in [packages/agent/README.md](packages/agent/README.md).
   is shown as **degraded** (with one notice), not as an outage.
 - **Alerts** to Email (Brevo or Resend, HTML), Discord (embeds) and Slack (Block Kit), sent as background jobs
   with retries after 30 s, 2 min and 8 min, and a full incident timeline.
+- **Admin panel** for the person running the deployment: every user (the demo account too), their
+  workspaces and monitor counts, and one button to stop or start a user's monitors. See
+  [Admin panel](#admin-panel).
 - **Import from GitHub** (for people who signed in with GitHub): finds the sites behind your public
   repos (homepage, GitHub Pages, deployments, README links), checks which are live, and creates the
   monitors you pick in one step. Deterministic, no AI; see [Import from GitHub](#import-from-github).
@@ -270,6 +273,38 @@ optionally adding them to a new or existing status page.
 - Results are cached for 10 minutes, and GitHub's rate limits are respected. Details and limits:
   [DECISIONS.md](docs/DECISIONS.md) (D106) and [docs/API.md](docs/API.md).
 
+### Admin panel
+
+The administrator sees every user and can stop or start their monitors with one button. There is no
+admin until you give the deployment an email and a password:
+
+1. Set `ADMIN_EMAIL` (the administrator's email) and `ADMIN_PASSWORD` (at least 12 characters) in the
+   API's environment: in `.env` locally, or on Render under **Environment**. Then restart or redeploy.
+2. At start-up the API creates that account (or, if it exists, makes its password match
+   `ADMIN_PASSWORD`, so changing the variable is how you change the password).
+3. Sign in on the normal login page with that email and password (or with Google or GitHub, if the
+   admin email is the one your provider account uses). An **Admin** link appears in the navigation.
+
+**The credentials are not in this README on purpose.** The repository is public, so an admin password
+written here would let anyone stop everyone's monitors. They live only in the environment variables
+above (Render keeps them as secrets). If you set only one of the two, or the password is shorter than
+12 characters, the admin is simply not created and the API logs why; the rest of PulseBoard runs
+normally.
+
+What the panel does:
+
+- Lists every user with email, how they sign in, workspaces and roles, monitor counts (total, running,
+  stopped by you, paused by the user, down), and last sign-in. The demo user is included and tagged.
+  Search by name or email.
+- **One button per user.** If anything is running it reads _Stop monitors_: it pauses every running
+  monitor and cancels its checks. Once nothing is running it reads _Start monitors_: it resumes only
+  the monitors you stopped. Monitors the user paused themselves stay paused.
+- It acts on the workspaces a user **owns** (for the demo user, the demo workspace), never on one they
+  were only invited to.
+- A user cannot resume a monitor you stopped (the Resume button is disabled and the API answers
+  `STOPPED_BY_ADMIN`), and pausing it again does not change who can start it.
+- Everyone else gets a plain "not found" for the panel and its API, so it does not reveal itself.
+
 ### Scripts
 
 | Command                                        | What it does                                                                                                   |
@@ -320,6 +355,8 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `SMTP_HOST` … `SMTP_PASS`      | api, worker            | empty                                                                       | Optional fallback, used only when `RESEND_API_KEY` is empty                                                                                   |
 | `DEMO_READ_ONLY`               | api, worker            | `false`                                                                     | Public demo: the demo user is a read-only Viewer, a banner says so, and the worker resets the demo data daily                                 |
 | `DEMO_OWNER_EMAIL`             | api, worker, seed      | empty                                                                       | Account that owns the demo workspace when `DEMO_READ_ONLY=true`; empty = a login-less owner account                                           |
+| `ADMIN_EMAIL`                  | api                    | empty                                                                       | The administrator's email. With `ADMIN_PASSWORD`, enables the admin panel. Set it as a secret, never in the repo                              |
+| `ADMIN_PASSWORD`               | api                    | empty                                                                       | The administrator's password, at least 12 characters. The API creates the account and keeps its password in line with this value              |
 | `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                                        |
 | `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                          |
 | `SEED_ALERT_EMAIL`             | seed                   | empty                                                                       | Email channel target (default: the demo user)                                                                                                 |

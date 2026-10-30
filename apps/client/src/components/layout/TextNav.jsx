@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext.js';
 import { cn } from '../../lib/cn.js';
 
 const NAV_ITEMS = [
@@ -11,6 +12,8 @@ const NAV_ITEMS = [
   { to: 'settings', label: 'Settings', short: 'Settings' },
 ];
 
+const ADMIN_ITEM = { to: 'admin', label: 'Admin', short: 'Admin' };
+
 const href = (wid, to) => (to ? `/app/${wid}/${to}` : `/app/${wid}`);
 
 /**
@@ -18,11 +21,13 @@ const href = (wid, to) => (to ? `/app/${wid}/${to}` : `/app/${wid}`);
  * the rest text-faint). Mobile: the same links in a hairline bottom bar.
  */
 export default function TextNav({ wid }) {
+  const { isAdmin } = useAuth();
+  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
   return (
     <>
       <nav aria-label="Main" className="hidden md:block">
         <ul className="flex flex-wrap gap-x-7 gap-y-1">
-          {NAV_ITEMS.map(({ to, label, end }) => (
+          {items.map(({ to, label, end }) => (
             <li key={label}>
               <NavLink
                 to={href(wid, to)}
@@ -46,7 +51,7 @@ export default function TextNav({ wid }) {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
       >
         <ul className="flex justify-between px-2">
-          {NAV_ITEMS.map(({ to, short, end }) => (
+          {items.map(({ to, short, end }) => (
             <li key={short} className="min-w-0 flex-1">
               <NavLink
                 to={href(wid, to)}

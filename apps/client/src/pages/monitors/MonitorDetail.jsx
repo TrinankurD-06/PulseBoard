@@ -34,7 +34,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useCurrentWorkspace } from '../../hooks/useCurrentWorkspace.js';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle.js';
 import { useNow } from '../../hooks/useNow.js';
-import { intervalDescription, isPausedByBudget } from '../../lib/budget.js';
+import { intervalDescription, isPausedByAdmin, isPausedByBudget } from '../../lib/budget.js';
 import { formatDuration, formatMs, timeAgo } from '../../lib/format.js';
 import { isAgent, isHeartbeat } from '../../lib/monitorType.js';
 import NotFound from '../NotFound.jsx';
@@ -208,7 +208,20 @@ function Actions({ monitor, wid, onTestResult, canTest = true }) {
           Test now
         </RingDotCta>
       )}
-      {monitor.isPaused && isPausedByBudget(monitor) ? (
+      {monitor.isPaused && isPausedByAdmin(monitor) ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled
+          title="Stopped by an administrator: only they can start it again"
+          aria-describedby="resume-admin-note"
+        >
+          <Play className="h-4 w-4" /> Resume
+          <span id="resume-admin-note" className="sr-only">
+            Stopped by an administrator: only they can start it again
+          </span>
+        </Button>
+      ) : monitor.isPaused && isPausedByBudget(monitor) ? (
         // The API refuses (409 BUDGET_EXCEEDED) until the budget is raised.
         <Button
           variant="secondary"

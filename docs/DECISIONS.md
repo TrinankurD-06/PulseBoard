@@ -1627,3 +1627,25 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Resend stays** for people who own a domain; nothing is removed. The channel's "Test" button shows the
   provider's refusal if the setup is wrong.
 - **Limit:** Brevo's free tier caps at 300 emails a day across all workspaces on the deployment.
+
+### D108. An admin panel, with the administrator defined by the environment
+
+- **Need:** see every user (the demo account too) and stop or start a user's monitors with one button.
+- **Who is the admin:** the account whose email equals `ADMIN_EMAIL`. The API creates it at start-up with `ADMIN_PASSWORD`
+  and re-syncs the password when the variable changes, so the secret lives only in the environment. Both must be set
+  (password of 12+ characters) or there is no admin; a short password logs a warning and disables only the panel, so a
+  typo cannot stop the API from starting. Creating the account at boot also means nobody can register the admin address
+  first. **The credentials are deliberately not in the README**: the repository is public, so a password there would let
+  anyone stop everyone's monitors. The README documents the variables and the steps instead.
+- **No new role in the database.** Admin is decided on the server by comparing the signed-in user's email with `ADMIN_EMAIL`
+  on every admin request (and reported to the client by `/auth/me` as `isAdmin` for the nav link only). Everyone else gets
+  404 from `/admin/*`, so the panel does not reveal itself.
+- **What "stop" means.** It pauses every running monitor in the workspaces the user **owns** (for the demo user, its demo
+  workspace, although it is only a viewer there), using the normal pause (job cancelled, open incident closed, pause
+  history written) with a new pause reason `admin`. Workspaces a user was merely invited to are never touched.
+- **What "start" means.** It resumes only monitors paused with reason `admin`, so it never overrides a user's own pause or a
+  budget pause. A user cannot resume an admin-stopped monitor (403 `STOPPED_BY_ADMIN`), and pausing it again is a no-op,
+  so the stop cannot be laundered into a user pause.
+- **Listing** returns names, emails, sign-in providers (never tokens or hashes), workspaces with roles, monitor counts and
+  the last sign-in, paged (25 by default, 100 at most) and searchable.
+- **Limits:** one administrator; no per-monitor control and no deleting users from the panel.

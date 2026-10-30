@@ -69,6 +69,7 @@ export default function AuthProvider({ children }) {
       isLoadingProfile: status === 'authenticated' && meQuery.isPending,
       user: meQuery.data?.user ?? null,
       workspaces: meQuery.data?.workspaces ?? [],
+      isAdmin: Boolean(meQuery.data?.isAdmin),
       login,
       register,
       logout,

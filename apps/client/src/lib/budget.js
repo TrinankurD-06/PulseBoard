@@ -22,6 +22,10 @@ export function isSlowedByBudget(monitor, now) {
 export const isPausedByBudget = (monitor) =>
   Boolean(monitor.isPaused && monitor.pausedReason === 'budget_exceeded');
 
+/** True when an administrator stopped the monitor (only they can start it again). */
+export const isPausedByAdmin = (monitor) =>
+  Boolean(monitor.isPaused && monitor.pausedReason === 'admin');
+
 /** The interval the monitor is actually checked at right now. */
 export const effectiveIntervalSec = (monitor) => monitor.currentIntervalSec ?? monitor.intervalSec;
 

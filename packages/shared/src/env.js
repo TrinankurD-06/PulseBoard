@@ -61,7 +61,9 @@ export const adminEnvFields = {
   ),
   ADMIN_PASSWORD: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() ? value.trim() : undefined),
-    z.string().min(12, 'ADMIN_PASSWORD must be at least 12 characters').optional(),
+    // Length is checked when the account is created, so a short password switches the admin off
+    // with a log message instead of stopping the whole API from starting.
+    z.string().optional(),
   ),
 };
 

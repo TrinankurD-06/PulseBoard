@@ -18,10 +18,18 @@ export function isAdminEmail(env, email) {
  * Creates the administrator account from ADMIN_EMAIL / ADMIN_PASSWORD, or brings its password
  * in line with ADMIN_PASSWORD, so the environment stays the one place the secret lives. Does
  * nothing unless both are set. Creating it at start-up also means nobody can register the
- * admin address first. Returns 'disabled' | 'created' | 'updated' | 'unchanged'.
+ * admin address first. Returns 'disabled' | 'weak-password' | 'created' | 'updated' | 'unchanged'.
  */
+export const MIN_ADMIN_PASSWORD_LENGTH = 12;
+
 export async function ensureAdminAccount({ env, logger, bcryptCost = env.BCRYPT_COST }) {
   if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD) return 'disabled';
+  if (env.ADMIN_PASSWORD.length < MIN_ADMIN_PASSWORD_LENGTH) {
+    logger?.warn(
+      `ADMIN_PASSWORD is shorter than ${MIN_ADMIN_PASSWORD_LENGTH} characters: the admin account was not created or updated`,
+    );
+    return 'weak-password';
+  }
   const existing = await User.findOne({ email: env.ADMIN_EMAIL }).select('+passwordHash');
   if (!existing) {
     const user = await User.create({

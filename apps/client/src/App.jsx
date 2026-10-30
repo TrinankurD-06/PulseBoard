@@ -9,6 +9,7 @@ import NotFound from './pages/NotFound.jsx';
 
 // Route-level code splitting: the landing page and public status pages don't
 // download the dashboard (and its charting library), and vice versa.
+const Admin = lazy(() => import('./pages/Admin.jsx'));
 const AlertChannels = lazy(() => import('./pages/AlertChannels.jsx'));
 const AppIndex = lazy(() => import('./pages/AppIndex.jsx'));
 const AppLayout = lazy(() => import('./components/layout/AppLayout.jsx'));
@@ -60,6 +61,7 @@ export default function App() {
                 <Route path="usage" element={<Usage />} />
                 <Route path="team" element={<Team />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="admin" element={<Admin />} />
               </Route>
             </Route>
 

@@ -454,3 +454,19 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       performance **79, 83, 84 → median 83** (the first run is cold), accessibility 100, best practices 100; main content 2.6 to 3.3 s, blocking time about 500 ms,
       layout shift 0.001 (was 0.023). Progress over the work: 60 → 83. Still 2 points under the target of 85; the remaining cost is script work on the page
       (the chart library, about 500 ms of blocking). Next step if it matters: draw the four small trend cards without the chart library.
+
+---
+
+# Admin panel (30 Oct)
+
+- [x] **Backend** (`5c3e4a5`): `GET /admin/users` (search, paging) and `POST /admin/users/:uid/monitors` (`stop` | `start`), answered only to the account with
+      `ADMIN_EMAIL` (404 for everyone else). The admin account is created at API start-up from `ADMIN_PASSWORD` and re-synced when it changes (short password: warning,
+      no admin, the API still starts). Stop pauses a user's running monitors with the new reason `admin`; start resumes only those; the user can neither resume nor
+      re-pause them (403 `STOPPED_BY_ADMIN`). The demo user is listed and managed through its demo workspace. `/auth/me` reports `isAdmin`. 18 tests.
+- [x] **Frontend**: `/app/:wid/admin` (Admin link in the navigation, administrator only): user list with search and paging, workspaces and roles, monitor counts, one
+      stop/start button per user with a confirmation before stopping; the monitor page shows Resume disabled for an admin-stopped monitor. Helpers in `lib/admin.js`, 7 tests.
+- [x] **Docs**: README "Admin panel" section and the two variables, `.env.example`, `render.yaml` (secrets, `sync: false`), D108.
+- **The admin email and password are NOT in the README, by design:** the repository is public. They are environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- [ ] **Needs you:** set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) on the Render service and redeploy, then sign in and open Admin.
+- [ ] **Not looked at in a browser** (memory was above the 80 % limit). Check the page in light and dark, and on a phone.
+- Gate: agent 49, shared 353, API 357, client 272, demo-target 23, worker 77 tests; ESLint, Prettier and the build clean.

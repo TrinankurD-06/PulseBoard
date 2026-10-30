@@ -277,6 +277,18 @@ describe('ensureAdminAccount', () => {
     expect(await User.exists({ email: 'root@example.com' })).toBeNull();
   });
 
+  it('refuses a short password instead of creating a weak admin, without stopping the API', async () => {
+    const warnings = [];
+    const logger = { info() {}, warn: (message) => warnings.push(message) };
+    const result = await ensureAdminAccount({
+      env: { ...adminEnv, ADMIN_PASSWORD: 'short' },
+      logger,
+    });
+    expect(result).toBe('weak-password');
+    expect(warnings[0]).toMatch(/shorter than 12/);
+    expect(await User.exists({ email: 'root@example.com' })).toBeNull();
+  });
+
   it('creates the account with a hashed password and a workspace, then can log in with it', async () => {
     expect(await ensureAdminAccount({ env: adminEnv })).toBe('created');
     const user = await User.findOne({ email: 'root@example.com' }).select('+passwordHash').lean();
