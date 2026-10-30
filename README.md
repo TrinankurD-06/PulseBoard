@@ -18,6 +18,8 @@ change streams are the realtime event bus. No Redis, no message broker.
 Render service, data on MongoDB Atlas). Use the demo login button on the sign-in page. The free
 backend sleeps when idle, so the first request after a pause can take up to a minute.
 
+**Demo video:** [watch the walkthrough on Google Drive](https://drive.google.com/drive/folders/1Z4Ohlq677-Peks-Vh-L0oikaTGp4miEf?usp=sharing).
+
 ![Dashboard during an outage](docs/screenshots/dashboard-outage.png)
 
 ## Monitor types
