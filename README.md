@@ -184,6 +184,8 @@ npm run heartbeat -w @pulseboard/demo-target   # optional, in a second terminal:
 The seed writes `apps/demo-target/.pulseboard-demo.json` (git-ignored) with the demo agent key
 and heartbeat URL, so the demo-target starts reporting through the agent by itself.
 
+The admin panel login for the evaluation is under [Admin panel](#admin-panel).
+
 Open <http://localhost:5173> and log in with **demo@pulseboard.dev / demo1234** (the login
 page has a "Fill in" button in demo mode). The public status page is at
 <http://localhost:5173/status/acme>, and the demo target's control panel at
@@ -275,21 +277,37 @@ optionally adding them to a new or existing status page.
 
 ### Admin panel
 
-The administrator sees every user and can stop or start their monitors with one button. There is no
-admin until you give the deployment an email and a password:
+The administrator sees every user (the demo account too) and can stop or start their monitors with one
+button.
 
-1. Set `ADMIN_EMAIL` (the administrator's email) and `ADMIN_PASSWORD` (at least 12 characters) in the
-   API's environment: in `.env` locally, or on Render under **Environment**. Then restart or redeploy.
+#### Evaluation admin account (temporary)
+
+For the evaluation of this project, a dedicated admin account is published here:
+
+|              |                         |
+| ------------ | ----------------------- |
+| **Email**    | `admin@pulseboard.dev`  |
+| **Password** | `PulseBoard-Admin-2026` |
+
+Sign in on the normal login page, then open **Admin** in the navigation.
+
+- **Locally**: `cp .env.example .env` already contains these values (`ADMIN_EMAIL`, `ADMIN_PASSWORD`), so
+  the admin exists as soon as the API starts with `npm run dev`.
+- **On the deployed site**: the same two variables must be set on the host (on Render, under
+  **Environment**), which the project owner does; the account then exists after the next start.
+- This is a throwaway account made for the evaluation. It is not anyone's personal login and it is only
+  as safe as this file is private, which it is not: **remove it afterwards** by deleting `ADMIN_EMAIL` and
+  `ADMIN_PASSWORD` from the host's environment (the panel then disappears), or change `ADMIN_PASSWORD`
+  there to lock everyone else out. The account stays in the database but cannot be used to sign in once its
+  password is changed.
+
+#### How the admin account works
+
+1. `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 12 characters) in the API's environment define it.
 2. At start-up the API creates that account (or, if it exists, makes its password match
    `ADMIN_PASSWORD`, so changing the variable is how you change the password).
-3. Sign in on the normal login page with that email and password (or with Google or GitHub, if the
-   admin email is the one your provider account uses). An **Admin** link appears in the navigation.
-
-**The credentials are not in this README on purpose.** The repository is public, so an admin password
-written here would let anyone stop everyone's monitors. They live only in the environment variables
-above (Render keeps them as secrets). If you set only one of the two, or the password is shorter than
-12 characters, the admin is simply not created and the API logs why; the rest of PulseBoard runs
-normally.
+3. If only one of the two is set, or the password is shorter than 12 characters, the admin is simply not
+   created and the API logs why; the rest of PulseBoard runs normally.
 
 What the panel does:
 

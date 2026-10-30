@@ -58,6 +58,10 @@ done on the demo target's `/admin` page, which needs no login.
     failure with a message.
 14. **Cost & usage.** Requests sent this month, requests saved, the estimate and cost per
     currency, per-monitor intervals (adaptive / slowed) and budget bars.
+15. **Admin panel.** Sign in with the evaluation admin from the README (Admin panel section) and open
+    **Admin**: every user, the demo account included, with workspaces and monitor counts. Press **Stop
+    monitors** on a user (confirm), watch their monitors turn paused on that user's dashboard, then press
+    **Start monitors**. A user cannot resume what you stopped.
 
 Tip: in production the free demo-target sleeps when idle; open its `/admin` page a minute
 before the demo.

@@ -48,7 +48,7 @@ services:
       - key: ADMIN_EMAIL
         sync: false # the administrator's email (enables the admin panel together with the password)
       - key: ADMIN_PASSWORD
-        sync: false # at least 12 characters; stays a secret in Render, never in the repo
+        sync: false # at least 12 characters; set it in Render (the README lists the temporary evaluation values)
       - key: DEMO_OWNER_EMAIL
         sync: false # optional: the account that owns the demo workspace (default: a login-less owner)
       - key: BREVO_API_KEY

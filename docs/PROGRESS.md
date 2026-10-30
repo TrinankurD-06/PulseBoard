@@ -472,3 +472,9 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       goes straight through, search, and a non-admin gets a 404 with no Admin link. Fixed two things found there: the workspace column did not line up from row to row, and
       the eight-item phone navigation cut off "Overview" and "Incidents" (the labels are slightly smaller when the Admin link is shown).
 - Gate: agent 49, shared 353, API 357, client 272, demo-target 23, worker 77 tests; ESLint, Prettier and the build clean.
+
+- [x] **Evaluation admin published in the README (30 Oct, owner's decision, for the evaluation):** `admin@pulseboard.dev` / `PulseBoard-Admin-2026`, a dedicated throwaway account (not a personal
+      address, password used nowhere else), marked temporary with the steps to remove or lock it. `.env.example` carries the same values so a local run has an admin out of the box;
+      `docs/DEMO.md` has an admin step; D108 records the accepted risk. A test keeps the README, `.env.example` and the real sign-in in step (362 API tests).
+- [ ] **Needs you on Render for the live site:** set `ADMIN_EMAIL=admin@pulseboard.dev` and `ADMIN_PASSWORD=PulseBoard-Admin-2026` under Environment and redeploy. **After the evaluation:** delete both
+      variables (the panel disappears) or change the password.
