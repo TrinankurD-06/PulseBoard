@@ -429,32 +429,6 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `VITE_API_URL`                 | client                 | `/api/v1`                                                                   | API base path (proxied/rewritten to the API)                                                                                                  |
 | `VITE_SOCKET_URL`              | client                 | `http://localhost:4000`                                                     | Socket.io server (the API's public URL in production)                                                                                         |
 
-## Testing
-
-```bash
-npm test
-```
-
-794 tests across six workspaces, all run against an in-memory MongoDB **replica set**
-(so change streams and transactions behave like production):
-
-- **Unit**: incident state machine (incl. flapping and per-type thresholds), uptime maths, SSRF
-  IP checker, check evaluation, schemas, alert formatting, cost estimator, adaptive interval
-  rules, budget states, agent report evaluation; the agent SDK's aggregation, percentiles,
-  route patterns, bounded memory and failure handling.
-- **Upgrade**: HEAD→GET fallback and usage metering; adaptive intervals applied to **real**
-  Agenda jobs; budget warning/slow/pause exactly once and the monthly reset; heartbeat pings,
-  overdue detection with two concurrent detectors; agent reports, silence → probes → incident
-  or degraded; migrations idempotent; workspace usage; one test file proving http, heartbeat
-  and agent monitors get identical uptime, rollups, status pages, incidents and alerts.
-- **Integration**: auth flow incl. refresh rotation and reuse detection; RBAC matrix; monitor
-  CRUD + real Agenda jobs created/cancelled; check runner against a local HTTP server
-  (timeouts, redirects, body cap); incident engine incl. a concurrency race; alert retries;
-  rollups; analytics endpoints; status pages (public endpoint leaks nothing private).
-- **Change streams**: monitor updates emit `check:result`, incident inserts emit
-  `incident:opened`, and events missed during a restart are delivered via resume tokens.
-- Shared core logic coverage: **≥ 90 % statements** (`npm run test:coverage -w @pulseboard/shared`).
-
 ## Deploy
 
 **MongoDB Atlas**: create a cluster (the free M0 tier works; Atlas clusters are replica sets,
