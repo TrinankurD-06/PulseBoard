@@ -58,7 +58,8 @@ export default function TextNav({ wid }) {
                 end={end}
                 className={({ isActive }) =>
                   cn(
-                    'relative block truncate px-0.5 py-3.5 text-center text-[11px] transition-colors duration-200',
+                    'relative block truncate px-0.5 py-3.5 text-center transition-colors duration-200',
+                    items.length > NAV_ITEMS.length ? 'text-[10px]' : 'text-[11px]',
                     isActive ? 'text-fg' : 'text-faint',
                   )
                 }

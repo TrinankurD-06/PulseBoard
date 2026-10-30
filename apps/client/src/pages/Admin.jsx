@@ -67,8 +67,8 @@ function UserRow({ row, now }) {
 
   const Icon = toggle.action === 'start' ? Play : Pause;
   return (
-    <li className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-      <div className="min-w-0 flex-[2_1_16rem]">
+    <li className="grid items-center gap-x-6 gap-y-3 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.3fr)_11rem]">
+      <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-fg">
           <span className="truncate">{row.name}</span>
           {userTags(row).map((tag) => (
@@ -84,7 +84,7 @@ function UserRow({ row, now }) {
         </p>
       </div>
 
-      <div className="min-w-0 flex-[2_1_14rem]">
+      <div className="min-w-0">
         <ul className="space-y-0.5">
           {row.workspaces.map((workspace) => (
             <li
@@ -100,7 +100,7 @@ function UserRow({ row, now }) {
         </div>
       </div>
 
-      <div className="flex-none">
+      <div className="lg:justify-self-end">
         <Button
           variant={
             toggle.action === 'stop'

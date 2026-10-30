@@ -468,5 +468,7 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
 - [x] **Docs**: README "Admin panel" section and the two variables, `.env.example`, `render.yaml` (secrets, `sync: false`), D108.
 - **The admin email and password are NOT in the README, by design:** the repository is public. They are environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 - [ ] **Needs you:** set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (12+ characters) on the Render service and redeploy, then sign in and open Admin.
-- [ ] **Not looked at in a browser** (memory was above the 80 % limit). Check the page in light and dark, and on a phone.
+- [x] **Looked at in a browser** (30 Oct, light and dark, 1440 and 390 px, API mocked): the list, the confirmation (Cancel focused first, Esc sends nothing), Stop sends one request, Start
+      goes straight through, search, and a non-admin gets a 404 with no Admin link. Fixed two things found there: the workspace column did not line up from row to row, and
+      the eight-item phone navigation cut off "Overview" and "Incidents" (the labels are slightly smaller when the Admin link is shown).
 - Gate: agent 49, shared 353, API 357, client 272, demo-target 23, worker 77 tests; ESLint, Prettier and the build clean.
