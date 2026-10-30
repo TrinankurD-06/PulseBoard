@@ -1,5 +1,9 @@
 # PulseBoard
 
+> ## 🎥 [**▶ WATCH THE DEMO VIDEO**](https://drive.google.com/drive/folders/1Z4Ohlq677-Peks-Vh-L0oikaTGp4miEf?usp=sharing)
+>
+> **A full walkthrough of PulseBoard: [open the demo video on Google Drive](https://drive.google.com/drive/folders/1Z4Ohlq677-Peks-Vh-L0oikaTGp4miEf?usp=sharing).**
+
 **Cost-aware uptime monitoring and public status pages, built on the MERN stack.**
 PulseBoard watches your websites, APIs and background jobs, opens an incident when one goes
 down, alerts your team by Email, Discord or Slack, shows everything live on a dashboard,
@@ -17,8 +21,6 @@ change streams are the realtime event bus. No Redis, no message broker.
 **Live demo:** https://pulseboard-ten-alpha.vercel.app (frontend on Vercel, API + worker on a free
 Render service, data on MongoDB Atlas). Use the demo login button on the sign-in page. The free
 backend sleeps when idle, so the first request after a pause can take up to a minute.
-
-**Demo video:** [watch the walkthrough on Google Drive](https://drive.google.com/drive/folders/1Z4Ohlq677-Peks-Vh-L0oikaTGp4miEf?usp=sharing).
 
 ![Dashboard during an outage](docs/screenshots/dashboard-outage.png)
 

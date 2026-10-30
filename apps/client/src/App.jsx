@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './auth/routes.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import ConfirmProvider from './components/ui/ConfirmProvider.jsx';
@@ -39,6 +39,12 @@ const StatusPages = lazy(() => import('./pages/StatusPages.jsx'));
 const Team = lazy(() => import('./pages/Team.jsx'));
 const Usage = lazy(() => import('./pages/Usage.jsx'));
 
+// The admin console lives at /app/admin; these addresses used to (or look like they should) lead there.
+function AdminRest() {
+  const { '*': rest } = useParams();
+  return <Navigate to={`/app/admin${rest ? `/${rest}` : ''}`} replace />;
+}
+
 export default function App() {
   const { pathname } = useLocation();
   return (
@@ -49,6 +55,7 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/status/:slug" element={<PublicStatus />} />
             <Route path="/bot" element={<Bot />} />
+            <Route path="/admin/*" element={<AdminRest />} />
             {/* Outside GuestRoute: it restores the session itself, then honours ?next. */}
             <Route path="/auth/callback" element={<AuthCallback />} />
 
@@ -75,6 +82,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Route>
               <Route path=":wid" element={<AppLayout />}>
+                <Route path="admin/*" element={<AdminRest />} />
                 <Route index element={<Dashboard />} />
                 <Route path="monitors/new" element={<NewMonitor />} />
                 <Route path="import/github" element={<GithubImport />} />
