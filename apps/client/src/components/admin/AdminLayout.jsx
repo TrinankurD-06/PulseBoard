@@ -17,7 +17,7 @@ const linkClasses = 'block py-1 text-[13px] transition-colors duration-200 ease-
  * a platform administrator gets the ordinary "not found" page, as the server does.
  */
 export default function AdminLayout() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, workspaces } = useAuth();
   if (!isAdmin) return <NotFound message="This page doesn't exist." />;
 
   return (
@@ -50,7 +50,7 @@ export default function AdminLayout() {
               ))}
               <li className="sm:ml-auto">
                 <Link
-                  to="/app"
+                  to={workspaces?.[0] ? `/app/${workspaces[0].id}` : '/app'}
                   className={cn(linkClasses, 'flex items-center gap-1.5 text-muted hover:text-fg')}
                 >
                   <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

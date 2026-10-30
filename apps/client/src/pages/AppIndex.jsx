@@ -6,11 +6,15 @@ import CreateWorkspaceModal from '../components/layout/CreateWorkspaceModal.jsx'
 import Button from '../components/ui/Button.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 
-/** /app: jump to the first workspace, or offer to create one if there are none. */
+/**
+ * /app: platform administrators land on the admin console; everyone else jumps to the first
+ * workspace, or is offered to create one if there are none.
+ */
 export default function AppIndex() {
-  const { workspaces } = useAuth();
+  const { workspaces, isAdmin } = useAuth();
   const [creating, setCreating] = useState(false);
 
+  if (isAdmin) return <Navigate to="/app/admin" replace />;
   if (workspaces.length > 0) return <Navigate to={`/app/${workspaces[0].id}`} replace />;
 
   return (
