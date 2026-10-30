@@ -41,7 +41,12 @@ import NotFound from '../NotFound.jsx';
 
 // The charts (and the chart library, the bulk of this page's JavaScript) load as
 // their own chunks, so the title, gauge and actions paint without waiting for them.
-const HealthDeck = lazy(() => import('../../components/health/HealthDeck.jsx'));
+// Every monitor type shows the Health deck, so its chunk starts downloading as soon as this
+// page's code loads, in parallel with the monitor request, instead of after the data arrives
+// (a lazy() component is otherwise only fetched at its first render).
+const loadHealthDeck = () => import('../../components/health/HealthDeck.jsx');
+loadHealthDeck();
+const HealthDeck = lazy(loadHealthDeck);
 const MonitorAnalytics = lazy(() => import('../../components/monitors/MonitorAnalytics.jsx'));
 const AgentAnalytics = lazy(() => import('../../components/monitors/AgentAnalytics.jsx'));
 const AgentSetup = lazy(() => import('../../components/monitors/AgentSetup.jsx'));

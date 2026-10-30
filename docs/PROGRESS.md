@@ -448,3 +448,5 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
 - [ ] **Needs you on Render:** create a Brevo API key (SMTP & API → API keys), verify one sender address in Brevo (Senders & IP → Senders), then set
       `BREVO_API_KEY` and `ALERT_FROM_EMAIL` (for example `PulseBoard <you@gmail.com>`, exactly the verified address) and redeploy. Then use "Test" on an
       email channel with a different address.
+- [x] Monitor page: the Health deck chunk (with the chart library) now starts downloading when the page's code loads, in parallel with the monitor request, instead of
+      after the data arrives. A waterfall fix; **not measured** (needs a quiet-machine Lighthouse, median of three, see above).
