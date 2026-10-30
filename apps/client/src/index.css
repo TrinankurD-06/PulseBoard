@@ -103,6 +103,16 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* The open list of a native <select> is drawn by the browser: give it the theme colours so it is never white-on-white. */
+  select {
+    color-scheme: inherit;
+  }
+  select option,
+  select optgroup {
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
   ::selection {
     background: color-mix(in oklab, var(--accent) 30%, transparent);
   }

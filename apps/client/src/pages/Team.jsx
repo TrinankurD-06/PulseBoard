@@ -132,7 +132,7 @@ function MemberRow({ member, wid, isOwner, isSelf }) {
             value={member.role}
             onChange={onRoleChange}
             disabled={changeRole.isPending}
-            className={cn(inputClasses, 'w-32 py-1.5')}
+            className={cn(inputClasses, 'w-32 py-1.5 [&>option]:bg-bg [&>option]:text-fg')}
           >
             <option value={ROLES.VIEWER}>Viewer</option>
             <option value={ROLES.MEMBER}>Member</option>
