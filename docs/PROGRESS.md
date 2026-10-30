@@ -432,7 +432,10 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       workspace-creation modal, the form library, `zod` and the shared schemas. The shell is now loaded on demand (only when a signed-in user lands on an error page).
       Also: `lib/monitorType.js` (the monitor-type checks without the schemas), and the agent and heartbeat setup panels load lazily on the monitor page.
 - Result (uncompressed JavaScript, from the build manifest): first load of any page about 600 KB → 413 KB; monitor-detail critical path 669 KB → 558 KB.
-- [ ] **Not measured with Lighthouse:** memory was above the 80 % limit. Re-run the monitor-detail check (was 83 performance, target 85) when memory allows.
+- [x] **Lighthouse re-run (30 Oct), monitor detail:** performance **78** (LCP 3.5 s, blocking time 500 ms), accessibility 100, best practices 100. This is
+      below the earlier 83, but the run was taken under memory pressure (peak 87 %) and with other sessions using the CPU, so it is noisy; it does not show that
+      the smaller first download helped or hurt. Still under the 85 target. To settle it: run it three times on a quiet machine and take the median.
+      (Bundle numbers above are exact; the Lighthouse scores are not.)
 
 ---
 
