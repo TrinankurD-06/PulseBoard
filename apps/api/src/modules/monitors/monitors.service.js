@@ -286,12 +286,14 @@ export function createMonitorService({ env, scheduler, schemas }) {
       return fresh;
     },
 
-    async pause(workspaceId, monitorId) {
+    async pause(workspaceId, monitorId, { reason = PAUSED_REASONS.USER } = {}) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
+      // Pausing again must not turn an administrator's stop into one the user can undo.
+      if (monitor.isPaused && monitor.pausedReason === PAUSED_REASONS.ADMIN) return monitor;
       monitor.set({
         isPaused: true,
         status: MONITOR_STATUS.PAUSED,
-        pausedReason: PAUSED_REASONS.USER,
+        pausedReason: reason,
       });
       await monitor.save();
       await openPause(monitor._id, new Date());
@@ -310,8 +312,15 @@ export function createMonitorService({ env, scheduler, schemas }) {
      * next check. A monitor paused because this month's budget ran out can only
      * resume after the budget is raised (or next month).
      */
-    async resume(workspaceId, monitorId) {
+    async resume(workspaceId, monitorId, { byAdmin = false } = {}) {
       const monitor = await findInWorkspace(workspaceId, monitorId);
+      if (monitor.pausedReason === PAUSED_REASONS.ADMIN && !byAdmin) {
+        throw new AppError(
+          403,
+          'STOPPED_BY_ADMIN',
+          'This monitor was stopped by an administrator and only they can start it again',
+        );
+      }
       const now = new Date();
       if (isHeartbeat(monitor)) {
         // A full period (plus grace) from now before a missing ping counts.

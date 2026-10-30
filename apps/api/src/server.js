@@ -8,6 +8,7 @@ import {
   ensureAgendaIndexes,
 } from '@pulseboard/shared/scheduling';
 import { createApp } from './app.js';
+import { ensureAdminAccount } from './modules/admin/admin.service.js';
 import { startCombinedWorker } from './combined.js';
 import { env } from './config/env.js';
 import { createTokenService } from './lib/tokens.js';
@@ -21,6 +22,9 @@ async function main() {
   if (urlWarning) logger.warn(urlWarning);
   await connectMongo(env.MONGODB_URI, logger);
   await ensureCollections();
+  const adminState = await ensureAdminAccount({ env, logger });
+  if (adminState === 'disabled')
+    logger.info('Admin panel off: set ADMIN_EMAIL and ADMIN_PASSWORD to enable it');
 
   // This instance only *writes* jobs and never calls agenda.start(). Checks run
   // in the worker: a separate process, or (RUN_MODE=combined) the one started below.

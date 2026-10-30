@@ -1,4 +1,10 @@
-import { alertEnvFields, demoEnvFields, loadEnv, parseEnv } from '@pulseboard/shared/env';
+import {
+  adminEnvFields,
+  alertEnvFields,
+  demoEnvFields,
+  loadEnv,
+  parseEnv,
+} from '@pulseboard/shared/env';
 import { z } from 'zod';
 
 loadEnv();
@@ -45,6 +51,7 @@ export const envSchema = z.object({
     .default(''),
   ...alertEnvFields,
   ...demoEnvFields,
+  ...adminEnvFields,
 });
 
 // Hosting platforms (Render, Heroku...) tell web services which port to use via PORT.

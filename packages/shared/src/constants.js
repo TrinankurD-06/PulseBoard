@@ -146,7 +146,13 @@ export const ADAPTIVE_DEFAULT_MAX_INTERVAL_SEC = 600;
 export const BUDGET_ACTIONS = Object.freeze(['slow', 'pause']);
 export const BUDGET_WARNING_RATIO = 0.8;
 export const BUDGET_SLOW_INTERVAL_SEC = 900;
-export const PAUSED_REASONS = Object.freeze({ USER: 'user', BUDGET: 'budget_exceeded' });
+// ADMIN: stopped from the admin panel. Only an administrator can start it again (a user who
+// paused a monitor themselves can resume it; one the admin stopped cannot).
+export const PAUSED_REASONS = Object.freeze({
+  USER: 'user',
+  BUDGET: 'budget_exceeded',
+  ADMIN: 'admin',
+});
 
 // Alerts that aren't about an incident (sent by the send-notice job).
 export const NOTICE_KIND = Object.freeze({

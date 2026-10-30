@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import { AppError, conflict, unauthorized } from '../../lib/errors.js';
 import { createTokenCrypto } from '../../lib/tokenCrypto.js';
 import { hashToken } from '../../lib/tokens.js';
+import { isAdminEmail } from '../admin/admin.service.js';
 import { createWorkspaceWithOwner, toWorkspaceDto } from '../workspaces/workspaces.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -182,7 +183,7 @@ export function createAuthService({ env, tokens, logger }) {
       const workspaces = memberships
         .filter((membership) => membership.workspaceId)
         .map((membership) => toWorkspaceDto(membership.workspaceId, membership.role));
-      return { user, workspaces };
+      return { user, workspaces, isAdmin: isAdminEmail(env, user.email) };
     },
   };
 }

@@ -15,6 +15,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 import { alertChannelsRouter } from './modules/alertChannels/alertChannels.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { adminRouter } from './modules/admin/admin.routes.js';
 import { githubRouter } from './modules/github/github.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { incidentsRouter } from './modules/incidents/incidents.routes.js';
@@ -108,6 +109,7 @@ export function createApp({
   api.use('/ping', pingRouter({ processCheckResult }));
   // Agent reports (U4): public, the Bearer agent key is the authentication.
   api.use('/agent', agentRouter({ processCheckResult }));
+  api.use('/admin', requireAuth, adminRouter({ env, scheduler, schemas: monitorSchemas }));
   api.use('/workspaces', requireAuth, workspacesRouter({ scheduler, env }));
   api.use('/workspaces/:wid/members', requireAuth, membersRouter());
   // Analytics first: its '/sparklines' must not be captured by the CRUD router's '/:mid'.

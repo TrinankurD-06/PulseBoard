@@ -50,6 +50,22 @@ export const alertEnvFields = {
 };
 
 /**
+ * The admin panel. The administrator is the account with ADMIN_EMAIL; the API creates it at start-up
+ * with ADMIN_PASSWORD (and re-syncs the password when this variable changes). With either one
+ * unset there is no admin and the panel does not exist. Never put real values in the repository.
+ */
+export const adminEnvFields = {
+  ADMIN_EMAIL: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined),
+    z.string().email().optional(),
+  ),
+  ADMIN_PASSWORD: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() ? value.trim() : undefined),
+    z.string().min(12, 'ADMIN_PASSWORD must be at least 12 characters').optional(),
+  ),
+};
+
+/**
  * Public-demo settings, shared by the API (meta, workspace creation), the worker (daily reset) and
  * the seed. DEMO_READ_ONLY makes the demo user a read-only Viewer; DEMO_OWNER_EMAIL names the
  * account that owns the demo workspace (empty: a login-less one is created).
