@@ -1633,12 +1633,12 @@ agendaName })` (`apps/worker/src/worker.js`, exported as `@pulseboard/worker/sta
 - **Need:** see every user (the demo account too) and stop or start a user's monitors with one button.
 - **Who is the admin:** the account whose email equals `ADMIN_EMAIL`. The API creates it at start-up with `ADMIN_PASSWORD`
   and re-syncs the password when the variable changes, so the secret lives only in the environment. Both must be set
-  (password of 12+ characters) or there is no admin; a short password logs a warning and disables only the panel, so a
+  (password of 8+ characters) or there is no admin; a short password logs a warning and disables only the panel, so a
   typo cannot stop the API from starting. Creating the account at boot also means nobody can register the admin address
   first. **The credentials are deliberately not in the README**: the repository is public, so a password there would let
   anyone stop everyone's monitors. The README documents the variables and the steps instead.
   **Amended for the evaluation:** the project is graded by someone who has to be able to sign in as the admin, so the
-  README now publishes a dedicated, throwaway account (`admin@pulseboard.dev`, not a personal address, with a password used nowhere
+  README now publishes a dedicated, throwaway account (`admin@pulseboard.com` / `admin123`, chosen by the owner: a dedicated address that is not a personal one; the password is short and guessable, which is why it is published as temporary and used nowhere
   else), marked temporary, with the steps to remove it (delete the two variables) or lock it (change the password) afterwards.
   `.env.example` carries the same values so a local run has an admin out of the box. The risk accepted: until it is removed,
   anyone who reads the README can sign in to a deployment that has these values and stop that deployment's monitors.

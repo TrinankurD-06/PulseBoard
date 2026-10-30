@@ -478,3 +478,7 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       `docs/DEMO.md` has an admin step; D108 records the accepted risk. A test keeps the README, `.env.example` and the real sign-in in step (362 API tests).
 - [ ] **Needs you on Render for the live site:** set `ADMIN_EMAIL=admin@pulseboard.dev` and `ADMIN_PASSWORD=PulseBoard-Admin-2026` under Environment and redeploy. **After the evaluation:** delete both
       variables (the panel disappears) or change the password.
+
+- [x] **Owner's own evaluation admin (30 Oct):** the owner set `ADMIN_EMAIL=admin@pulseboard.com` and `ADMIN_PASSWORD=admin123` on Render. The 12-character minimum would have refused that password
+      (the API would have logged a warning and created no admin), so the minimum is now **8**, and the README and `.env.example` show these values. The earlier values in this file
+      (`admin@pulseboard.dev` / `PulseBoard-Admin-2026`) are superseded. **Needs a redeploy** of the API on Render with this commit before the admin exists on the live site.

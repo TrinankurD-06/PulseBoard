@@ -20,7 +20,7 @@ export function isAdminEmail(env, email) {
  * nothing unless both are set. Creating it at start-up also means nobody can register the
  * admin address first. Returns 'disabled' | 'weak-password' | 'created' | 'updated' | 'unchanged'.
  */
-export const MIN_ADMIN_PASSWORD_LENGTH = 12;
+export const MIN_ADMIN_PASSWORD_LENGTH = 8;
 
 export async function ensureAdminAccount({ env, logger, bcryptCost = env.BCRYPT_COST }) {
   if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD) return 'disabled';

@@ -281,11 +281,11 @@ describe('ensureAdminAccount', () => {
     const warnings = [];
     const logger = { info() {}, warn: (message) => warnings.push(message) };
     const result = await ensureAdminAccount({
-      env: { ...adminEnv, ADMIN_PASSWORD: 'short' },
+      env: { ...adminEnv, ADMIN_PASSWORD: 'tiny' },
       logger,
     });
     expect(result).toBe('weak-password');
-    expect(warnings[0]).toMatch(/shorter than 12/);
+    expect(warnings[0]).toMatch(/shorter than 8/);
     expect(await User.exists({ email: 'root@example.com' })).toBeNull();
   });
 

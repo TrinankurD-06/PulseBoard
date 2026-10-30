@@ -284,10 +284,10 @@ button.
 
 For the evaluation of this project, a dedicated admin account is published here:
 
-|              |                         |
-| ------------ | ----------------------- |
-| **Email**    | `admin@pulseboard.dev`  |
-| **Password** | `PulseBoard-Admin-2026` |
+|              |                        |
+| ------------ | ---------------------- |
+| **Email**    | `admin@pulseboard.com` |
+| **Password** | `admin123`             |
 
 Sign in on the normal login page, then open **Admin** in the navigation.
 
@@ -303,10 +303,10 @@ Sign in on the normal login page, then open **Admin** in the navigation.
 
 #### How the admin account works
 
-1. `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 12 characters) in the API's environment define it.
+1. `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 8 characters) in the API's environment define it.
 2. At start-up the API creates that account (or, if it exists, makes its password match
    `ADMIN_PASSWORD`, so changing the variable is how you change the password).
-3. If only one of the two is set, or the password is shorter than 12 characters, the admin is simply not
+3. If only one of the two is set, or the password is shorter than 8 characters, the admin is simply not
    created and the API logs why; the rest of PulseBoard runs normally.
 
 What the panel does:
@@ -374,7 +374,7 @@ All variables live in one `.env` at the repository root (see `.env.example`).
 | `DEMO_READ_ONLY`               | api, worker            | `false`                                                                     | Public demo: the demo user is a read-only Viewer, a banner says so, and the worker resets the demo data daily                                 |
 | `DEMO_OWNER_EMAIL`             | api, worker, seed      | empty                                                                       | Account that owns the demo workspace when `DEMO_READ_ONLY=true`; empty = a login-less owner account                                           |
 | `ADMIN_EMAIL`                  | api                    | empty                                                                       | The administrator's email. With `ADMIN_PASSWORD`, enables the admin panel. Set it as a secret, never in the repo                              |
-| `ADMIN_PASSWORD`               | api                    | empty                                                                       | The administrator's password, at least 12 characters. The API creates the account and keeps its password in line with this value              |
+| `ADMIN_PASSWORD`               | api                    | empty                                                                       | The administrator's password, at least 8 characters. The API creates the account and keeps its password in line with this value               |
 | `SEED_DISCORD_WEBHOOK_URL`     | seed                   | empty                                                                       | Creates a Discord channel when seeding                                                                                                        |
 | `SEED_SLACK_WEBHOOK_URL`       | seed                   | empty                                                                       | Creates a Slack channel when seeding                                                                                                          |
 | `SEED_ALERT_EMAIL`             | seed                   | empty                                                                       | Email channel target (default: the demo user)                                                                                                 |

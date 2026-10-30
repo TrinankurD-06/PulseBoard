@@ -37,8 +37,8 @@ describe('the evaluation admin account in the README', () => {
     expect(readme).toContain(`\`${password}\``);
   });
 
-  it('is not a personal address', () => {
-    expect(email.endsWith('@pulseboard.dev')).toBe(true);
+  it('is the dedicated evaluation address, not a personal one', () => {
+    expect(email).toBe('admin@pulseboard.com');
   });
 
   it('parses with the API environment schema', () => {
