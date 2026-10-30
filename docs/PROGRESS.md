@@ -450,3 +450,7 @@ Memory kept at or below 80 % (a second Claude session runs beside this one). Hea
       email channel with a different address.
 - [x] Monitor page: the Health deck chunk (with the chart library) now starts downloading when the page's code loads, in parallel with the monitor request, instead of
       after the data arrives. A waterfall fix; **not measured** (needs a quiet-machine Lighthouse, median of three, see above).
+- [x] **Clean Lighthouse measurement (30 Oct), monitor detail, three runs in one signed-in session** (mobile profile, production build; memory peaked at 83 %):
+      performance **79, 83, 84 → median 83** (the first run is cold), accessibility 100, best practices 100; main content 2.6 to 3.3 s, blocking time about 500 ms,
+      layout shift 0.001 (was 0.023). Progress over the work: 60 → 83. Still 2 points under the target of 85; the remaining cost is script work on the page
+      (the chart library, about 500 ms of blocking). Next step if it matters: draw the four small trend cards without the chart library.
