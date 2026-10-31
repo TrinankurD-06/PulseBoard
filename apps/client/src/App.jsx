@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './auth/routes.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
+import TesterScript from './components/TesterScript.jsx';
 import ConfirmProvider from './components/ui/ConfirmProvider.jsx';
 import FullPageSpinner from './components/ui/FullPageSpinner.jsx';
 import Landing from './pages/Landing.jsx';
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <AppErrorBoundary resetKey={pathname}>
       <ConfirmProvider>
+        <TesterScript />
         <Suspense fallback={<FullPageSpinner />}>
           <Routes>
             <Route path="/" element={<Landing />} />
