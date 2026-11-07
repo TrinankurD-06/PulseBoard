@@ -13,7 +13,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@300;400;500;600&display=swap"
     />
-    <title>PulseBoard</title>
+    <title>Uptime monitoring · PulseBoard</title>
     <script>
       // Sets the theme before first paint so there is no flash. Keep in step with src/lib/theme.js.
       (function () {
@@ -30,6 +30,29 @@
           document.querySelector('meta[name="theme-color"]').setAttribute('content', '#fbf3e8');
       })();
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "PulseBoard",
+        "url": "https://pulseboard-ten-alpha.vercel.app/",
+        "description": "PulseBoard: uptime monitoring and public status pages."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "PulseBoard",
+        "url": "https://pulseboard-ten-alpha.vercel.app/"
+      }
+    </script>
+    <link rel="canonical" href="https://pulseboard-ten-alpha.vercel.app/" />
+    <meta property="og:title" content="Uptime monitoring · PulseBoard" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://pulseboard-ten-alpha.vercel.app/" />
+    <meta property="og:description" content="PulseBoard: uptime monitoring and public status pages." />
+    <meta name="twitter:card" content="summary" />
   </head>
   <body>
     <div id="root"></div>

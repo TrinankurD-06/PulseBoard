@@ -1,0 +1,7 @@
+# PulseBoard
+
+> PulseBoard: uptime monitoring and public status pages.
+
+## Pages
+
+- [Uptime monitoring · PulseBoard](https://pulseboard-ten-alpha.vercel.app/): PulseBoard: uptime monitoring and public status pages.
